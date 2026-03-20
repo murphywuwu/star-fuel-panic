@@ -1,0 +1,14 @@
+[package]
+name = "killmail_bingo_ops"
+edition = "2024.beta"
+version = "0.0.1"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.68.0" }
+
+[addresses]
+killmail_bingo_ops = "0x0"
+
+[environments]
+devnet = "3d6c67b7"
+testnet = "4c78adac"

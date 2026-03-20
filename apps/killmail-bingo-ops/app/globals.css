@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --eve-yellow: #E5B32B;
+  --eve-black: #080808;
+  --eve-grey: #1A1A1A;
+  --eve-red: #CC3300;
+  --eve-offwhite: #E0E0E0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background-color: var(--eve-black);
+  color: var(--eve-offwhite);
+}
+
+body {
+  font-family: var(--font-body), sans-serif;
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(229, 179, 43, 0.12), transparent 42%),
+    radial-gradient(circle at 82% 80%, rgba(204, 51, 0, 0.1), transparent 38%);
+}
+
+.panel {
+  background: rgba(8, 8, 8, 0.86);
+  border: 1px solid #333;
+  border-left: 2px solid var(--eve-yellow);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.tactical-btn {
+  background: var(--eve-yellow);
+  color: #0d0d0d;
+  border: 1px solid #000;
+  border-right: 4px solid #000;
+  border-bottom: 4px solid #000;
+  text-transform: uppercase;
+  font-weight: 700;
+  transition: transform 80ms linear, filter 120ms linear;
+}
+
+.tactical-btn:hover {
+  filter: brightness(1.08);
+}
+
+.tactical-btn:active {
+  transform: translateY(1px);
+}
+
+.tactical-btn:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 1px solid var(--eve-yellow);
+  outline-offset: 2px;
+}

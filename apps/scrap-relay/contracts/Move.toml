@@ -1,0 +1,12 @@
+[package]
+name = "scrap_relay"
+version = "0.0.1"
+edition = "2024.beta"
+
+[dependencies]
+
+[addresses]
+scrap_relay = "0x0"
+
+[environments]
+devnet = "3d6c67b7"
