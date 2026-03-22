@@ -1,6 +1,6 @@
 # SPEC Template (Per Project)
 
-> Canonical file location: `apps/<project-name>/spec.md` (do not place project SPEC under `docs/`).
+> Canonical file location: `docs/SPEC.md`.
 
 ## 0. One-Screen Implementation Summary (Problem / Why / How)
 
@@ -136,7 +136,7 @@
 
 ## 8. TODO Mapping
 
-- Every interface/feature in this SPEC must map to an actionable item in project `todo.md`.
+- Every interface/feature in this SPEC must map to an actionable item in project `docs/TODO.md`.
 
 | TODO ID | Linked Layer | Linked Feature | Linked PRD AC | Description | Status |
 |---|---|---|---|---|---|

@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This file defines how coding/documentation agents should use project docs as authoritative context in this monorepo, and defines the default delivery workflow from idea to implementation.
+This file defines how documentation agents should use project docs as authoritative context in this single-project repository, and defines the default delivery workflow from idea to implementation.
 
 ## Repository Profile
 
-- Structure: monorepo.
+- Structure: single-project repository.
 - Frontend stack: TypeScript, Next.js, Tailwind CSS, Zustand.
 - Contract layer: Sui Move.
 - First mini-game: `Neural Sync: Civilization Code Reconstruction`.
@@ -20,22 +20,20 @@ Four working roles are defined and must be used by intent.
 Ownership:
 
 - Product design and decomposition only.
-- Create and maintain PRD/SPEC/TODO artifacts.
+- Create and maintain PRD artifacts only.
 
 Must do:
 
 - Create PRD first (if missing).
-- Create per-project SPEC based on PRD + architecture constraints.
-- Create per-project `todo.md` with atomic checkable tasks.
-- For project initialization, create project workspace under `apps/<project-name>/` first.
-- Store planning artifacts inside the project folder:
-  - SPEC path (canonical): `apps/<project-name>/spec.md`
-  - TODO path (canonical): `apps/<project-name>/todo.md`
-- Keep PRD/SPEC aligned with approved scope decisions.
+- Store and maintain PRD at canonical path:
+  - PRD path (canonical): `docs/PRD.md`
+- Keep PRD aligned with approved scope decisions.
+- Ensure PRD is implementation-brief ready for downstream engineering planning.
 
 Must not do:
 
 - Direct business code implementation, except small doc-related stubs when explicitly requested.
+- Create or maintain `docs/SPEC.md` and `docs/TODO.md` as part of PM baseline responsibilities.
 
 PM quality bar (mandatory):
 
@@ -59,17 +57,14 @@ PM quality bar (mandatory):
   - PM answer must be readable in 30s:
     - reviewer can directly locate these three answers without scanning full monetization text.
   - include phase-based scope split (P0/P1) and explicit non-goals.
-- SPEC must be implementation-ready:
-  - first screen must communicate `Problem -> Why -> How -> Expected Outcome` for implementation scope.
-  - add one-screen implementation summary at the top of each SPEC.
-  - define layer contracts, state transitions, and error contracts.
-  - define side-effect ownership and retry/idempotency policy.
-  - map each PRD acceptance criterion to TODO tasks.
-- TODO must be execution-ready:
-  - first screen must communicate `Problem -> Why -> How -> Expected Outcome` for the current execution batch.
-  - include before/after execution value statement for this batch.
-  - each task is atomic, checkable, and linked to feature + layer + acceptance signal.
-  - include dependencies and ordering for critical path items.
+- PRD must include professional product sections:
+  - target users/personas and user pain.
+  - JTBD and usage scenarios.
+  - user journey and key interaction flow.
+  - functional requirements with explicit business rules.
+  - non-functional requirements and constraints.
+  - dependencies, risks, open questions, and decision log.
+  - measurable success metrics and guardrail metrics.
 
 PM discussion mode (Q&A + doc sync, mandatory):
 
@@ -90,61 +85,65 @@ PM discussion mode (Q&A + doc sync, mandatory):
   - Every discussion that changes decisions must be recorded in affected PRD under `## 12. PM Discussion Log`.
   - Log must include date, user question summary, PM answer summary, decision type, and changed sections.
 
-### Design Agent
+### Architecture Agent
 
 Ownership:
 
-- UI/UX design description generation based on approved PRD scope.
-- Update design output directly inside the same PRD document (no separate design doc by default).
+- System architecture design and interface contract design.
+- Create and maintain architecture/SPEC artifacts.
 
 Must do:
 
-- Read target PRD first, then treat `docs/eve-frontier-ui-style-guide.md` as mandatory design source.
-- Write/update PRD design sections with implementation-ready description (screen-level, component-level, state-level).
-- For each key screen, clearly define:
-  - screen goal and target user action
-  - layout structure and key modules
-  - CTA behavior and interaction feedback
-  - empty/loading/error states
-  - responsive notes and accessibility notes
-- Map visual decisions to style guide tokens (color/typography/interaction language) and avoid listed anti-patterns.
-- Keep design description aligned with existing product scope, game loop, and monetization logic in PRD.
+- Read approved PRD first.
+- Produce/update architecture document at canonical path:
+  - `docs/architecture.md`
+- Produce/update SPEC interface document at canonical path:
+  - `docs/SPEC.md`
+- Define implementation-ready contracts:
+  - module/layer boundaries and dependency direction
+  - state ownership and data flow
+  - side-effect ownership and retry/idempotency policy
+  - error contracts and observability contracts
+  - integration boundaries (on-chain/off-chain, internal/external)
+- Map PRD acceptance criteria to SPEC sections.
 
 Must not do:
 
 - Direct business code implementation.
-- Change business scope/logic/monetization without PM alignment.
-- Output generic visual language that ignores EVE Frontier tactical style constraints.
+- Replace PM product scope decisions without PM alignment.
+- Skip architecture/SPEC updates when interface contracts change.
 
-Design discussion mode (Q&A + PRD sync, mandatory):
+Architecture discussion mode (Q&A + doc sync, mandatory):
 
 - Trigger:
-  - Any time user asks UI/UX/interaction/style-related questions in design intent.
+  - Any time user asks architecture, layering, boundary, or interface-contract questions.
 - Response contract:
   - Answer directly with recommendation + rationale.
-  - Explicitly state if this answer changes PRD design description.
+  - Explicitly state if architecture/SPEC baseline changes.
 - Documentation sync behavior:
-  - If design decision changes, update PRD in the same turn.
-  - If not changing design baseline, explicitly state `No PRD design update required`.
+  - If architecture decision changes, update `docs/architecture.md` and/or `docs/SPEC.md` in the same turn.
+  - If not changing architecture baseline, explicitly state `No architecture/SPEC update required`.
 
-### Coding Agent
+### Todo Agent
 
 Ownership:
 
-- Implement code strictly from existing TODO artifacts.
-- Execute tests and report technical outcomes.
+- Create and maintain execution planning artifact (`docs/TODO.md`) from approved PRD + SPEC.
+- Keep implementation task decomposition clear, atomic, and traceable.
 
 Must do:
 
-- Read relevant PRD/SPEC/TODO before coding.
-- Update `todo.md` by marking completed tasks immediately.
-- When user reports issues: add fix tasks into `todo.md` first, then implement.
-- Update SPEC/PRD when implementation changes interfaces, behavior, or scope.
+- Read relevant PRD/SPEC before TODO planning.
+- If `docs/TODO.md` is missing, create it first from PRD + SPEC.
+- Keep `docs/TODO.md` aligned with implementation reality.
+- Break work into atomic, checkable tasks with acceptance signals and dependency order.
+- When user reports issues: add fix tasks into `docs/TODO.md` first.
+- Mark task status updates immediately when progress changes.
 
 Must not do:
 
+- Directly implement business code as part of Todo Agent baseline responsibility.
 - Skip TODO creation for requested changes.
-- Ignore architecture/style/testing constraints.
 
 ### Testing Agent
 
@@ -155,11 +154,11 @@ Ownership:
 
 Must do:
 
-- Create and maintain per-project test plan using `docs/templates/test-plan-template.md`.
+- Create and maintain the project test plan using `docs/templates/test-plan-template.md`.
 - Build test cases covering main flow, error flow, and edge cases.
 - Validate architecture constraints and style/testing standards when applicable.
 - For contract tasks, run CLI-first verification with default `devnet` integration checks.
-- When defects are found: update `todo.md` first with bugfix tasks, then hand over to Coding Agent.
+- When defects are found: update `docs/TODO.md` first with bugfix tasks, then hand over to implementation owner.
 - Re-run targeted regression and critical-path regression after fixes.
 
 Must not do:
@@ -181,6 +180,7 @@ For every task (code or documentation), the agent must:
 - Do not load unrelated docs by default.
 - Prefer minimal, high-relevance context.
 - If a required doc is missing, proceed with best-effort implementation and clearly state assumptions.
+- For any coding/implementation task, read `docs/PRD.md`, `docs/SPEC.md`, and `docs/architecture.md` before writing code.
 - For feature feasibility assessment that depends on on-chain capabilities, treat `docs/all_contracts.move.txt` as mandatory contract source context.
 
 3. Frontend architecture is mandatory:
@@ -192,18 +192,15 @@ For every task (code or documentation), the agent must:
   - Service can access Model only.
 - Enforce Zustand-only implementation for Model layer.
 
-4. UI style constraints:
-- Treat `docs/eve-frontier-ui-style-guide.md` as mandatory reference for any UI-related output.
-
-5. Sui contract testing constraints:
+4. Sui contract testing constraints:
 - Treat `docs/sui-devnet-testing-standard.md` as mandatory for all contract-related tasks.
 - Contract testing is CLI-first.
 - Default integration test network is `devnet`.
 - Contract delivery must include executed test commands and key verification outcomes.
 
-6. Keep output consistent with project stack and tone:
+5. Keep output consistent with project stack and tone:
 - Tactical, industrial, hard sci-fi UX language.
-- Monorepo-friendly structure.
+- Single-project-friendly structure.
 - Frontend output compatible with Next.js + Tailwind + Zustand.
 - Contract examples aligned with Sui Move patterns.
 
@@ -218,15 +215,15 @@ When user confirms an idea and asks for implementation, follow this workflow ord
   - business logic description for each feature
   - scope boundaries and acceptance notes
 
-2. Design stage (in-PRD, mandatory for UI-heavy features)
-- Design Agent expands PRD with interface design description directly in PRD.
-- Must reference `docs/eve-frontier-ui-style-guide.md` and include screen-level + state-level behavior.
-- No separate design document by default unless user explicitly requests one.
-
-3. SPEC stage (per project/app)
-- Based on PRD (including design section) and `docs/architecture.md`, create one SPEC per project.
-- SPEC must be created under app project folder, not under `docs/`:
-  - `apps/<project-name>/spec.md`
+2. Architecture and SPEC stage (Architecture Agent)
+- Based on PRD, produce architecture and interface docs:
+  - `docs/architecture.md`
+  - `docs/SPEC.md`
+- Architecture must define:
+  - layer boundaries and dependency direction
+  - state/data ownership and flows
+  - side-effect ownership and error/retry contracts
+  - integration boundaries
 - SPEC must define layer-level interfaces and contracts:
   - View layer interfaces/events
   - Controller handlers/use-cases
@@ -234,56 +231,56 @@ When user confirms an idea and asks for implementation, follow this workflow ord
   - Model (Zustand) state/actions/selectors
 - Enforce dependency direction in SPEC: `View -> Controller -> Service -> Model`.
 
-4. TODO stage (per project/app)
-- Create `todo.md` under each app project folder:
-  - `apps/<project-name>/todo.md`
+3. TODO planning stage (Todo Agent)
+- Based on approved PRD + SPEC, create execution task list:
+  - `docs/TODO.md`
 - Break implementation into atomic tasks with checkboxes.
 - Tasks should map back to SPEC interfaces and PRD features.
 
-5. Execution stage
-- Implement code strictly from `todo.md`.
-- As each task is finished, mark it done immediately in `todo.md`.
-- Keep implementation aligned with PRD and SPEC.
+4. Execution stage
+- Implement code strictly from `docs/TODO.md`.
+- As each task is finished, mark it done immediately in `docs/TODO.md`.
+- Keep implementation aligned with PRD, SPEC, and architecture constraints.
 
-6. Testing stage
+5. Testing stage
 - Testing Agent creates/updates test plan and executes verification.
-- For defects, update `todo.md` first, then hand over fix implementation.
+- For defects, update `docs/TODO.md` first, then hand over fix implementation.
 - Re-test after fixes and record outcomes.
 
-7. Bugfix/change-request stage
+6. Bugfix/change-request stage
 - When user reports issues after testing:
-  - first update related `todo.md` with new fix tasks
+  - first update related `docs/TODO.md` with new fix tasks
   - then implement code changes
   - mark completed fix tasks as done
 - After code changes, update SPEC and PRD in real time when behavior/scope/interfaces changed.
 
 ## Documentation Synchronization Rules
 
-- `todo.md` is the execution source of truth for active implementation status.
+- `docs/TODO.md` is the execution source of truth for active implementation status.
 - SPEC must always reflect current interface boundaries after changes.
 - PRD must reflect current product behavior/scope when business logic changes.
-- PRD must also reflect latest approved UI design description (screen flow, states, style mapping).
 - Canonical file placement for implementation planning artifacts:
-  - PRD remains in `docs/prd/<product-name>/prd.md`.
-  - SPEC must be app-local: `apps/<project-name>/spec.md`.
-  - TODO must be app-local: `apps/<project-name>/todo.md`.
-  - If `apps/<project-name>/` does not exist, PM Agent must create it during initialization.
+  - PRD must be stored in `docs/` directly (default canonical path: `docs/PRD.md`).
+  - Architecture doc must be project-local: `docs/architecture.md`.
+  - SPEC must be project-local: `docs/SPEC.md`.
+  - TODO must be project-local: `docs/TODO.md`.
+- Ownership split for planning artifacts:
+  - PM Agent owns PRD creation/updates.
+  - Architecture Agent owns architecture/SPEC creation/updates.
+  - Todo Agent owns TODO creation/updates.
 - Test plan must reflect current test coverage and defect status.
-- No coding starts before TODO tasks exist for the requested change.
+- No implementation starts before `docs/SPEC.md` and `docs/TODO.md` exist for the requested change.
+- No coding starts before reviewing `docs/PRD.md`, `docs/SPEC.md`, and `docs/architecture.md`.
 - PM Q&A decisions are documentation events; if decision changes scope/logic/metrics/priorities, PRD must be updated in the same turn.
-- Design Q&A decisions are documentation events; if decision changes interaction/style/screen behavior, PRD must be updated in the same turn.
-- For UI-heavy features, SPEC/TODO should not start before PRD design section is present.
-- PRD granularity for multi-game products is mandatory:
-  - Do not put multiple mini-games into one PRD file.
-  - Each mini-game must have its own PRD file in `docs/prd/<product-name>/prd.md`.
-  - `<product-name>` should be a stable lowercase kebab-case identifier (example: `fuel-frog-panic`).
-  - If a shared platform exists (hub/engine), keep it as a separate PRD (example: `docs/prd/arcade-core-hub/prd.md`).
-  - Keep a lightweight index file at `docs/prd/README.md` listing all active PRDs.
-  - Every per-game PRD must include `## 2.1 Why Players Need This Product`:
+- PRD file policy:
+  - PRD files must live directly under `docs/` (no nested `docs/prd/` directory requirement).
+  - Single-product default file is `docs/PRD.md`.
+  - If multiple PRDs are needed, use `docs/<product-name>-prd.md` naming.
+  - Every PRD must include `## 2.1 Why Players Need This Product`:
     - Explain concrete player pain and why this game should exist.
-  - Every per-game PRD must include `### Step-by-step Gameplay User Stories` in Feature Business Logic:
+  - Every PRD must include `### Step-by-step Gameplay User Stories` in Feature Business Logic:
     - Describe the playable journey as ordered step stories from entry to settlement.
-  - Every PRD (including hub PRD) must include an explicit section:
+  - Every PRD must include an explicit section:
     - `### Three Core Questions (Required)`
     - It must answer exactly:
       - `1. 钱从哪里来？`
@@ -292,8 +289,9 @@ When user confirms an idea and asks for implementation, follow this workflow ord
 
 ## Current Docs Index
 
+- `docs/PRD.md` (canonical product requirements)
+- `docs/SPEC.md` (canonical interface and architecture contracts)
 - `docs/architecture.md` (mandatory frontend architecture constraints)
-- `docs/eve-frontier-ui-style-guide.md` (EVE Frontier visual/UI constraints)
 - `docs/sui-devnet-testing-standard.md` (mandatory Sui contract testing rules)
 - `docs/all_contracts.move.txt` (integrated EVE Frontier contract code; mandatory reference for contract-feature feasibility checks)
 - `docs/templates/prd-template.md` (PRD scaffold)
@@ -306,10 +304,8 @@ When user confirms an idea and asks for implementation, follow this workflow ord
 ## Delivery Rules
 
 - If generating frontend code, cite which architecture constraints were applied.
-- If generating UI code, verify color tokens and typography rules from the style guide.
-- If generating UI design description, update PRD directly and cite style-guide token/interaction references used.
+- If generating architecture docs or SPEC interfaces, state layer boundaries, ownership, and interface/error contracts explicitly.
 - If generating contract code, apply devnet testing standard and report executed commands/outcomes.
 - If generating tests, provide case coverage, failures, and reproduction details.
-- If generating non-UI code, avoid forcing style-guide details unless relevant.
 - If generating docs, cite which `docs/*.md` files were used.
 - For implementation requests, report PRD/SPEC/TODO/Test Plan updates together with code changes.

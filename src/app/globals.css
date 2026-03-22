@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --eve-yellow: #e5b32b;
+  --eve-black: #080808;
+  --eve-grey: #1a1a1a;
+  --eve-red: #cc3300;
+  --eve-offwhite: #e0e0e0;
+  --eve-glow: rgba(255, 95, 0, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  color: var(--eve-offwhite);
+  font-family: "Space Grotesk", "Inter Tight", Inter, system-ui, sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(255, 95, 0, 0.18), transparent 38%),
+    radial-gradient(circle at 15% 10%, rgba(229, 179, 43, 0.08), transparent 24%),
+    linear-gradient(rgba(224, 224, 224, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(224, 224, 224, 0.03) 1px, transparent 1px),
+    var(--eve-black);
+  background-size:
+    100% 100%,
+    100% 100%,
+    18px 18px,
+    18px 18px,
+    auto;
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(255, 95, 0, 0.35);
+  color: #000;
+}
+
+.grid-bg {
+  background-image:
+    radial-gradient(rgba(255, 95, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(224, 224, 224, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(224, 224, 224, 0.03) 1px, transparent 1px);
+  background-size:
+    22px 22px,
+    20px 20px,
+    20px 20px;
+}
+
+.scanline {
+  background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.12) 50%);
+  background-size: 100% 4px;
+}

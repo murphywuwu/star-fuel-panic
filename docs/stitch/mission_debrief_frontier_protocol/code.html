@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MISSION DEBRIEF | FUEL_FROG_PANIC</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-container": "#9df800",
+                        "on-tertiary": "#2f3131",
+                        "surface": "#131313",
+                        "on-secondary": "#1f3700",
+                        "on-secondary-fixed-variant": "#2f4f00",
+                        "surface-container-highest": "#353534",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#e2e2e2",
+                        "outline": "#ab8a7d",
+                        "tertiary-container": "#939494",
+                        "primary-fixed-dim": "#ffb599",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#e5e2e1",
+                        "inverse-primary": "#a63b00",
+                        "surface-container-low": "#1c1b1b",
+                        "on-surface-variant": "#e4bfb1",
+                        "secondary-fixed-dim": "#8bdc00",
+                        "surface-variant": "#353534",
+                        "outline-variant": "#5b4137",
+                        "secondary-fixed": "#9ffb06",
+                        "on-primary-container": "#531a00",
+                        "on-surface": "#e5e2e1",
+                        "inverse-on-surface": "#313030",
+                        "primary": "#ffb599",
+                        "surface-tint": "#ffb599",
+                        "on-tertiary-container": "#2b2d2d",
+                        "on-primary-fixed": "#370e00",
+                        "primary-fixed": "#ffdbce",
+                        "surface-container-lowest": "#0e0e0e",
+                        "surface-bright": "#3a3939",
+                        "secondary": "#f9ffe8",
+                        "on-primary": "#5a1c00",
+                        "on-primary-fixed-variant": "#7f2b00",
+                        "tertiary": "#c6c6c7",
+                        "on-tertiary-fixed": "#1a1c1c",
+                        "on-secondary-container": "#436e00",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed-variant": "#454747",
+                        "surface-dim": "#131313",
+                        "tertiary-fixed-dim": "#c6c6c7",
+                        "surface-container-high": "#2a2a2a",
+                        "on-background": "#e5e2e1",
+                        "on-secondary-fixed": "#102000",
+                        "background": "#131313",
+                        "primary-container": "#ff5f00",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#201f1f"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .grid-bg {
+            background-image: radial-gradient(rgba(255, 95, 0, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.1) 50%);
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary-container selection:text-black min-h-screen overflow-x-hidden">
+<!-- TOP NAVIGATION SHELL -->
+<nav class="fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-6 py-3 h-16 bg-[#0e0e0e] border-b-2 border-[#ff5f00]/20 shadow-[0_0_15px_rgba(255,95,0,0.1)]">
+<div class="text-2xl font-black italic tracking-tighter text-[#ff5f00]">
+            FUEL_FROG_PANIC
+        </div>
+<div class="hidden md:flex space-x-8 items-center">
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">SYSTEM_MAP</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">SQUAD_MGMT</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">HUD_OVERLAY</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">VAULT</a>
+</div>
+<div class="flex items-center space-x-6">
+<span class="material-symbols-outlined text-[#ff5f00]">sensors</span>
+<span class="material-symbols-outlined text-[#ff5f00]">security</span>
+<button class="bg-[#ff5f00] text-black font-black px-4 py-1 text-xs tracking-widest hover:bg-[#ffb599] transition-all active:translate-x-0.5 active:translate-y-0.5">PANIC</button>
+</div>
+</nav>
+<!-- SIDE NAVIGATION SHELL -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col justify-between w-64 z-40 bg-[#1c1b1b] border-r-2 border-[#ff5f00]/10 hidden lg:flex">
+<div class="flex flex-col w-full">
+<div class="p-6 border-b border-[#ff5f00]/10">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-black">account_circle</span>
+</div>
+<div>
+<div class="font-bold text-xs tracking-widest uppercase text-[#ff5f00]">STRAT_CMD</div>
+<div class="text-[10px] text-tertiary">SECTOR_04</div>
+</div>
+</div>
+</div>
+<div class="mt-4 flex flex-col w-full">
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full font-bold text-xs tracking-widest uppercase hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">radar</span>
+<span>SENSORS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full font-bold text-xs tracking-widest uppercase hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span>LOGISTICS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full font-bold text-xs tracking-widest uppercase hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span>COMMS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full font-bold text-xs tracking-widest uppercase hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>HULL_CARGO</span>
+</a>
+<a class="flex items-center space-x-4 p-4 bg-[#ff5f00] text-black w-full font-bold text-xs tracking-widest uppercase" href="#">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">list_alt</span>
+<span>EVENT_LOGS</span>
+</a>
+</div>
+</div>
+<div class="p-4">
+<button class="w-full bg-[#ff5f00]/10 border border-[#ff5f00] text-[#ff5f00] py-3 font-black tracking-widest text-xs hover:bg-[#ff5f00] hover:text-black transition-all">DEPLOY</button>
+<a class="flex items-center space-x-4 p-4 mt-2 text-tertiary hover:text-error transition-colors font-bold text-xs tracking-widest uppercase" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>SYSTEM_EXIT</span>
+</a>
+</div>
+</aside>
+<!-- MAIN CANVAS -->
+<main class="lg:ml-64 pt-20 px-6 pb-12 min-h-screen grid-bg relative">
+<!-- Telemetry Header -->
+<div class="absolute top-16 left-0 right-0 h-6 bg-surface-container-low border-b border-outline-variant/10 flex items-center px-4 overflow-hidden pointer-events-none">
+<div class="flex space-x-8 text-[10px] font-mono text-primary-container opacity-50 whitespace-nowrap animate-pulse">
+<span>SYS_READY: OK</span>
+<span>DATA_STREAM: [A4:88:F2:01]</span>
+<span>UP_LINK: ACTIVE</span>
+<span>LATENCY: 12ms</span>
+<span>ENCRYPTION: AES-256</span>
+<span>SYS_READY: OK</span>
+<span>DATA_STREAM: [B1:2C:D4:F9]</span>
+<span>UP_LINK: ACTIVE</span>
+</div>
+</div>
+<div class="max-w-6xl mx-auto mt-8 flex flex-col gap-8">
+<!-- HERO SECTION -->
+<section class="relative py-12 flex flex-col items-center justify-center text-center">
+<div class="absolute inset-0 bg-primary-container/5 blur-3xl rounded-full"></div>
+<div class="relative">
+<div class="flex items-center justify-center space-x-4 mb-2">
+<div class="h-[2px] w-12 bg-primary-container"></div>
+<span class="text-primary-container font-black tracking-[0.3em] text-xs uppercase">Tactical Resolution Complete</span>
+<div class="h-[2px] w-12 bg-primary-container"></div>
+</div>
+<h1 class="text-7xl md:text-9xl font-black italic tracking-tighter text-on-surface uppercase leading-none drop-shadow-[0_0_20px_rgba(255,95,0,0.3)]">
+                        MISSION SUCCESS
+                    </h1>
+<div class="mt-4 inline-flex items-center space-x-2 bg-surface-container-high px-3 py-1 border-l-4 border-primary-container">
+<span class="material-symbols-outlined text-primary-container text-sm">check_circle</span>
+<span class="text-xs font-bold tracking-widest text-on-surface-variant uppercase">All Objectives Finalized</span>
+</div>
+</div>
+</section>
+<!-- DATA MODULES GRID -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+<!-- SQUAD CONTRIBUTION LEDGER (LEFT/CENTER) -->
+<div class="md:col-span-8 bg-surface-container-low relative border border-outline-variant/10 overflow-hidden">
+<div class="bg-surface-container-high p-4 flex justify-between items-center border-b-2 border-primary-container/20">
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-primary-container">groups</span>
+<h2 class="font-black text-sm tracking-widest uppercase">Squad Contribution Ledger</h2>
+</div>
+<div class="text-[10px] font-mono text-tertiary">REF_ID: 9823-PX</div>
+</div>
+<div class="p-0">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-highest/50 border-b border-outline-variant/20">
+<th class="p-4 text-[10px] font-bold tracking-widest text-tertiary uppercase">Operator ID</th>
+<th class="p-4 text-[10px] font-bold tracking-widest text-tertiary uppercase">Role</th>
+<th class="p-4 text-[10px] font-bold tracking-widest text-tertiary uppercase">Delivery Vol</th>
+<th class="p-4 text-[10px] font-bold tracking-widest text-tertiary uppercase text-right">Rank</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4 font-mono text-sm text-on-surface">#PRX_77</td>
+<td class="p-4 text-xs font-bold text-on-surface-variant">NAVIGATOR</td>
+<td class="p-4 text-xs font-mono">2,450.00 UNIT</td>
+<td class="p-4 text-right">
+<span class="bg-primary-container text-black px-3 py-1 font-black text-sm skew-x-[-10deg] inline-block">S+</span>
+</td>
+</tr>
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4 font-mono text-sm text-on-surface">#DHK_12</td>
+<td class="p-4 text-xs font-bold text-on-surface-variant">HULL_MECH</td>
+<td class="p-4 text-xs font-mono">1,820.50 UNIT</td>
+<td class="p-4 text-right">
+<span class="border border-primary-container text-primary-container px-3 py-1 font-black text-sm inline-block">A</span>
+</td>
+</tr>
+<tr class="hover:bg-primary-container/5 transition-colors group">
+<td class="p-4 font-mono text-sm text-on-surface">#FLT_09</td>
+<td class="p-4 text-xs font-bold text-on-surface-variant">LOGISTICS</td>
+<td class="p-4 text-xs font-mono">940.12 UNIT</td>
+<td class="p-4 text-right">
+<span class="text-on-surface-variant px-3 py-1 font-black text-sm inline-block opacity-50">B+</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- REWARD DISTRIBUTION (RIGHT) -->
+<div class="md:col-span-4 flex flex-col gap-6">
+<div class="bg-surface-container-low border-r-4 border-primary-container p-6 relative">
+<div class="absolute top-0 right-0 p-2 opacity-10">
+<span class="material-symbols-outlined text-6xl">payments</span>
+</div>
+<h2 class="font-black text-xs tracking-[0.2em] text-primary-container uppercase mb-6">Reward Distribution</h2>
+<div class="space-y-6">
+<div>
+<div class="text-[10px] text-tertiary uppercase tracking-widest mb-1">Total Prize Pool</div>
+<div class="text-4xl font-black text-on-surface tracking-tighter italic">12,850 <span class="text-sm font-bold text-primary-container not-italic">LUX</span></div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-end border-b border-outline-variant/20 pb-2">
+<span class="text-xs font-bold text-on-surface-variant uppercase">Winner Share</span>
+<span class="text-xs font-mono text-primary-container">70% (8,995 LUX)</span>
+</div>
+<div class="flex justify-between items-end border-b border-outline-variant/20 pb-2">
+<span class="text-xs font-bold text-on-surface-variant uppercase">Org Tax</span>
+<span class="text-xs font-mono text-error">30% (3,855 LUX)</span>
+</div>
+</div>
+<div class="bg-surface-container-highest p-4">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-bold text-tertiary uppercase">Payout Status</span>
+<span class="text-[10px] font-mono text-primary-container">EN_ROUTE</span>
+</div>
+<div class="flex space-x-1">
+<div class="h-2 w-full bg-primary-container"></div>
+<div class="h-2 w-full bg-primary-container"></div>
+<div class="h-2 w-full bg-primary-container"></div>
+<div class="h-2 w-full bg-primary-container/20"></div>
+<div class="h-2 w-full bg-primary-container/20"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- BLOCKCHAIN STATUS -->
+<div class="bg-surface-container-high border border-outline-variant/10 p-5 flex flex-col items-center">
+<div class="w-full flex justify-between items-center mb-4">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-primary-container text-sm" style="font-variation-settings: 'FILL' 1;">security</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Blockchain Finalized</span>
+</div>
+<span class="h-2 w-2 rounded-full bg-primary-container animate-ping"></span>
+</div>
+<div class="flex w-full items-start space-x-4">
+<div class="bg-on-surface p-1">
+<img alt="Transaction QR Code" class="w-16 h-16 grayscale invert" data-alt="QR code for blockchain transaction verification" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXerRRJ4HYf4puO_RPjKWP-fbjgDaYv_zKB8kdK_W7OIN52LzgE5iQKeTGFtJaQim1Smm2fJN2DLy2KqSb46Opx67d9U5UJdvdAUF_Yl3IMrY6FIdHz39lSsRDjjQhaLjpJ4xwnxuvaole6voUH_kE7nmwchw7KjA5HqvAkDrXW0Z6ADUD0ELouxj7q7eHOzE4FN5qJB4SWjCRWhIvp6gprgbKv2dy_j1OsfQDFjIs-wgOsADx80agBOGdv2yyCxbPfBQx49v9jbeb"/>
+</div>
+<div class="flex-1">
+<div class="text-[9px] text-tertiary uppercase mb-1">TX_HASH</div>
+<div class="font-mono text-[10px] break-all text-on-surface-variant leading-tight">
+                                    0x4f88e2...f92a4c11090d88b44
+                                </div>
+<div class="mt-2 text-[9px] text-primary-container flex items-center space-x-1">
+<span class="material-symbols-outlined text-[10px]">verified</span>
+<span>LEDGER_CONFIRMED</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- PRIMARY ACTION -->
+<div class="mt-8 flex justify-center">
+<button class="group relative px-12 py-5 bg-primary-container overflow-hidden hover:skew-x-[-12deg] transition-all duration-300">
+<div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+<span class="relative font-black text-xl italic tracking-tighter text-black flex items-center space-x-4 uppercase">
+<span>RETURN TO HUB</span>
+<span class="material-symbols-outlined text-2xl">trending_flat</span>
+</span>
+</button>
+</div>
+</div>
+</main>
+<!-- FOOTER DATA STRIP -->
+<footer class="lg:ml-64 bg-surface-container-lowest border-t border-outline-variant/10 py-4 px-8">
+<div class="flex justify-between items-center opacity-40">
+<div class="text-[10px] font-mono flex space-x-6">
+<span>VERSION: 0.9.44-ALPHA</span>
+<span>BUILD: 2024.11.08</span>
+<span>ENC: RSA-4096</span>
+</div>
+<div class="text-[10px] font-mono">
+                SECURE_TERMINAL_001 // NO_INTENTIONAL_DATA_LEAKAGE
+            </div>
+</div>
+</footer>
+</body></html>

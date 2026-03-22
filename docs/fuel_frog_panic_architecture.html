@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fuel Frog Panic — Architecture Design</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:        #0a0c10;
+    --surface:   #111520;
+    --surface2:  #181e2e;
+    --border:    #1e2840;
+    --gold:      #f0b840;
+    --gold2:     #ffda6e;
+    --red:       #ff4444;
+    --yellow:    #f5c542;
+    --green:     #42d97a;
+    --blue:      #4a9eff;
+    --purple:    #9b6dff;
+    --text:      #e8eaf0;
+    --muted:     #7a8499;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  /* ───── HEADER ───── */
+  header {
+    background: linear-gradient(135deg, #0d1020 0%, #111830 100%);
+    border-bottom: 2px solid var(--gold);
+    padding: 48px 64px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 70% 50%, rgba(240,184,64,.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-frog {
+    font-size: 52px;
+    display: block;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 0 20px rgba(240,184,64,.6));
+  }
+  .header-title {
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--gold);
+    line-height: 1.1;
+  }
+  .header-sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin: 4px 4px 4px 0;
+  }
+  .badge-gold  { background: rgba(240,184,64,.15); color: var(--gold); border: 1px solid rgba(240,184,64,.3); }
+  .badge-blue  { background: rgba(74,158,255,.15); color: var(--blue); border: 1px solid rgba(74,158,255,.3); }
+  .badge-green { background: rgba(66,217,122,.15); color: var(--green); border: 1px solid rgba(66,217,122,.3); }
+  .badge-purple{ background: rgba(155,109,255,.15); color: var(--purple); border: 1px solid rgba(155,109,255,.3); }
+  .badge-red   { background: rgba(255,68,68,.15);  color: var(--red);  border: 1px solid rgba(255,68,68,.3); }
+
+  /* ───── LAYOUT ───── */
+  main { max-width: 1200px; margin: 0 auto; padding: 48px 48px 80px; }
+
+  section { margin-bottom: 64px; }
+  h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--gold2);
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--blue);
+    margin: 28px 0 12px;
+    font-family: var(--mono);
+    letter-spacing: 0.5px;
+  }
+  p { color: var(--text); margin-bottom: 12px; line-height: 1.7; }
+
+  /* ───── CARDS ───── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    font-family: var(--mono);
+  }
+
+  /* ───── ARCH DIAGRAM ───── */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-diagram::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(240,184,64,.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .layer {
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 0;
+    position: relative;
+  }
+  .layer-fe   { background: rgba(74,158,255,.06); border: 1px solid rgba(74,158,255,.25); }
+  .layer-be   { background: rgba(155,109,255,.06); border: 1px solid rgba(155,109,255,.25); }
+  .layer-db   { background: rgba(66,217,122,.06);  border: 1px solid rgba(66,217,122,.25); }
+  .layer-chain{ background: rgba(240,184,64,.06);  border: 1px solid rgba(240,184,64,.25); }
+
+  .layer-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .lfe   { color: var(--blue); }
+  .lbe   { color: var(--purple); }
+  .ldb   { color: var(--green); }
+  .lchain{ color: var(--gold); }
+
+  .modules-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .mod {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .mod-fe    { border-color: rgba(74,158,255,.4); color: var(--blue); }
+  .mod-be    { border-color: rgba(155,109,255,.4); color: var(--purple); }
+  .mod-db    { border-color: rgba(66,217,122,.4); color: var(--green); }
+  .mod-chain { border-color: rgba(240,184,64,.4); color: var(--gold); }
+
+  .arrow-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .arrow-row .arrow { font-size: 18px; }
+
+  /* ───── GRID 2-COL ───── */
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 768px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* ───── TABLE ───── */
+  .tbl-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+  thead tr { background: var(--surface2); }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(30,40,64,.6);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td { border-bottom: none; }
+  .td-key { color: var(--gold2); font-weight: 700; white-space: nowrap; }
+  .td-type { color: var(--purple); }
+  .td-note { color: var(--muted); font-size: 12px; }
+
+  /* ───── CODE BLOCK ───── */
+  pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-x: auto;
+    color: #c8d0e0;
+  }
+  .c-comment { color: var(--muted); }
+  .c-key     { color: var(--gold2); }
+  .c-val     { color: var(--green); }
+  .c-type    { color: var(--blue); }
+  .c-str     { color: #ff9e6e; }
+  .c-fn      { color: var(--purple); }
+
+  /* ───── STATE MACHINE ───── */
+  .states {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 16px 0;
+  }
+  .state {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: center;
+  }
+  .s-lobby    { color: var(--blue); border-color: rgba(74,158,255,.4); }
+  .s-pre      { color: var(--yellow); border-color: rgba(245,197,66,.4); }
+  .s-running  { color: var(--green); border-color: rgba(66,217,122,.4); }
+  .s-panic    { color: var(--red); border-color: rgba(255,68,68,.4); }
+  .s-settling { color: var(--muted); border-color: var(--border); }
+  .s-settled  { color: var(--gold); border-color: rgba(240,184,64,.4); }
+  .s-arrow {
+    font-size: 18px;
+    color: var(--muted);
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+
+  /* ───── FLOW STEP ───── */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    padding-left: 32px;
+  }
+  .flow::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 12px; bottom: 12px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--gold), var(--purple), var(--green));
+    opacity: .3;
+  }
+  .flow-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .flow-dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-left: -32px;
+    position: relative;
+    z-index: 1;
+  }
+  .flow-dot-gold   { background: rgba(240,184,64,.2); border: 2px solid var(--gold); color: var(--gold); }
+  .flow-dot-blue   { background: rgba(74,158,255,.2); border: 2px solid var(--blue); color: var(--blue); }
+  .flow-dot-green  { background: rgba(66,217,122,.2); border: 2px solid var(--green); color: var(--green); }
+  .flow-dot-purple { background: rgba(155,109,255,.2); border: 2px solid var(--purple); color: var(--purple); }
+  .flow-body { padding-top: 2px; }
+  .flow-title { font-weight: 700; color: var(--text); font-size: 14px; margin-bottom: 4px; }
+  .flow-desc  { color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+  /* ───── DIVIDER ───── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    margin: 40px 0;
+  }
+
+  /* ───── TAG ───── */
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin: 2px;
+  }
+  .tag-onchain  { background: rgba(240,184,64,.12); color: var(--gold); }
+  .tag-offchain { background: rgba(66,217,122,.12); color: var(--green); }
+  .tag-ws       { background: rgba(74,158,255,.12); color: var(--blue); }
+  .tag-rest     { background: rgba(155,109,255,.12); color: var(--purple); }
+
+  footer {
+    text-align: center;
+    padding: 32px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║           HEADER              ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<header>
+  <span class="header-frog">🐸</span>
+  <div class="header-title">Fuel Frog Panic</div>
+  <div class="header-sub">Architecture Design Document · v1.0</div>
+  <div style="margin-top:16px;">
+    <span class="badge badge-blue">Next.js 14</span>
+    <span class="badge badge-blue">React</span>
+    <span class="badge badge-blue">Zustand</span>
+    <span class="badge badge-blue">TailwindCSS</span>
+    <span class="badge badge-green">Supabase</span>
+    <span class="badge badge-green">PostgreSQL</span>
+    <span class="badge badge-purple">Node.js</span>
+    <span class="badge badge-gold">Sui Chain</span>
+    <span class="badge badge-red">WebSocket</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║     1. SYSTEM OVERVIEW        ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">01</span>系统总体架构</h2>
+
+  <p>整体架构分为四层：<strong>前端层（Next.js Dashboard + In-game Overlay）</strong>、<strong>后端层（API Server + 三个后台服务）</strong>、<strong>数据持久层（Supabase / PostgreSQL）</strong> 以及 <strong>链上层（Sui / world::fuel）</strong>。选择 Supabase 作为核心数据层，因为它的 Realtime 功能原生支持 PostgreSQL Change → WebSocket 广播，完美契合弹幕、得分实时推送的需求，省去自建 WebSocket 服务的复杂性。</p>
+
+  <div class="arch-diagram">
+    <div class="layers">
+
+      <!-- FE Layer -->
+      <div class="layer layer-fe">
+        <div class="layer-label lfe">🖥  Frontend Layer</div>
+        <div class="modules-row">
+          <div class="mod mod-fe">Web Dashboard<br><span style="font-size:10px;color:var(--muted)">Next.js App Router</span></div>
+          <div class="mod mod-fe">In-game Overlay<br><span style="font-size:10px;color:var(--muted)">EVE WebView (iframe)</span></div>
+          <div class="mod mod-fe">Galaxy Heatmap<br><span style="font-size:10px;color:var(--muted)">Canvas / SVG</span></div>
+          <div class="mod mod-fe">Squad Lobby<br><span style="font-size:10px;color:var(--muted)">WebSocket real-time</span></div>
+          <div class="mod mod-fe">Match Running<br><span style="font-size:10px;color:var(--muted)">Optimistic UI</span></div>
+          <div class="mod mod-fe">Settlement<br><span style="font-size:10px;color:var(--muted)">Battle Report</span></div>
+        </div>
+      </div>
+
+      <div class="arrow-row">
+        <span class="arrow">↕</span>
+        <span>REST API &amp; WebSocket (Supabase Realtime)</span>
+        <span class="arrow">↕</span>
+      </div>
+
+      <!-- BE Layer -->
+      <div class="layer layer-be">
+        <div class="layer-label lbe">⚙️  Backend Layer</div>
+        <div class="modules-row">
+          <div class="mod mod-be">API Routes<br><span style="font-size:10px;color:var(--muted)">Next.js Route Handlers</span></div>
+          <div class="mod mod-be">Node Worker<br><span style="font-size:10px;color:var(--muted)">Sui Event Listener</span></div>
+          <div class="mod mod-be">Node Worker<br><span style="font-size:10px;color:var(--muted)">Node Scanner (5s poll)</span></div>
+          <div class="mod mod-be">Node Worker<br><span style="font-size:10px;color:var(--muted)">Match State Machine</span></div>
+          <div class="mod mod-be">Attribution Engine<br><span style="font-size:10px;color:var(--muted)">3-Filter Score Calc</span></div>
+        </div>
+      </div>
+
+      <div class="arrow-row">
+        <span class="arrow">↕</span>
+        <span>Supabase Client SDK / PostgreSQL Driver</span>
+        <span class="arrow">↕</span>
+      </div>
+
+      <!-- DB Layer -->
+      <div class="layer layer-db">
+        <div class="layer-label ldb">🗄  Data Layer — Supabase (PostgreSQL + Realtime)</div>
+        <div class="modules-row">
+          <div class="mod mod-db">network_nodes<br><span style="font-size:10px;color:var(--muted)">站点 + fill_ratio 缓存</span></div>
+          <div class="mod mod-db">matches<br><span style="font-size:10px;color:var(--muted)">比赛元信息 + 状态机</span></div>
+          <div class="mod mod-db">teams<br><span style="font-size:10px;color:var(--muted)">战队 + 角色槽位</span></div>
+          <div class="mod mod-db">players<br><span style="font-size:10px;color:var(--muted)">钱包地址 + 信誉分</span></div>
+          <div class="mod mod-db">match_scores<br><span style="font-size:10px;color:var(--muted)">实时得分累加</span></div>
+          <div class="mod mod-db">fuel_events<br><span style="font-size:10px;color:var(--muted)">归因链上事件记录</span></div>
+        </div>
+      </div>
+
+      <div class="arrow-row">
+        <span class="arrow">↕</span>
+        <span>Sui RPC / WebSocket Event Stream</span>
+        <span class="arrow">↕</span>
+      </div>
+
+      <!-- Chain Layer -->
+      <div class="layer layer-chain">
+        <div class="layer-label lchain">⛓  Sui Chain — world::fuel</div>
+        <div class="modules-row">
+          <div class="mod mod-chain">NetworkNode<br><span style="font-size:10px;color:var(--muted)">SharedObject: fuel_quantity</span></div>
+          <div class="mod mod-chain">deposit_fuel()<br><span style="font-size:10px;color:var(--muted)">→ FuelEvent(DEPOSITED)</span></div>
+          <div class="mod mod-chain">start_match()<br><span style="font-size:10px;color:var(--muted)">后端调用</span></div>
+          <div class="mod mod-chain">end_match()<br><span style="font-size:10px;color:var(--muted)">后端调用</span></div>
+          <div class="mod mod-chain">LUX Transfer<br><span style="font-size:10px;color:var(--muted)">结算奖励发放</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   2. FRONTEND ARCHITECTURE    ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">02</span>前端架构</h2>
+
+  <h3>目录结构</h3>
+  <pre><span class="c-comment"># Next.js App Router 结构</span>
+<span class="c-key">fuel-frog-panic/</span>
+├── <span class="c-key">app/</span>
+│   ├── <span class="c-fn">layout.tsx</span>              <span class="c-comment"># 根布局：钱包 Provider + Zustand Provider</span>
+│   ├── <span class="c-fn">page.tsx</span>               <span class="c-comment"># 登录/钱包连接引导页</span>
+│   ├── <span class="c-key">galaxy/</span>
+│   │   └── <span class="c-fn">page.tsx</span>           <span class="c-comment"># 星系热力图 + 比赛大厅（主页面）</span>
+│   ├── <span class="c-key">match/[matchId]/</span>
+│   │   ├── <span class="c-fn">lobby/page.tsx</span>     <span class="c-comment"># 组队大厅</span>
+│   │   ├── <span class="c-fn">running/page.tsx</span>   <span class="c-comment"># 比赛进行中</span>
+│   │   └── <span class="c-fn">result/page.tsx</span>    <span class="c-comment"># 战报结算页</span>
+│   ├── <span class="c-key">overlay/</span>
+│   │   └── <span class="c-fn">page.tsx</span>           <span class="c-comment"># EVE WebView 浮窗（轻量独立页面）</span>
+│   └── <span class="c-key">api/</span>                   <span class="c-comment"># Next.js Route Handlers（BFF 层）</span>
+│       ├── <span class="c-fn">nodes/route.ts</span>
+│       ├── <span class="c-fn">matches/route.ts</span>
+│       ├── <span class="c-fn">teams/route.ts</span>
+│       └── <span class="c-fn">scores/route.ts</span>
+├── <span class="c-key">components/</span>
+│   ├── <span class="c-key">galaxy/</span>              <span class="c-comment"># GalaxyMap, NodeMarker, PulseRing, FilterBar</span>
+│   ├── <span class="c-key">lobby/</span>               <span class="c-comment"># MatchBoard, MatchCard, NodeDetailOverlay</span>
+│   ├── <span class="c-key">squad/</span>               <span class="c-comment"># SquadCard, RoleSlot, LockButton</span>
+│   ├── <span class="c-key">running/</span>             <span class="c-comment"># ScoreBoard, NodeProgressBar, DanmakuFeed</span>
+│   ├── <span class="c-key">overlay/</span>             <span class="c-comment"># OverlayWindow, PanicBanner, OptimisticBar</span>
+│   └── <span class="c-key">wallet/</span>              <span class="c-comment"># WalletButton, WalletStatus, ConnectModal</span>
+├── <span class="c-key">store/</span>                 <span class="c-comment"># Zustand stores</span>
+│   ├── <span class="c-fn">walletStore.ts</span>
+│   ├── <span class="c-fn">galaxyStore.ts</span>
+│   ├── <span class="c-fn">matchStore.ts</span>
+│   └── <span class="c-fn">overlayStore.ts</span>
+├── <span class="c-key">lib/</span>
+│   ├── <span class="c-fn">supabase.ts</span>            <span class="c-comment"># Supabase client（浏览器端）</span>
+│   ├── <span class="c-fn">supabase-server.ts</span>     <span class="c-comment"># Supabase client（Server Components）</span>
+│   ├── <span class="c-fn">sui.ts</span>                 <span class="c-comment"># @mysten/sui.js client 封装</span>
+│   └── <span class="c-fn">scoring.ts</span>             <span class="c-comment"># 客户端 Optimistic 得分预估</span>
+└── <span class="c-key">workers/</span>               <span class="c-comment"># 独立 Node.js 进程（非 Next.js）</span>
+    ├── <span class="c-fn">eventListener.ts</span>      <span class="c-comment"># Sui FuelEvent 监听</span>
+    ├── <span class="c-fn">nodeScanner.ts</span>        <span class="c-comment"># NetworkNode 轮询</span>
+    └── <span class="c-fn">stateMachine.ts</span>       <span class="c-comment"># 比赛状态机</span></pre>
+
+  <h3>Zustand Store 设计</h3>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">walletStore.ts</div>
+      <pre><span class="c-key">interface</span> <span class="c-type">WalletState</span> {
+  address:   <span class="c-type">string</span> | <span class="c-val">null</span>
+  luxBalance: <span class="c-type">bigint</span>
+  isConnected: <span class="c-type">boolean</span>
+  isConnecting: <span class="c-type">boolean</span>
+  <span class="c-comment">// actions</span>
+  connect:    () => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+  disconnect: () => <span class="c-type">void</span>
+  refreshBalance: () => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+}</pre>
+    </div>
+    <div class="card">
+      <div class="card-title">galaxyStore.ts</div>
+      <pre><span class="c-key">interface</span> <span class="c-type">GalaxyState</span> {
+  nodes:     <span class="c-type">NetworkNode</span>[]
+  activeMatches: <span class="c-type">Match</span>[]
+  selectedNodeId: <span class="c-type">string</span> | <span class="c-val">null</span>
+  filter:    <span class="c-str">'all'</span>|<span class="c-str">'prize'</span>|<span class="c-str">'urgent'</span>
+  isLoading: <span class="c-type">boolean</span>
+  <span class="c-comment">// actions</span>
+  fetchNodes:   () => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+  selectNode:   (<span class="c-type">id</span>: <span class="c-type">string</span>) => <span class="c-type">void</span>
+  setFilter:    (<span class="c-type">f</span>) => <span class="c-type">void</span>
+}</pre>
+    </div>
+    <div class="card">
+      <div class="card-title">matchStore.ts</div>
+      <pre><span class="c-key">interface</span> <span class="c-type">MatchState</span> {
+  match:     <span class="c-type">Match</span> | <span class="c-val">null</span>
+  teams:     <span class="c-type">Team</span>[]
+  scores:    <span class="c-type">Record</span>&lt;<span class="c-type">teamId</span>, <span class="c-type">number</span>&gt;
+  danmaku:   <span class="c-type">DanmakuMsg</span>[]
+  timeLeft:  <span class="c-type">number</span>  <span class="c-comment">// seconds</span>
+  isPanic:   <span class="c-type">boolean</span>
+  <span class="c-comment">// actions</span>
+  joinTeam:  (<span class="c-type">teamId</span>, <span class="c-type">role</span>) => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+  lockTeam:  () => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+  joinAndPay:() => <span class="c-type">Promise</span>&lt;<span class="c-type">void</span>&gt;
+  addOptimisticScore: (<span class="c-type">delta</span>) => <span class="c-type">void</span>
+}</pre>
+    </div>
+    <div class="card">
+      <div class="card-title">overlayStore.ts</div>
+      <pre><span class="c-key">interface</span> <span class="c-type">OverlayState</span> {
+  activeMatchId: <span class="c-type">string</span> | <span class="c-val">null</span>
+  pendingTxs:    <span class="c-type">OptimisticTx</span>[]
+  nodeProgress:  <span class="c-type">Record</span>&lt;<span class="c-type">nodeId</span>, <span class="c-type">number</span>&gt;
+  <span class="c-comment">// Optimistic update</span>
+  addPendingTx:  (<span class="c-type">tx</span>) => <span class="c-type">void</span>
+  confirmTx:     (<span class="c-type">txDigest</span>) => <span class="c-type">void</span>
+  revertTx:      (<span class="c-type">txDigest</span>) => <span class="c-type">void</span>
+}</pre>
+    </div>
+  </div>
+
+  <h3>实时数据订阅（Supabase Realtime）</h3>
+  <pre><span class="c-comment">// lib/realtime.ts — 统一订阅管理</span>
+<span class="c-key">export function</span> <span class="c-fn">subscribeMatchUpdates</span>(matchId: <span class="c-type">string</span>) {
+  <span class="c-key">return</span> supabase
+    .channel(<span class="c-str">`match-${matchId}`</span>)
+    <span class="c-comment">// 得分变化 → 更新 matchStore.scores</span>
+    .on(<span class="c-str">'postgres_changes'</span>, {
+      event: <span class="c-str">'UPDATE'</span>, schema: <span class="c-str">'public'</span>, table: <span class="c-str">'match_scores'</span>,
+      filter: <span class="c-str">`match_id=eq.${matchId}`</span>
+    }, payload => matchStore.syncScores(payload.new))
+    <span class="c-comment">// 弹幕推送 → 插入 matchStore.danmaku</span>
+    .on(<span class="c-str">'postgres_changes'</span>, {
+      event: <span class="c-str">'INSERT'</span>, schema: <span class="c-str">'public'</span>, table: <span class="c-str">'fuel_events'</span>,
+      filter: <span class="c-str">`match_id=eq.${matchId}`</span>
+    }, payload => matchStore.pushDanmaku(payload.new))
+    <span class="c-comment">// 状态机迁移 → 切换页面/视觉模式</span>
+    .on(<span class="c-str">'postgres_changes'</span>, {
+      event: <span class="c-str">'UPDATE'</span>, schema: <span class="c-str">'public'</span>, table: <span class="c-str">'matches'</span>,
+      filter: <span class="c-str">`id=eq.${matchId}`</span>
+    }, payload => matchStore.handleStatusChange(payload.new.status))
+    .subscribe()
+}</pre>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   3. BACKEND ARCHITECTURE     ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">03</span>后端架构</h2>
+
+  <p>后端分为两部分：<strong>Next.js API Routes</strong>（处理前端 REST 请求，轻量 BFF 层）和 <strong>独立 Node.js Workers</strong>（长期运行的后台进程，不适合放在 serverless 函数中）。Workers 通过 Supabase 客户端写入数据库，Supabase Realtime 自动向前端广播变化。</p>
+
+  <h3>① Sui Event Listener Worker</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-dot flow-dot-gold">1</div>
+      <div class="flow-body">
+        <div class="flow-title">订阅 Sui 事件流</div>
+        <div class="flow-desc">suiClient.subscribeEvent({ filter: { MoveModule: { package, module: 'fuel' } } })</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot flow-dot-blue">2</div>
+      <div class="flow-body">
+        <div class="flow-title">捕获 FuelEvent(DEPOSITED)</div>
+        <div class="flow-desc">提取 assembly_id, old_quantity, new_quantity, tx_digest</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot flow-dot-purple">3</div>
+      <div class="flow-body">
+        <div class="flow-title">调用 getTransactionBlock(tx_digest)</div>
+        <div class="flow-desc">获取 sender（钱包地址）和 timestamp</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot flow-dot-gold">4</div>
+      <div class="flow-body">
+        <div class="flow-title">三重过滤</div>
+        <div class="flow-desc">Filter1: sender ∈ match.whitelist → Filter2: assembly_id ∈ match.target_nodes → Filter3: timestamp ∈ [start, end]</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-dot flow-dot-green">5</div>
+      <div class="flow-body">
+        <div class="flow-title">写入 Supabase</div>
+        <div class="flow-desc">INSERT fuel_events + UPDATE match_scores → Realtime 自动推送前端</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>② Node Scanner Worker</h3>
+  <pre><span class="c-comment">// workers/nodeScanner.ts — 每 5 秒轮询全星系站点</span>
+<span class="c-key">async function</span> <span class="c-fn">scanNodes</span>() {
+  <span class="c-key">const</span> nodes = <span class="c-key">await</span> supabase.from(<span class="c-str">'network_nodes'</span>).select(<span class="c-str">'id, object_id'</span>)
+  <span class="c-key">const</span> results = <span class="c-key">await</span> <span class="c-type">Promise</span>.all(
+    nodes.data.map(n => suiClient.getObject({ id: n.object_id, options: { showContent: <span class="c-val">true</span> } }))
+  )
+  <span class="c-key">for</span> (<span class="c-key">const</span> obj <span class="c-key">of</span> results) {
+    <span class="c-key">const</span> { fuel_quantity, fuel_max_capacity } = obj.data.content.fields
+    <span class="c-key">const</span> fill_ratio = fuel_quantity / fuel_max_capacity
+    <span class="c-comment">// 更新缓存 → Realtime 推送星系地图颜色变化</span>
+    <span class="c-key">await</span> supabase.from(<span class="c-str">'network_nodes'</span>)
+      .update({ fill_ratio, updated_at: <span class="c-val">new</span> <span class="c-type">Date</span>() })
+      .eq(<span class="c-str">'object_id'</span>, obj.data.objectId)
+    <span class="c-comment">// 触发自动比赛生成</span>
+    <span class="c-key">if</span> (fill_ratio < <span class="c-val">0.20</span> && node.is_public) {
+      <span class="c-key">await</span> <span class="c-fn">autoCreateMatch</span>(node.id)
+    }
+  }
+}
+setInterval(scanNodes, <span class="c-val">5000</span>)</pre>
+
+  <h3>③ Match State Machine Worker</h3>
+  <div class="states">
+    <div class="state s-lobby">Lobby</div>
+    <div class="s-arrow">→</div>
+    <div class="state s-pre">PreStart<br><span style="font-size:10px;color:var(--muted)">30s 倒计时</span></div>
+    <div class="s-arrow">→</div>
+    <div class="state s-running">Running<br><span style="font-size:10px;color:var(--muted)">8.5 min</span></div>
+    <div class="s-arrow">→</div>
+    <div class="state s-panic">Panic<br><span style="font-size:10px;color:var(--muted)">90s × 1.5</span></div>
+    <div class="s-arrow">→</div>
+    <div class="state s-settling">Settling<br><span style="font-size:10px;color:var(--muted)">10~30s</span></div>
+    <div class="s-arrow">→</div>
+    <div class="state s-settled">Settled ✓</div>
+  </div>
+  <pre><span class="c-comment">// 每秒检查所有 Running 比赛</span>
+<span class="c-key">async function</span> <span class="c-fn">tickStateMachine</span>() {
+  <span class="c-key">const</span> running = <span class="c-key">await</span> supabase.from(<span class="c-str">'matches'</span>)
+    .select(<span class="c-str">'*'</span>).eq(<span class="c-str">'status'</span>, <span class="c-str">'running'</span>)
+
+  <span class="c-key">for</span> (<span class="c-key">const</span> match <span class="c-key">of</span> running.data) {
+    <span class="c-key">const</span> elapsed = Date.now() - match.started_at
+    <span class="c-key">if</span> (elapsed > MATCH_DURATION - PANIC_WINDOW) {  <span class="c-comment">// 进入 Panic</span>
+      <span class="c-key">await</span> supabase.from(<span class="c-str">'matches'</span>).update({ status: <span class="c-str">'panic'</span> }).eq(<span class="c-str">'id'</span>, match.id)
+    }
+    <span class="c-key">if</span> (elapsed > MATCH_DURATION) {  <span class="c-comment">// 结算</span>
+      <span class="c-key">await</span> suiClient.executeTransaction(<span class="c-fn">buildEndMatchTx</span>(match.on_chain_id))
+      <span class="c-key">await</span> supabase.from(<span class="c-str">'matches'</span>).update({ status: <span class="c-str">'settling'</span> }).eq(<span class="c-str">'id'</span>, match.id)
+    }
+  }
+}
+setInterval(tickStateMachine, <span class="c-val">1000</span>)</pre>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   4. DATABASE SCHEMA          ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">04</span>数据库 Schema（Supabase / PostgreSQL）</h2>
+
+  <div class="grid2">
+
+    <div class="card">
+      <div class="card-title">network_nodes</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">id</td><td class="td-type">uuid PK</td><td class="td-note">内部 ID</td></tr>
+            <tr><td class="td-key">object_id</td><td class="td-type">text UNIQUE</td><td class="td-note">Sui NetworkNode 对象 ID</td></tr>
+            <tr><td class="td-key">name</td><td class="td-type">text</td><td class="td-note">站点显示名称</td></tr>
+            <tr><td class="td-key">owner_address</td><td class="td-type">text</td><td class="td-note">站点所有者钱包</td></tr>
+            <tr><td class="td-key">is_public</td><td class="td-type">boolean</td><td class="td-note">是否公共/中立站点</td></tr>
+            <tr><td class="td-key">coord_x</td><td class="td-type">float8</td><td class="td-note">星系坐标 X</td></tr>
+            <tr><td class="td-key">coord_y</td><td class="td-type">float8</td><td class="td-note">星系坐标 Y</td></tr>
+            <tr><td class="td-key">fuel_quantity</td><td class="td-type">bigint</td><td class="td-note">当前燃料量</td></tr>
+            <tr><td class="td-key">fuel_max_capacity</td><td class="td-type">bigint</td><td class="td-note">最大容量</td></tr>
+            <tr><td class="td-key">fill_ratio</td><td class="td-type">float4</td><td class="td-note">缓存计算值，5s 刷新</td></tr>
+            <tr><td class="td-key">updated_at</td><td class="td-type">timestamptz</td><td class="td-note">最近一次扫描时间</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">matches</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">id</td><td class="td-type">uuid PK</td><td></td></tr>
+            <tr><td class="td-key">on_chain_id</td><td class="td-type">text</td><td class="td-note">链上 match_id</td></tr>
+            <tr><td class="td-key">status</td><td class="td-type">enum</td><td class="td-note">lobby/prestart/running/panic/settling/settled</td></tr>
+            <tr><td class="td-key">target_node_ids</td><td class="td-type">uuid[]</td><td class="td-note">目标站点列表（1-5个）</td></tr>
+            <tr><td class="td-key">prize_pool</td><td class="td-type">bigint</td><td class="td-note">总奖池 LUX</td></tr>
+            <tr><td class="td-key">entry_fee</td><td class="td-type">bigint</td><td class="td-note">入场费 LUX/人</td></tr>
+            <tr><td class="td-key">max_teams</td><td class="td-type">int2</td><td class="td-note">最大战队数</td></tr>
+            <tr><td class="td-key">trigger_mode</td><td class="td-type">enum</td><td class="td-note">dynamic / min_threshold</td></tr>
+            <tr><td class="td-key">started_at</td><td class="td-type">timestamptz</td><td class="td-note">链上 start_match 时间</td></tr>
+            <tr><td class="td-key">ended_at</td><td class="td-type">timestamptz</td><td></td></tr>
+            <tr><td class="td-key">created_by</td><td class="td-type">text</td><td class="td-note">'system' / 钱包地址</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">teams</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">id</td><td class="td-type">uuid PK</td><td></td></tr>
+            <tr><td class="td-key">match_id</td><td class="td-type">uuid FK</td><td></td></tr>
+            <tr><td class="td-key">name</td><td class="td-type">text</td><td></td></tr>
+            <tr><td class="td-key">captain_address</td><td class="td-type">text</td><td></td></tr>
+            <tr><td class="td-key">max_size</td><td class="td-type">int2</td><td class="td-note">3~8</td></tr>
+            <tr><td class="td-key">is_locked</td><td class="td-type">boolean</td><td></td></tr>
+            <tr><td class="td-key">has_paid</td><td class="td-type">boolean</td><td></td></tr>
+            <tr><td class="td-key">pay_tx_digest</td><td class="td-type">text</td><td class="td-note">入场费链上 tx</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">team_members</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">id</td><td class="td-type">uuid PK</td><td></td></tr>
+            <tr><td class="td-key">team_id</td><td class="td-type">uuid FK</td><td></td></tr>
+            <tr><td class="td-key">wallet_address</td><td class="td-type">text</td><td></td></tr>
+            <tr><td class="td-key">role</td><td class="td-type">enum</td><td class="td-note">collector/hauler/escort</td></tr>
+            <tr><td class="td-key">slot_status</td><td class="td-type">enum</td><td class="td-note">waiting/confirmed/locked</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">match_scores</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">match_id</td><td class="td-type">uuid FK</td><td></td></tr>
+            <tr><td class="td-key">team_id</td><td class="td-type">uuid FK</td><td></td></tr>
+            <tr><td class="td-key">wallet_address</td><td class="td-type">text</td><td></td></tr>
+            <tr><td class="td-key">total_score</td><td class="td-type">int8</td><td class="td-note">实时累加</td></tr>
+            <tr><td class="td-key">fuel_deposited</td><td class="td-type">bigint</td><td class="td-note">累计送油量</td></tr>
+            <tr><td class="td-key">updated_at</td><td class="td-type">timestamptz</td><td class="td-note">每次 FuelEvent 更新</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">fuel_events</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td class="td-key">id</td><td class="td-type">uuid PK</td><td></td></tr>
+            <tr><td class="td-key">match_id</td><td class="td-type">uuid FK</td><td></td></tr>
+            <tr><td class="td-key">tx_digest</td><td class="td-type">text UNIQUE</td><td class="td-note">链上去重</td></tr>
+            <tr><td class="td-key">sender</td><td class="td-type">text</td><td class="td-note">执行钱包地址</td></tr>
+            <tr><td class="td-key">assembly_id</td><td class="td-type">text</td><td class="td-note">目标 NetworkNode</td></tr>
+            <tr><td class="td-key">old_quantity</td><td class="td-type">bigint</td><td></td></tr>
+            <tr><td class="td-key">new_quantity</td><td class="td-type">bigint</td><td></td></tr>
+            <tr><td class="td-key">score_awarded</td><td class="td-type">int8</td><td class="td-note">计算得分</td></tr>
+            <tr><td class="td-key">urgency_weight</td><td class="td-type">float4</td><td class="td-note">注入时刻权重</td></tr>
+            <tr><td class="td-key">chain_timestamp</td><td class="td-type">timestamptz</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   5. API DESIGN               ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">05</span>API 设计（Next.js Route Handlers）</h2>
+
+  <div class="card">
+    <div class="card-title">REST Endpoints</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>描述</th><th>认证</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/nodes</td>
+            <td>获取全星系节点列表（含 fill_ratio、active_match_id）</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/nodes/[id]</td>
+            <td>节点详情 + 当前关联比赛信息</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/matches</td>
+            <td>比赛大厅列表，按奖池×紧急度排序</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/matches/[id]</td>
+            <td>比赛详情 + 战队 + 实时得分</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">POST</span></td>
+            <td class="td-key">/api/matches/[id]/teams</td>
+            <td>创建战队（需钱包签名验证）</td>
+            <td><span class="tag tag-ws">Wallet Signed</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">POST</span></td>
+            <td class="td-key">/api/teams/[id]/join</td>
+            <td>加入战队，选择角色</td>
+            <td><span class="tag tag-ws">Wallet Signed</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">POST</span></td>
+            <td class="td-key">/api/teams/[id]/lock</td>
+            <td>队长锁定阵容</td>
+            <td><span class="tag tag-ws">Captain Only</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-green">POST</span></td>
+            <td class="td-key">/api/teams/[id]/pay</td>
+            <td>队长提交入场费 tx_digest，后端验证上链后注册白名单</td>
+            <td><span class="tag tag-ws">Captain Only</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/matches/[id]/result</td>
+            <td>战报：最终得分 + 奖励分配 + Sui Explorer 链接</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-blue">GET</span></td>
+            <td class="td-key">/api/players/[address]</td>
+            <td>玩家历史战绩 + 信誉分</td>
+            <td><span class="tag tag-offchain">Public</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3>身份验证方案</h3>
+  <pre><span class="c-comment">// 无需传统账号系统，用 Sui 钱包签名验签</span>
+<span class="c-comment">// 请求体携带：</span>
+{
+  <span class="c-key">"wallet_address"</span>: <span class="c-str">"0x1a2b..."</span>,
+  <span class="c-key">"signature"</span>:      <span class="c-str">"base64_signed_message"</span>,
+  <span class="c-key">"message"</span>:        <span class="c-str">"FuelFrogPanic:join-team:team_id:timestamp"</span>
+}
+<span class="c-comment">// 后端用 @mysten/sui.js verifyMessage() 验证签名</span>
+<span class="c-comment">// 验证通过 = 身份确认，无需 JWT/Session</span></pre>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   6. DATA FLOW                ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">06</span>链上 / 链下数据边界与流向</h2>
+
+  <div class="card">
+    <div class="card-title">数据归属一览</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>数据</th><th>存储位置</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>deposit_fuel() + FuelEvent</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">唯一可信计分数据源，不可篡改</td>
+          </tr>
+          <tr>
+            <td>NetworkNode.fuel_quantity</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">原生链上对象</td>
+          </tr>
+          <tr>
+            <td>入场费 LUX 转账</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">涉及真实资产，必须链上</td>
+          </tr>
+          <tr>
+            <td>白名单写入</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">归因计分信任根</td>
+          </tr>
+          <tr>
+            <td>start_match / end_match</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">时间窗口锚点，可审计</td>
+          </tr>
+          <tr>
+            <td>奖励 LUX 发放</td>
+            <td><span class="tag tag-onchain">On-chain</span></td>
+            <td class="td-note">结算合约 70/30 自动分账</td>
+          </tr>
+          <tr>
+            <td>fill_ratio 缓存</td>
+            <td><span class="tag tag-offchain">Off-chain DB</span></td>
+            <td class="td-note">5s 轮询缓存，高频读</td>
+          </tr>
+          <tr>
+            <td>比赛状态机</td>
+            <td><span class="tag tag-offchain">Off-chain DB</span></td>
+            <td class="td-note">每秒迁移，链上仅记录 start/end</td>
+          </tr>
+          <tr>
+            <td>实时得分</td>
+            <td><span class="tag tag-offchain">Off-chain DB</span></td>
+            <td class="td-note">比赛中累加，结算时快照</td>
+          </tr>
+          <tr>
+            <td>弹幕/通知消息</td>
+            <td><span class="tag tag-ws">Realtime WS</span></td>
+            <td class="td-note">纯 UI 反馈，不持久化</td>
+          </tr>
+          <tr>
+            <td>Optimistic 临时状态</td>
+            <td><span class="tag tag-ws">前端内存</span></td>
+            <td class="td-note">交易确认后自动同步链上</td>
+          </tr>
+          <tr>
+            <td>战队/角色/昵称/信誉分</td>
+            <td><span class="tag tag-offchain">Off-chain DB</span></td>
+            <td class="td-note">展示类信息，与资产无关</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ╔═══════════════════════════════╗ -->
+<!-- ║   7. NFR & DEPLOY             ║ -->
+<!-- ╚═══════════════════════════════╝ -->
+<section>
+  <h2><span class="num">07</span>性能指标 &amp; 部署方案</h2>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">关键性能指标（NFRs）</div>
+      <table>
+        <thead><tr><th>指标</th><th>目标</th></tr></thead>
+        <tbody>
+          <tr><td>弹幕端到端延迟</td><td style="color:var(--green)">&lt; 500ms</td></tr>
+          <tr><td>得分更新延迟</td><td style="color:var(--green)">&lt; 1s</td></tr>
+          <tr><td>节点轮询周期</td><td style="color:var(--blue)">5s</td></tr>
+          <tr><td>并发比赛支持</td><td style="color:var(--blue)">≥ 20 局</td></tr>
+          <tr><td>Optimistic 回退</td><td style="color:var(--yellow)">&lt; 5s</td></tr>
+          <tr><td>Sui 事件到 Supabase</td><td style="color:var(--green)">&lt; 200ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">部署架构</div>
+      <pre style="font-size:11px;line-height:1.9"><span class="c-key">Next.js App</span>        → <span class="c-val">Vercel</span>
+  App Router pages   → Edge/Serverless
+  API Route Handlers → Serverless Functions
+
+<span class="c-key">Workers (3个进程)</span> → <span class="c-val">Railway / Fly.io</span>
+  eventListener.ts   → Long-running Node
+  nodeScanner.ts     → Long-running Node
+  stateMachine.ts    → Long-running Node
+  (不适合 Vercel Serverless)
+
+<span class="c-key">Database</span>           → <span class="c-val">Supabase Cloud</span>
+  PostgreSQL         → 数据持久化
+  Realtime           → WebSocket 广播
+  Row Level Security → 钱包地址级权限
+
+<span class="c-key">CDN / Assets</span>       → <span class="c-val">Vercel Edge Network</span></pre>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  🐸 Fuel Frog Panic — Architecture Design v1.0 &nbsp;·&nbsp; Generated from PRD v2.0 &nbsp;·&nbsp; Sui × Supabase × Next.js
+</footer>
+
+</body>
+</html>

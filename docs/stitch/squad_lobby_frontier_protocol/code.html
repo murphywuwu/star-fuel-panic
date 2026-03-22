@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FUEL_FROG_PANIC // SQUAD_LOBBY</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-container": "#9df800",
+              "on-tertiary": "#2f3131",
+              "surface": "#131313",
+              "on-secondary": "#1f3700",
+              "on-secondary-fixed-variant": "#2f4f00",
+              "surface-container-highest": "#353534",
+              "on-error": "#690005",
+              "tertiary-fixed": "#e2e2e2",
+              "outline": "#ab8a7d",
+              "tertiary-container": "#939494",
+              "primary-fixed-dim": "#ffb599",
+              "error-container": "#93000a",
+              "inverse-surface": "#e5e2e1",
+              "inverse-primary": "#a63b00",
+              "surface-container-low": "#1c1b1b",
+              "on-surface-variant": "#e4bfb1",
+              "secondary-fixed-dim": "#8bdc00",
+              "surface-variant": "#353534",
+              "outline-variant": "#5b4137",
+              "secondary-fixed": "#9ffb06",
+              "on-primary-container": "#531a00",
+              "on-surface": "#e5e2e1",
+              "inverse-on-surface": "#313030",
+              "primary": "#ffb599",
+              "surface-tint": "#ffb599",
+              "on-tertiary-container": "#2b2d2d",
+              "on-primary-fixed": "#370e00",
+              "primary-fixed": "#ffdbce",
+              "surface-container-lowest": "#0e0e0e",
+              "surface-bright": "#3a3939",
+              "secondary": "#f9ffe8",
+              "on-primary": "#5a1c00",
+              "on-primary-fixed-variant": "#7f2b00",
+              "tertiary": "#c6c6c7",
+              "on-tertiary-fixed": "#1a1c1c",
+              "on-secondary-container": "#436e00",
+              "error": "#ffb4ab",
+              "on-tertiary-fixed-variant": "#454747",
+              "surface-dim": "#131313",
+              "tertiary-fixed-dim": "#c6c6c7",
+              "surface-container-high": "#2a2a2a",
+              "on-background": "#e5e2e1",
+              "on-secondary-fixed": "#102000",
+              "background": "#131313",
+              "primary-container": "#ff5f00",
+              "on-error-container": "#ffdad6",
+              "surface-container": "#201f1f"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Space Grotesk"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0rem", "lg": "0rem", "xl": "0rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scanline-bg {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+        }
+        .glitch-border {
+            box-shadow: 2px 0px 0px 0px #ff5f00;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- TOP NAVIGATION SHELL -->
+<nav class="flex justify-between items-center w-full px-6 py-3 h-16 bg-[#0e0e0e] dark:bg-[#0e0e0e] fixed top-0 z-50 bg-[#2a2a2a] border-b-2 border-[#ff5f00]/20 shadow-[0_0_15px_rgba(255,95,0,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black italic tracking-tighter text-[#ff5f00] dark:text-[#ff5f00]">FUEL_FROG_PANIC</span>
+<div class="hidden md:flex space-x-6 font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm">
+<a class="text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">SYSTEM_MAP</a>
+<a class="text-[#ff5f00] border-b-2 border-[#ff5f00] pb-1" href="#">SQUAD_MGMT</a>
+<a class="text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">HUD_OVERLAY</a>
+<a class="text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">VAULT</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex gap-3 mr-4">
+<span class="material-symbols-outlined text-tertiary text-sm">sensors</span>
+<span class="material-symbols-outlined text-tertiary text-sm">security</span>
+<span class="material-symbols-outlined text-tertiary text-sm">signal_cellular_alt</span>
+</div>
+<button class="bg-primary-container text-on-primary-container px-4 py-1 font-bold uppercase tracking-tighter hover:bg-[#ff5f00] hover:text-black transition-all duration-100 active:translate-x-0.5 active:translate-y-0.5">PANIC</button>
+</div>
+</nav>
+<!-- SIDE NAVIGATION SHELL -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col justify-between w-64 z-40 bg-[#1c1b1b] dark:bg-[#1c1b1b] bg-[#1c1b1b] border-r-2 border-[#ff5f00]/10 flat no shadows">
+<div class="flex flex-col w-full">
+<div class="p-6 border-b border-outline-variant/20">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container-highest border border-primary-container/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-container">person</span>
+</div>
+<div>
+<div class="font-['Space_Grotesk'] font-bold text-xs tracking-widest uppercase text-primary-container">STRAT_CMD</div>
+<div class="text-[10px] text-tertiary opacity-60">SECTOR_04</div>
+</div>
+</div>
+</div>
+<div class="mt-4 flex flex-col font-['Space_Grotesk'] font-bold text-xs tracking-widest uppercase">
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">radar</span>
+<span>SENSORS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 bg-[#ff5f00] text-black w-full active:scale-95 origin-left transition-transform" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span>LOGISTICS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">terminal</span>
+<span>COMMS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>HULL_CARGO</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined">list_alt</span>
+<span>EVENT_LOGS</span>
+</a>
+</div>
+</div>
+<div class="p-4 flex flex-col gap-4">
+<button class="w-full py-3 bg-surface-container-highest border border-primary-container text-primary-container font-black tracking-widest uppercase text-xs hover:bg-primary-container hover:text-black transition-all">DEPLOY</button>
+<a class="flex items-center space-x-4 p-4 text-tertiary hover:text-error transition-colors uppercase font-bold text-xs" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>SYSTEM_EXIT</span>
+</a>
+</div>
+</aside>
+<!-- MAIN CONTENT CANVAS -->
+<main class="ml-64 mt-16 p-8 min-h-[calc(100vh-64px)] scanline-bg grid grid-cols-12 gap-6 items-start">
+<!-- LEFT: MISSION BRIEFING -->
+<section class="col-span-12 lg:col-span-3 h-full">
+<div class="bg-surface-container-low border-l-4 border-primary-container p-6 relative flex flex-col gap-6">
+<div class="absolute top-0 right-0 p-2 text-[10px] text-primary-container/40 font-mono">ID: BRF-992-X</div>
+<header>
+<h2 class="text-display-lg font-black text-on-surface uppercase tracking-tighter leading-none mb-2">MISSION<br/>BRIEFING</h2>
+<div class="h-1 w-12 bg-primary-container"></div>
+</header>
+<div class="space-y-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">priority_high</span>
+<span class="text-label-sm font-bold uppercase tracking-widest text-primary-container">Critical Objective</span>
+</div>
+<p class="text-body-sm text-tertiary leading-relaxed">
+                        SSU (Super-Stable Uranium) Fuel is the lifeblood of Sector-04 operations. Without sustained enrichment cycles, the Frog-Vault cooling systems will enter terminal feedback. Your squad is tasked with unauthorized extraction from the Deep-Well zones. Failure to extract 5,000 units results in immediate franchise forfeiture.
+                    </p>
+</div>
+<div class="bg-surface-container-highest p-4 border border-outline-variant/30">
+<div class="text-[10px] text-primary-container font-bold uppercase mb-2">Hazard Level</div>
+<div class="flex gap-1">
+<div class="h-4 w-4 bg-primary-container"></div>
+<div class="h-4 w-4 bg-primary-container"></div>
+<div class="h-4 w-4 bg-primary-container"></div>
+<div class="h-4 w-4 bg-primary-container"></div>
+<div class="h-4 w-4 bg-surface-container-low"></div>
+</div>
+<div class="mt-4 text-[10px] text-tertiary font-mono">ZONE: RADIATED_FENS</div>
+</div>
+</div>
+</section>
+<!-- CENTER: ROLE SELECTION BENTO -->
+<section class="col-span-12 lg:col-span-6 flex flex-col gap-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- COLLECTOR -->
+<div class="bg-surface-container-high p-5 border-t border-primary-container/20 group hover:border-primary-container transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-4xl text-primary-container" style="font-variation-settings: 'FILL' 1;">precision_manufacturing</span>
+<div class="text-[10px] text-primary-container/50 font-mono">ROLE_01</div>
+</div>
+<h3 class="font-black text-xl uppercase tracking-tighter mb-1">COLLECTOR</h3>
+<p class="text-[11px] text-tertiary mb-6 h-12 overflow-hidden">Heavy-duty SSU extraction and bio-hazard containment specialists.</p>
+<div class="flex items-center gap-2 text-primary-container font-bold text-xs">
+<span class="h-2 w-2 rounded-full bg-primary-container animate-pulse"></span>
+                        SELECT ROLE
+                    </div>
+</div>
+<!-- HAULER -->
+<div class="bg-primary-container p-5 border-t border-on-primary-container/20 relative">
+<div class="absolute top-2 right-2 bg-black text-primary-container px-2 py-0.5 text-[8px] font-bold">LOCKED</div>
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-4xl text-black" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+<div class="text-[10px] text-black/50 font-mono">ROLE_02</div>
+</div>
+<h3 class="font-black text-xl uppercase tracking-tighter mb-1 text-black">HAULER</h3>
+<p class="text-[11px] text-on-primary-container mb-6 h-12 overflow-hidden">Logistics expert focused on hull integrity and engine overclocking.</p>
+<div class="flex items-center gap-2 text-black font-black text-xs">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+                        SLOT OCCUPIED
+                    </div>
+</div>
+<!-- ESCORT -->
+<div class="bg-surface-container-high p-5 border-t border-primary-container/20 group hover:border-primary-container transition-all cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-4xl text-primary-container" style="font-variation-settings: 'FILL' 1;">shield</span>
+<div class="text-[10px] text-primary-container/50 font-mono">ROLE_03</div>
+</div>
+<h3 class="font-black text-xl uppercase tracking-tighter mb-1">ESCORT</h3>
+<p class="text-[11px] text-tertiary mb-6 h-12 overflow-hidden">Security detachment. Counter-piracy and kinetic defense systems.</p>
+<div class="flex items-center gap-2 text-primary-container font-bold text-xs">
+<span class="h-2 w-2 rounded-full bg-primary-container animate-pulse"></span>
+                        SELECT ROLE
+                    </div>
+</div>
+</div>
+<!-- ACTION FOOTER -->
+<div class="bg-surface-container-low border border-outline-variant/20 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
+<div>
+<div class="text-tertiary text-[10px] uppercase font-bold tracking-widest mb-1">Authorization Fee</div>
+<div class="text-2xl font-black text-on-surface">2,450.00 <span class="text-primary-container">LUX</span></div>
+<div class="text-tertiary text-[10px] font-mono mt-1 italic">Total for 5 authorized pilots / Sector 04 Tax Incl.</div>
+</div>
+<button class="bg-primary-container text-on-primary-container px-12 py-5 font-black text-xl uppercase tracking-tighter hover:bg-[#ff5f00] hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(255,95,0,0.3)] flex items-center gap-4">
+                    JOIN &amp; AUTHORIZE
+                    <span class="material-symbols-outlined">double_arrow</span>
+</button>
+</div>
+</section>
+<!-- RIGHT: SQUAD METRICS -->
+<section class="col-span-12 lg:col-span-3 flex flex-col gap-4">
+<div class="bg-surface-container-high p-6 border-r-4 border-primary-container flex flex-col gap-6">
+<h2 class="text-label-lg font-black uppercase tracking-widest text-primary-container border-b border-primary-container/20 pb-2">SQUAD_METRICS</h2>
+<!-- METRIC 1 -->
+<div>
+<div class="flex justify-between text-[10px] uppercase font-bold text-tertiary mb-2">
+<span>EST_PAYOUT</span>
+<span class="text-primary-container">12.4K LUX</span>
+</div>
+<div class="flex gap-0.5 h-2">
+<div class="flex-1 bg-primary-container"></div>
+<div class="flex-1 bg-primary-container"></div>
+<div class="flex-1 bg-primary-container"></div>
+<div class="flex-1 bg-primary-container/20"></div>
+<div class="flex-1 bg-primary-container/20"></div>
+</div>
+</div>
+<!-- METRIC 2 -->
+<div class="flex flex-col gap-1">
+<span class="text-[10px] uppercase font-bold text-tertiary">COMBAT_EFFECTIVE</span>
+<div class="text-4xl font-black italic text-on-surface">88<span class="text-primary-container text-xl ml-1">%</span></div>
+<div class="text-[9px] text-primary-container/60 font-mono">STATUS: HIGH_READINESS</div>
+</div>
+<!-- METRIC 3 -->
+<div class="bg-surface-container-lowest p-4 border border-outline-variant/30 flex items-center justify-between">
+<div>
+<div class="text-[10px] font-bold text-tertiary uppercase">SYNC_COHERENCE</div>
+<div class="text-lg font-bold text-primary-container">0.992.X</div>
+</div>
+<span class="material-symbols-outlined text-primary-container animate-pulse">leak_add</span>
+</div>
+<!-- AMBER STATUS LIGHTS -->
+<div class="pt-4 border-t border-outline-variant/20 flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_5px_#ff5f00]"></div>
+<span class="text-[9px] font-bold text-tertiary">PWR</span>
+</div>
+<div class="flex items-center gap-2 opacity-50">
+<div class="w-2 h-2 rounded-full bg-primary-container"></div>
+<span class="text-[9px] font-bold text-tertiary">NET</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary-container shadow-[0_0_5px_#ff5f00]"></div>
+<span class="text-[9px] font-bold text-tertiary">LNK</span>
+</div>
+</div>
+</div>
+<!-- MINI TELEMETRY -->
+<div class="p-4 bg-surface-container-low border border-primary-container/10 flex flex-col gap-2 overflow-hidden">
+<div class="flex justify-between items-center text-[8px] font-mono text-primary-container/40">
+<span>TERMINAL_RECV: 0x8832</span>
+<span>12:44:02 UTC</span>
+</div>
+<div class="text-[9px] font-mono text-primary-container/60 space-y-1">
+<p>&gt; AUTHENTICATING_CREDENTIALS...</p>
+<p>&gt; VECTOR_MATCH: SECTOR_04</p>
+<p>&gt; RAD_SHIELDING: ACTIVE</p>
+<p class="animate-pulse">&gt; WAITING_FOR_PILOTS_AUTH...</p>
+</div>
+</div>
+</section>
+</main>
+<!-- DECORATIVE BACKGROUND ELEMENTS -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] opacity-5">
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary-container rounded-full blur-[200px]"></div>
+</div>
+</body></html>

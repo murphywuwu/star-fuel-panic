@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FUEL_FROG_PANIC // SYSTEM_HUB</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #0e0e0e;
+            color: #e5e2e1;
+            margin: 0;
+            overflow: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .grid-bg {
+            background-image: radial-gradient(circle, #ff5f00 1px, transparent 1px);
+            background-size: 32px 32px;
+            opacity: 0.05;
+        }
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 95, 0, 0.1);
+            position: absolute;
+            top: 0;
+            z-index: 10;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1c1b1b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #ff5f00;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-container": "#9df800",
+                        "on-tertiary": "#2f3131",
+                        "surface": "#131313",
+                        "on-secondary": "#1f3700",
+                        "surface-container-highest": "#353534",
+                        "outline": "#ab8a7d",
+                        "tertiary-container": "#939494",
+                        "primary-fixed-dim": "#ffb599",
+                        "surface-container-low": "#1c1b1b",
+                        "on-surface-variant": "#e4bfb1",
+                        "secondary-fixed": "#9ffb06",
+                        "on-primary-container": "#531a00",
+                        "on-surface": "#e5e2e1",
+                        "primary": "#ffb599",
+                        "surface-container-lowest": "#0e0e0e",
+                        "tertiary": "#c6c6c7",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-container": "#ff5f00",
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Space Grotesk"],
+                        "label": ["Space Grotesk"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "0px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface-container-lowest text-on-surface">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 right-0 z-50 flex justify-between items-center w-full px-6 py-3 h-16 bg-[#0e0e0e] border-b-2 border-[#ff5f00]/20 shadow-[0_0_15px_rgba(255,95,0,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-black italic tracking-tighter text-[#ff5f00]">FUEL_FROG_PANIC</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#ff5f00] border-b-2 border-[#ff5f00] pb-1" href="#">SYSTEM_MAP</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">SQUAD_MGMT</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">HUD_OVERLAY</a>
+<a class="font-['Space_Grotesk'] uppercase tracking-tighter font-bold text-sm text-[#c6c6c7] hover:text-[#ff5f00] transition-colors" href="#">VAULT</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex gap-3 text-[#ff5f00]">
+<span class="material-symbols-outlined text-sm" data-icon="sensors_connectivity">sensors</span>
+<span class="material-symbols-outlined text-sm" data-icon="security">security</span>
+<span class="material-symbols-outlined text-sm" data-icon="signal_cellular_alt">signal_cellular_alt</span>
+</div>
+<button class="bg-[#ff5f00] text-black px-4 py-1 font-black text-sm skew-x-[-12deg] hover:bg-white transition-all">PANIC</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-16 h-[calc(100vh-64px)] flex flex-col justify-between w-64 z-40 bg-[#1c1b1b] border-r-2 border-[#ff5f00]/10 font-['Space_Grotesk'] font-bold text-xs tracking-widest uppercase">
+<div class="flex flex-col w-full">
+<div class="p-6 border-b border-[#ff5f00]/10">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container-highest flex items-center justify-center border border-[#ff5f00]/30">
+<span class="material-symbols-outlined text-[#ff5f00]" data-icon="person">person</span>
+</div>
+<div>
+<div class="text-[#ff5f00] text-sm">COMMANDER_PROX</div>
+<div class="text-[#c6c6c7] text-[10px]">STRAT_CMD // SECTOR_04</div>
+</div>
+</div>
+</div>
+<nav class="mt-4">
+<a class="flex items-center space-x-4 p-4 bg-[#ff5f00] text-black w-full scale-95 origin-left" href="#">
+<span class="material-symbols-outlined" data-icon="radar">radar</span>
+<span>SENSORS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span>LOGISTICS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>COMMS</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span>HULL_CARGO</span>
+</a>
+<a class="flex items-center space-x-4 p-4 text-[#c6c6c7] hover:bg-[#2a2a2a] w-full hover:skew-x-1 hover:border-l-4 hover:border-[#ff5f00] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+<span>EVENT_LOGS</span>
+</a>
+</nav>
+</div>
+<div class="p-6">
+<button class="w-full bg-[#ff5f00]/10 border border-[#ff5f00] text-[#ff5f00] py-3 mb-4 hover:bg-[#ff5f00] hover:text-black transition-all">DEPLOY</button>
+<a class="flex items-center space-x-4 p-2 text-[#c6c6c7] hover:text-white" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>SYSTEM_EXIT</span>
+</a>
+</div>
+</aside>
+<!-- Main Content: Split View -->
+<main class="ml-64 mt-16 h-[calc(100vh-64px)] flex overflow-hidden">
+<!-- Left Side: Interactive Star-System Heatmap -->
+<section class="flex-grow relative bg-surface-container-lowest border-r border-[#ff5f00]/10 overflow-hidden">
+<div class="grid-bg absolute inset-0"></div>
+<!-- Telemetry Header Component -->
+<div class="absolute top-0 left-0 right-0 h-6 bg-[#ff5f00]/5 border-b border-[#ff5f00]/20 flex items-center px-4 justify-between z-20">
+<div class="text-[10px] font-mono text-[#ff5f00] flex gap-4">
+<span>STATUS: MONITORING_SECTOR_04</span>
+<span>LATENCY: 12ms</span>
+<span>NODES_ACTIVE: 142</span>
+</div>
+<div class="text-[10px] font-mono text-[#ff5f00] opacity-50 overflow-hidden whitespace-nowrap">
+                    0x4F 0x52 0x41 0x4E 0x47 0x45 0x5F 0x50 0x41 0x4E 0x49 0x43 0x5F 0x53 0x59 0x53 0x5F 0x4C 0x4F 0x41 0x44
+                </div>
+</div>
+<!-- Heatmap Visualization Canvas (Simulated) -->
+<div class="relative w-full h-full flex items-center justify-center p-12">
+<!-- Map UI Overlays -->
+<div class="absolute top-10 left-6 z-20">
+<div class="bg-surface-container-high p-4 border-l-4 border-primary-container">
+<h2 class="text-xs font-black tracking-widest text-primary-container mb-2 uppercase">SECTOR_HEATMAP [v4.2]</h2>
+<div class="space-y-1">
+<div class="flex justify-between gap-8 items-center">
+<span class="text-[10px] text-tertiary">FUEL_CRITICAL</span>
+<span class="w-3 h-3 bg-red-600"></span>
+</div>
+<div class="flex justify-between gap-8 items-center">
+<span class="text-[10px] text-tertiary">FUEL_LOW</span>
+<span class="w-3 h-3 bg-[#ff5f00]"></span>
+</div>
+<div class="flex justify-between gap-8 items-center">
+<span class="text-[10px] text-tertiary">NOMINAL</span>
+<span class="w-3 h-3 bg-[#c6c6c7] opacity-40"></span>
+</div>
+</div>
+</div>
+</div>
+<div class="relative w-full h-full max-w-4xl max-h-[700px]">
+<!-- Star System Grid & Nodes -->
+<div class="absolute inset-0 border border-[#ff5f00]/5 pointer-events-none"></div>
+<!-- Nodes (Example placements) -->
+<!-- SSU-7 (Critical) -->
+<div class="absolute top-[20%] left-[30%] group cursor-pointer">
+<div class="relative flex items-center justify-center">
+<div class="absolute w-12 h-12 bg-red-600/20 rounded-full animate-pulse"></div>
+<div class="w-4 h-4 bg-red-600 border border-white"></div>
+</div>
+<div class="mt-2 bg-black/80 p-2 border border-red-600 translate-x-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+<div class="text-[10px] font-bold text-red-500">SSU-7 // ALERT</div>
+<div class="text-[9px] text-on-surface-variant">FILL_RATIO: 12%</div>
+<div class="text-[9px] text-on-surface-variant">MATCH_PENDING: YES</div>
+</div>
+</div>
+<!-- GATE-ALPHA -->
+<div class="absolute top-[45%] left-[55%] group cursor-pointer">
+<div class="relative flex items-center justify-center">
+<div class="w-3 h-3 bg-[#ff5f00] border border-black"></div>
+</div>
+<div class="mt-2 bg-black/80 p-2 border border-[#ff5f00] translate-x-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+<div class="text-[10px] font-bold text-[#ff5f00]">GATE_ALPHA</div>
+<div class="text-[9px] text-on-surface-variant">FILL_RATIO: 44%</div>
+<div class="text-[9px] text-on-surface-variant">TRAFFIC: HIGH</div>
+</div>
+</div>
+<!-- HUB-PRIME -->
+<div class="absolute top-[70%] left-[20%] group cursor-pointer">
+<div class="relative flex items-center justify-center">
+<div class="absolute w-8 h-8 border border-white/10 animate-spin opacity-30"></div>
+<div class="w-5 h-5 bg-white/20 border border-white/40"></div>
+</div>
+<div class="mt-2 bg-black/80 p-2 border border-white/40 translate-x-4 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+<div class="text-[10px] font-bold text-white">HUB_PRIME</div>
+<div class="text-[9px] text-on-surface-variant">STATUS: STABLE</div>
+</div>
+</div>
+<!-- SSU-12 (Match Active) -->
+<div class="absolute top-[40%] left-[80%] group cursor-pointer">
+<div class="relative flex items-center justify-center">
+<div class="absolute w-16 h-16 border-2 border-primary-container rounded-full animate-ping opacity-20"></div>
+<div class="w-4 h-4 bg-primary-container border border-white"></div>
+</div>
+<div class="mt-2 bg-black/80 p-2 border border-primary-container -translate-x-full -translate-y-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-30">
+<div class="text-[10px] font-bold text-primary-container uppercase">Match Active: SSU-12</div>
+<div class="text-[9px] text-on-surface-variant">PRIZE: 1,200 LUX</div>
+</div>
+</div>
+<!-- Map Lines -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-20">
+<line stroke="#ff5f00" stroke-width="1" x1="30%" x2="55%" y1="20%" y2="45%"></line>
+<line stroke="#ff5f00" stroke-width="1" x1="55%" x2="80%" y1="45%" y2="40%"></line>
+<line stroke="#ff5f00" stroke-dasharray="4" stroke-width="1" x1="30%" x2="20%" y1="20%" y2="70%"></line>
+</svg>
+<img class="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-10" data-alt="Dark abstract deep space satellite map visualization" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAu21SX2YwhsteqUVhSbFY7mygjwKcCjpe7RcGpGIE_ZHqbiwEHldOUO5FGElFtJ8AV0yx_nwZwjUiJLDhGTLnUq3yT_9ljeqN6_RdzBig2c8NUjgCShpm_yJQ6POYpEiR0iHCc_96FhHW2liwE6fyUgpIyXI8G9P1p9iH64XQUZ2Er5zwwzSTHlpsiqIMcOyYGZr9W9NXb9xhnrpGoBSiNYhTM2mmzIoWFNWX2Pl2F-mFT4-NUpR16rWLKU5--tM7PNf-UR3KpMcaL"/>
+</div>
+</div>
+<!-- Bottom Left Telemetry Detail -->
+<div class="absolute bottom-6 left-6 z-20 w-64 bg-surface-container-low p-4 border border-[#ff5f00]/10">
+<div class="flex justify-between items-center mb-2">
+<span class="text-[10px] font-bold text-primary-container">NODE_DETAIL: SSU-7</span>
+<span class="material-symbols-outlined text-xs text-red-600" data-icon="warning">warning</span>
+</div>
+<div class="space-y-3">
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-[9px] uppercase">
+<span>Fuel_Ratio</span>
+<span class="text-red-500">12.4%</span>
+</div>
+<div class="h-1.5 flex gap-0.5">
+<div class="w-1/6 bg-red-600"></div>
+<div class="w-5/6 bg-surface-container-highest"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-surface-container-high p-2">
+<div class="text-[8px] text-tertiary">TEMP</div>
+<div class="text-xs font-mono">1.2k K</div>
+</div>
+<div class="bg-surface-container-high p-2">
+<div class="text-[8px] text-tertiary">OUTPUT</div>
+<div class="text-xs font-mono">4.1 GW</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Side: Fueling Match Board -->
+<section class="w-[450px] bg-surface-container-low flex flex-col h-full">
+<div class="p-6 border-b-2 border-primary-container/20">
+<div class="flex justify-between items-end">
+<div>
+<h1 class="text-2xl font-black uppercase tracking-tighter text-on-surface">Match Board</h1>
+<p class="text-[10px] text-tertiary tracking-[0.2em] font-bold">AVAILABLE_FUEL_RUNS</p>
+</div>
+<div class="text-right">
+<span class="text-[10px] text-primary-container block font-mono">LIVE_MATCHES</span>
+<span class="text-xl font-black">24</span>
+</div>
+</div>
+</div>
+<div class="flex-grow overflow-y-auto custom-scrollbar p-4 space-y-4 bg-[#131313]">
+<!-- Match Card 1 -->
+<div class="bg-surface-container-high p-4 border-l-4 border-primary-container relative group hover:bg-surface-container-highest transition-colors">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 font-bold mb-1 inline-block uppercase">Critical</span>
+<h3 class="text-xl font-bold tracking-tight">TARGET: SSU-7</h3>
+<p class="text-[10px] text-on-surface-variant font-mono">COORD: 124.99 // -2.44</p>
+</div>
+<div class="text-right">
+<div class="text-xs font-bold text-primary-container">PRIZE_POOL</div>
+<div class="text-lg font-black text-secondary-fixed">1,200 LUX</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Entry_Fee</div>
+<div class="text-xs font-bold">100 LUX / PSN</div>
+</div>
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Time_Left</div>
+<div class="text-xs font-bold font-mono text-red-500">04:12.09</div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 bg-primary-container flex items-center justify-center border-2 border-surface-container-high">
+<span class="text-[10px] font-black text-black">A</span>
+</div>
+<div class="w-8 h-8 bg-[#c6c6c7] flex items-center justify-center border-2 border-surface-container-high">
+<span class="text-[10px] font-black text-black">B</span>
+</div>
+<div class="w-8 h-8 border-2 border-dashed border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-xs text-outline-variant" data-icon="add">add</span>
+</div>
+</div>
+<button class="bg-primary-container text-black font-black text-xs px-6 py-2 uppercase hover:translate-x-1 transition-transform">INTERCEPT</button>
+</div>
+</div>
+<!-- Match Card 2 -->
+<div class="bg-surface-container-high p-4 border-l-4 border-outline relative group hover:bg-surface-container-highest transition-colors">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="text-[10px] bg-surface-container-lowest text-on-surface-variant px-1.5 py-0.5 font-bold mb-1 inline-block uppercase">Standard</span>
+<h3 class="text-xl font-bold tracking-tight">TARGET: GATE_04</h3>
+<p class="text-[10px] text-on-surface-variant font-mono">COORD: 98.21 // +14.05</p>
+</div>
+<div class="text-right">
+<div class="text-xs font-bold text-primary-container">PRIZE_POOL</div>
+<div class="text-lg font-black text-secondary-fixed">450 LUX</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Entry_Fee</div>
+<div class="text-xs font-bold">25 LUX / PSN</div>
+</div>
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Time_Left</div>
+<div class="text-xs font-bold font-mono">12:45.33</div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="text-[10px] font-bold text-on-surface-variant italic">VACANT_SLOTS: 04</div>
+<button class="bg-white/10 text-white font-black text-xs px-6 py-2 uppercase border border-white/20 hover:bg-white hover:text-black">JOIN_QUEUE</button>
+</div>
+</div>
+<!-- Match Card 3 -->
+<div class="bg-surface-container-high p-4 border-l-4 border-primary-container relative group hover:bg-surface-container-highest transition-colors opacity-80">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="text-[10px] bg-red-600 text-white px-1.5 py-0.5 font-bold mb-1 inline-block uppercase">Critical</span>
+<h3 class="text-xl font-bold tracking-tight">TARGET: SSU-12</h3>
+<p class="text-[10px] text-on-surface-variant font-mono">COORD: 312.44 // -88.10</p>
+</div>
+<div class="text-right">
+<div class="text-xs font-bold text-primary-container">PRIZE_POOL</div>
+<div class="text-lg font-black text-secondary-fixed">3,000 LUX</div>
+</div>
+</div>
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-xs font-black tracking-widest text-primary-container">LOCKED // SQUAD_ONLY</span>
+</div>
+<div class="grid grid-cols-2 gap-4 mb-4">
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Entry_Fee</div>
+<div class="text-xs font-bold">500 LUX</div>
+</div>
+<div class="bg-surface-container-lowest p-2 border border-outline-variant/30">
+<div class="text-[8px] text-tertiary uppercase mb-1">Time_Left</div>
+<div class="text-xs font-bold font-mono text-red-500">00:58.12</div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 bg-primary-container flex items-center justify-center border-2 border-surface-container-high">
+<span class="text-[10px] font-black text-black">V</span>
+</div>
+<div class="w-8 h-8 bg-primary-container flex items-center justify-center border-2 border-surface-container-high">
+<span class="text-[10px] font-black text-black">K</span>
+</div>
+</div>
+<div class="text-[10px] font-black text-primary-container">DEPLOYED_ACTIVE</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Footer Action -->
+<div class="p-6 bg-surface-container-high border-t border-primary-container/20">
+<button class="w-full bg-primary-container text-black font-black text-sm py-4 flex items-center justify-center gap-2 hover:bg-white transition-all">
+<span class="material-symbols-outlined" data-icon="add_box">add_box</span>
+<span>CREATE_NEW_MATCH_CONTRACT</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Global Interface Overlay -->
+<div class="fixed inset-0 pointer-events-none border-[12px] border-surface-container-lowest z-50"></div>
+<div class="scanline animate-pulse pointer-events-none opacity-20"></div>
+</body></html>

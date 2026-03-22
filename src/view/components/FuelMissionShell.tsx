@@ -1,0 +1,235 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
+import type { ReactNode } from "react";
+import type { MissionPhase } from "@/types/fuelMission";
+import { TacticalButton } from "@/view/components/TacticalButton";
+
+interface FuelMissionShellProps {
+  title: string;
+  subtitle: string;
+  activeRoute: string;
+  phase: MissionPhase;
+  countdownSec: number;
+  roomId?: string;
+  staleSnapshot?: boolean;
+  bannerMessage?: string;
+  bannerTone?: "warning" | "error";
+  children: ReactNode;
+}
+
+const NAV_ITEMS = [
+  { href: "/lobby", label: "HEATMAP", hint: "Browse dangerous nodes and live matches" },
+  { href: "/planning", label: "SQUAD LOBBY", hint: "Create a team, lock roles, and prepare to enter" },
+  { href: "/match", label: "LIVE MATCH", hint: "Submit supply runs, watch the board, beat the timer" },
+  { href: "/settlement", label: "SETTLEMENT LEDGER", hint: "Review payouts, MVP, and final rewards" }
+];
+
+function formatStatusLabel(status: MissionPhase) {
+  if (status === "pre_start") return "PreStart";
+  if (status === "running") return "Running";
+  if (status === "panic") return "Panic";
+  if (status === "settling") return "Settling";
+  if (status === "settled") return "Settled";
+  return "Lobby";
+}
+
+function navClass(active: boolean) {
+  return active
+    ? "border-eve-red bg-eve-red text-black shadow-[0_0_0_1px_rgba(255,95,0,0.28)]"
+    : "border-eve-offwhite/15 bg-transparent text-eve-offwhite/80 hover:border-eve-red/50 hover:text-eve-offwhite";
+}
+
+export function FuelMissionShell({
+  title,
+  subtitle,
+  activeRoute,
+  phase,
+  countdownSec,
+  roomId,
+  staleSnapshot,
+  bannerMessage,
+  bannerTone = "warning",
+  children
+}: FuelMissionShellProps) {
+  const { state: authState, selectors, actions: authActions } = useAuthController();
+  const [walletNotice, setWalletNotice] = useState<string | null>(null);
+
+  const handleConnectWallet = async () => {
+    const connected = await authActions.onConnectWallet();
+    if (!connected.ok) {
+      setWalletNotice(walletErrorMessage(connected.errorCode, connected.message));
+      return;
+    }
+    setWalletNotice("WALLET CONNECTED");
+  };
+
+  const handleDisconnectWallet = async () => {
+    const disconnected = await authActions.onDisconnectWallet();
+    if (!disconnected.ok) {
+      setWalletNotice(walletErrorMessage(disconnected.errorCode, disconnected.message));
+      return;
+    }
+    setWalletNotice("WALLET DISCONNECTED");
+  };
+
+  const handleRefreshBalance = async () => {
+    const refreshed = await authActions.onRefreshBalance();
+    if (!refreshed.ok) {
+      setWalletNotice(walletErrorMessage(refreshed.errorCode, refreshed.message));
+      return;
+    }
+    setWalletNotice(`BALANCE REFRESHED // ${refreshed.payload?.luxBalance ?? authState.luxBalance} LUX`);
+  };
+
+  return (
+    <main className="min-h-screen text-eve-offwhite">
+      <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-eve-red/25 bg-[#0e0e0e]/96 px-4 shadow-[0_0_24px_rgba(255,95,0,0.08)] backdrop-blur-md sm:px-6 lg:px-8">
+        <Link href="/lobby" className="text-2xl font-black italic tracking-[-0.08em] text-eve-red">
+          FUEL_FROG_PANIC
+        </Link>
+        <div className="hidden items-center gap-2 lg:flex">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`border px-3 py-2 text-xs font-black uppercase tracking-[0.22em] transition ${navClass(
+                item.href === activeRoute
+              )}`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-[10px] uppercase tracking-[0.28em] text-eve-red/80 sm:inline">LINK ACTIVE</span>
+          <Link
+            href="/match"
+            className="inline-flex items-center border border-eve-red bg-eve-red px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-black transition hover:bg-[#ffb599]"
+          >
+            PANIC
+          </Link>
+        </div>
+      </nav>
+
+      <aside className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 border-r border-eve-red/15 bg-[#1c1b1b]/96 backdrop-blur-md lg:flex lg:flex-col">
+        <div className="border-b border-eve-red/15 p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center bg-eve-red text-black">
+              <span className="text-sm font-black">◉</span>
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-eve-red">STRAT_CMD</p>
+              <p className="text-[10px] uppercase tracking-[0.22em] text-eve-offwhite/60">SECTOR_04</p>
+            </div>
+          </div>
+          <div className="mt-4 border border-eve-red/15 bg-[#080808]/80 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red">Wallet Identity</p>
+            <div className="mt-3 space-y-1 text-xs text-eve-offwhite/85">
+              <p>ADDRESS: {selectors.walletShort}</p>
+              <p className={authState.luxBalance < 100 ? "text-eve-red" : "text-eve-offwhite/85"}>
+                BALANCE: {authState.luxBalance.toFixed(2)} LUX
+              </p>
+              <p>STATUS: {authState.isConnected ? "CONNECTED" : authState.isConnecting ? "CONNECTING" : "DISCONNECTED"}</p>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {!authState.isConnected ? (
+                <TacticalButton onClick={handleConnectWallet} disabled={authState.isConnecting}>
+                  {authState.isConnecting ? "CONNECTING" : "CONNECT"}
+                </TacticalButton>
+              ) : (
+                <>
+                  <TacticalButton tone="ghost" onClick={handleRefreshBalance}>
+                    REFRESH
+                  </TacticalButton>
+                  <TacticalButton tone="danger" onClick={handleDisconnectWallet}>
+                    EXIT
+                  </TacticalButton>
+                </>
+              )}
+            </div>
+            {walletNotice ? (
+              <p className="mt-3 border border-eve-red/25 bg-[#080808] px-2 py-2 text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/90">
+                {walletNotice}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex-1 px-2 py-4">
+          <div className="space-y-1">
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-start gap-3 border-l-4 px-4 py-4 text-left transition ${navClass(
+                  item.href === activeRoute
+                )}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.24em]">{item.label}</p>
+                  <p className="mt-1 text-[10px] leading-4 uppercase tracking-[0.16em] text-eve-offwhite/60">
+                    {item.hint}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-eve-red/15 p-4">
+          <button className="w-full border border-eve-red/50 bg-transparent px-3 py-3 text-xs font-black uppercase tracking-[0.22em] text-eve-red transition hover:bg-eve-red/10">
+            DEPLOY
+          </button>
+        </div>
+      </aside>
+
+      <div className="lg:pl-64">
+        <div className="fixed left-0 right-0 top-16 z-30 flex h-6 items-center overflow-hidden border-b border-eve-red/10 bg-[#1c1b1b]/90 px-4 text-[10px] uppercase tracking-[0.22em] text-eve-red/75 backdrop-blur-sm">
+          <div className="flex whitespace-nowrap">
+            <span className="mr-6">SYS_READY: {formatStatusLabel(phase).toUpperCase()}</span>
+            <span className="mr-6">DATA_STREAM: [{roomId ?? "NO_ROOM"}]</span>
+            <span className="mr-6">COUNTDOWN: {countdownSec}s</span>
+            <span className="mr-6">SNAPSHOT: {staleSnapshot ? "STALE" : "LIVE"}</span>
+            <span className="mr-6">LATENCY: 12ms</span>
+            <span className="mr-6">SYS_READY: OK</span>
+            <span className="mr-6">LINK: ACTIVE</span>
+          </div>
+        </div>
+
+        <section className="grid-bg min-h-screen px-4 pb-10 pt-28 sm:px-6 lg:px-8">
+          {bannerMessage ? (
+            <div
+              className={
+                bannerTone === "error"
+                  ? "mb-6 border border-eve-red/60 bg-eve-red/20 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-eve-offwhite"
+                  : "mb-6 border border-eve-red/40 bg-eve-red/10 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-eve-offwhite"
+              }
+            >
+              {bannerMessage}
+            </div>
+          ) : null}
+
+          <section className="relative overflow-hidden border border-eve-red/15 bg-[linear-gradient(180deg,rgba(18,18,18,0.95)_0%,rgba(13,13,13,0.98)_100%)] px-6 py-10 shadow-[0_0_0_1px_rgba(255,95,0,0.05),0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(255,95,0,0.14),transparent_35%),radial-gradient(circle_at_20%_20%,rgba(229,179,43,0.08),transparent_24%)]" />
+            <div className="relative flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-px w-10 bg-eve-red" />
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-eve-red">TACTICAL RESOLUTION COMPLETE</p>
+                <div className="h-px w-10 bg-eve-red" />
+              </div>
+              <h1 className="max-w-5xl text-4xl font-black italic uppercase leading-none tracking-[-0.08em] text-eve-offwhite md:text-6xl">
+                {title}
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-eve-offwhite/75">{subtitle}</p>
+            </div>
+          </section>
+
+          <div className="mt-6 space-y-6">{children}</div>
+        </section>
+      </div>
+    </main>
+  );
+}

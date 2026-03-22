@@ -1,6 +1,6 @@
 # TODO Template (Per Project)
 
-> Canonical file location: `apps/<project-name>/todo.md` (do not place project TODO under `docs/`).
+> Canonical file location: `docs/TODO.md`.
 
 ## 0. One-Screen Execution Summary (Problem / Why / How)
 
