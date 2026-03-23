@@ -30,11 +30,14 @@ export function createRuntimeDAppKit() {
   return createDAppKit({
     networks: [defaultNetwork],
     defaultNetwork,
-    autoConnect: true,
+    autoConnect: false,
+    slushWalletConfig: null,
     createClient: (network) =>
       new SuiGrpcClient({
         network,
         baseUrl: resolveRpcUrl(network)
-      })
+      }),
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    storageKey: "sui:dapp-kit:wallet-connection-info"
   });
 }

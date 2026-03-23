@@ -72,26 +72,26 @@ export function useAuthController() {
   useEffect(() => {
     setWalletRuntimeBridge({
       connect: async () => {
-        if (account?.address) {
-          return account.address;
-        }
-
         const preferredWallet = pickPreferredWallet(wallets);
         if (!preferredWallet) {
           throw new Error("no compatible wallet found");
         }
 
         const connected = await dAppKit.connectWallet({ wallet: preferredWallet });
-        const selectedAddress = connected.accounts[0]?.address ?? preferredWallet.accounts[0]?.address ?? null;
+        const selectedAddress = connected.accounts[0]?.address ?? null;
         if (!selectedAddress) {
-          throw new Error("wallet returned no account");
+          throw new Error(`wallet returned no authorized account: ${preferredWallet.name}`);
         }
         return selectedAddress;
       },
       disconnect: async () => {
         await dAppKit.disconnectWallet();
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("sui:dapp-kit:wallet-connection-info");
+        }
       },
       currentAddress: () => account?.address ?? null,
+      isWalletReady: () => Boolean(account?.address),
       signTransaction: (txBytes: Uint8Array) =>
         dAppKit.signTransaction({
           transaction: toBase64(txBytes)
@@ -110,10 +110,6 @@ export function useAuthController() {
 
         throw new Error("wallet execution returned no digest");
       },
-      signPersonalMessage: (message: Uint8Array) =>
-        dAppKit.signPersonalMessage({
-          message
-        }),
       getBalance: async (address: string) => {
         if (decimalsRef.current === null) {
           decimalsRef.current = 9;

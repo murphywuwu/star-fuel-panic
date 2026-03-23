@@ -1,12 +1,11 @@
 import { fromBase64 } from "@mysten/sui/utils";
-import { verifyPersonalMessageSignature, verifyTransactionSignature } from "@mysten/sui/verify";
+import { verifyTransactionSignature } from "@mysten/sui/verify";
 import { Transaction } from "@mysten/sui/transactions";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
 
 const STORAGE_ADDRESS_KEY = "ffp.wallet.address";
 const STORAGE_BALANCE_KEY = "ffp.wallet.balance";
-const STORAGE_IDENTITY_PROOF_KEY = "ffp.wallet.identity_proof";
-
+const LEGACY_STORAGE_IDENTITY_PROOF_KEY = "ffp.wallet.identity_proof";
 interface SignedPayload {
   bytes: string;
   signature: string;
@@ -16,9 +15,9 @@ export interface WalletRuntimeBridge {
   connect: () => Promise<string>;
   disconnect: () => Promise<void>;
   currentAddress: () => string | null;
+  isWalletReady?: () => boolean;
   signTransaction: (txBytes: Uint8Array) => Promise<SignedPayload>;
   signAndExecuteTransaction: (transaction: Transaction) => Promise<{ txDigest: string }>;
-  signPersonalMessage: (message: Uint8Array) => Promise<SignedPayload>;
   getBalance: (address: string) => Promise<number>;
 }
 
@@ -68,6 +67,16 @@ function parseErrorCode(error: unknown, fallback: FuelMissionErrorCode): FuelMis
     return "E_WALLET_NOT_CONNECTED";
   }
 
+  if (
+    raw.includes("autherror") ||
+    raw.includes("auth error") ||
+    raw.includes("login") ||
+    raw.includes("jwt") ||
+    raw.includes("nonce")
+  ) {
+    return "E_WALLET_CONNECT_REJECTED";
+  }
+
   if (raw.includes("reject") || raw.includes("denied") || raw.includes("cancel")) {
     return fallback === "E_WALLET_SIGN_REJECTED" ? "E_WALLET_SIGN_REJECTED" : "E_WALLET_CONNECT_REJECTED";
   }
@@ -85,6 +94,23 @@ function parseErrorCode(error: unknown, fallback: FuelMissionErrorCode): FuelMis
   }
 
   return fallback;
+}
+
+function resolveErrorMessage(error: unknown, fallback: string) {
+  const rawCode = (error as { code?: string })?.code;
+  const rawMessage = (error as { message?: string })?.message;
+  const pieces = [rawCode, rawMessage].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  if (pieces.length === 0) {
+    return fallback;
+  }
+
+  const combined = pieces.join(": ");
+  const lower = combined.toLowerCase();
+  if (lower === "unknown error" || lower.endsWith(": unknown error")) {
+    return fallback;
+  }
+
+  return combined;
 }
 
 function getStoredBalance() {
@@ -105,21 +131,7 @@ function saveWalletSession(address: string, balance: number) {
   }
   window.localStorage.setItem(STORAGE_ADDRESS_KEY, address);
   window.localStorage.setItem(STORAGE_BALANCE_KEY, String(balance));
-}
-
-function saveIdentityProof(address: string, challenge: string, signature: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(
-    STORAGE_IDENTITY_PROOF_KEY,
-    JSON.stringify({
-      address,
-      challenge,
-      signature,
-      createdAt: new Date().toISOString()
-    })
-  );
+  window.localStorage.removeItem(LEGACY_STORAGE_IDENTITY_PROOF_KEY);
 }
 
 function clearWalletSession() {
@@ -128,7 +140,7 @@ function clearWalletSession() {
   }
   window.localStorage.removeItem(STORAGE_ADDRESS_KEY);
   window.localStorage.removeItem(STORAGE_BALANCE_KEY);
-  window.localStorage.removeItem(STORAGE_IDENTITY_PROOF_KEY);
+  window.localStorage.removeItem(LEGACY_STORAGE_IDENTITY_PROOF_KEY);
 }
 
 function shortDelay(ms: number) {
@@ -137,41 +149,11 @@ function shortDelay(ms: number) {
   });
 }
 
-function randomNonce() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}_${Math.floor(Math.random() * 1_000_000_000)}`;
-}
-
 function ensureRuntime(): WalletRuntimeBridge {
   if (!runtimeBridge) {
     throw new WalletServiceError("E_WALLET_UNAVAILABLE", "wallet runtime unavailable");
   }
   return runtimeBridge;
-}
-
-function buildIdentityChallenge(address: string) {
-  const origin = typeof window === "undefined" ? "server" : window.location.origin;
-  return [
-    "Fuel Frog Panic Wallet Identity", 
-    `address=${address}`,
-    `origin=${origin}`,
-    `nonce=${randomNonce()}`,
-    `issuedAt=${new Date().toISOString()}`
-  ].join("\n");
-}
-
-async function verifyWalletIdentity(address: string, runtime: WalletRuntimeBridge) {
-  const challenge = buildIdentityChallenge(address);
-  const challengeBytes = new TextEncoder().encode(challenge);
-  const signed = await runtime.signPersonalMessage(challengeBytes);
-
-  await verifyPersonalMessageSignature(fromBase64(signed.bytes), signed.signature, {
-    address
-  });
-
-  saveIdentityProof(address, challenge, signed.signature);
 }
 
 function concatBytes(left: Uint8Array, right: Uint8Array) {
@@ -239,18 +221,20 @@ export const walletService = {
     const runtime = ensureRuntime();
 
     try {
-      const connectedAddress = runtime.currentAddress() ?? (await runtime.connect());
+      const connectedAddress = await runtime.connect();
       if (!connectedAddress) {
         throw new WalletServiceError("E_WALLET_UNAVAILABLE", "wallet returned no active account");
       }
 
-      await verifyWalletIdentity(connectedAddress, runtime);
       const balance = await runtime.getBalance(connectedAddress);
       saveWalletSession(connectedAddress, balance);
 
       return { address: connectedAddress, balance };
     } catch (error) {
-      throw new WalletServiceError(parseErrorCode(error, "E_WALLET_CONNECT_REJECTED"), "wallet connect failed");
+      throw new WalletServiceError(
+        parseErrorCode(error, "E_WALLET_CONNECT_REJECTED"),
+        resolveErrorMessage(error, "wallet connect failed")
+      );
     }
   },
 
@@ -294,7 +278,10 @@ export const walletService = {
       }
     }
 
-    throw new WalletServiceError(parseErrorCode(lastError, "E_WALLET_SIGN_REJECTED"), "wallet sign transaction failed");
+    throw new WalletServiceError(
+      parseErrorCode(lastError, "E_WALLET_SIGN_REJECTED"),
+      resolveErrorMessage(lastError, "wallet sign transaction failed")
+    );
   },
 
   async signAndExecuteEntryPayment(input: {
@@ -341,7 +328,10 @@ export const walletService = {
       }
     }
 
-    throw new WalletServiceError(parseErrorCode(lastError, "E_WALLET_NETWORK"), "wallet pay entry transaction failed");
+    throw new WalletServiceError(
+      parseErrorCode(lastError, "E_WALLET_NETWORK"),
+      resolveErrorMessage(lastError, "wallet pay entry transaction failed")
+    );
   },
 
   async getBalance(address: string): Promise<number> {
@@ -356,7 +346,10 @@ export const walletService = {
       saveWalletSession(address, balance);
       return balance;
     } catch (error) {
-      throw new WalletServiceError(parseErrorCode(error, "E_WALLET_NETWORK"), "wallet balance query failed");
+      throw new WalletServiceError(
+        parseErrorCode(error, "E_WALLET_NETWORK"),
+        resolveErrorMessage(error, "wallet balance query failed")
+      );
     }
   }
 };
