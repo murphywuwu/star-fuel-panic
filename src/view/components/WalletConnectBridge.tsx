@@ -19,7 +19,7 @@ export function WalletConnectBridge({ openSignal, isConnected }: WalletConnectBr
 
   useEffect(() => {
     if (isConnected) {
-      void connectModalRef.current?.hide?.();
+      void (connectModalRef.current as { close?: (returnValue?: string) => void } | null)?.close?.("connected");
     }
   }, [isConnected]);
 
@@ -31,7 +31,7 @@ export function WalletConnectBridge({ openSignal, isConnected }: WalletConnectBr
     setModalKey((prev) => prev + 1);
 
     const timer = setTimeout(() => {
-      void connectModalRef.current?.show?.();
+      void (connectModalRef.current as { show?: () => void } | null)?.show?.();
     }, 100);
 
     return () => clearTimeout(timer);

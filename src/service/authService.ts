@@ -1,179 +1,269 @@
 import { authStore, type AuthStore } from "@/model/authStore";
-import { WalletServiceError, walletService } from "@/service/walletService";
+import { WalletServiceError, walletService, type WalletService } from "@/service/walletService";
 import type { ControllerResult, FuelMissionErrorCode } from "@/types/fuelMission";
 
 const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT?.trim() ?? "";
 const LUX_COIN_TYPE = process.env.NEXT_PUBLIC_LUX_COIN_TYPE?.trim() || "0x2::sui::SUI";
 const LUX_DECIMALS = Number(process.env.NEXT_PUBLIC_LUX_DECIMALS ?? Number.NaN);
 
-function result<T>(ok: boolean, message: string, payload?: T, errorCode?: FuelMissionErrorCode): ControllerResult<T> {
-  return { ok, message, payload, errorCode };
-}
+/**
+ * AuthService - 钱包认证服务
+ *
+ * 职责：
+ * - 管理钱包连接/断开生命周期
+ * - 同步钱包状态到 authStore
+ * - 封装余额查询和交易签名
+ */
+class AuthService {
+  // ============ Private Fields ============
+  // 使用懒加载避免循环依赖问题
+  private _store: typeof authStore | null = null;
+  private _wallet: WalletService | null = null;
 
-function resolveWalletError(error: unknown, fallbackCode: FuelMissionErrorCode, fallbackMessage: string) {
-  if (error instanceof WalletServiceError) {
-    return result(false, error.message, undefined, error.code);
-  }
-  return result(false, fallbackMessage, undefined, fallbackCode);
-}
-
-function normalizeAddress(address: string | null | undefined) {
-  return address?.trim().toLowerCase() ?? null;
-}
-
-function toBaseUnits(amount: number, decimals: number) {
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 0n;
-  }
-
-  const safeDecimals = Number.isFinite(decimals) && decimals >= 0 ? Math.floor(decimals) : 9;
-  const fixed = amount.toFixed(safeDecimals);
-  const [wholePart, fractionPart = ""] = fixed.split(".");
-  const combined = `${wholePart}${fractionPart.padEnd(safeDecimals, "0")}`.replace(/^0+/, "") || "0";
-  return BigInt(combined);
-}
-
-export const authService = {
-  subscribe(listener: () => void) {
-    return authStore.subscribe(listener);
-  },
-
-  getSnapshot(): AuthStore {
-    return authStore.getState();
-  },
-
-  hydrateFromStorage() {
-    const activeAddress = walletService.getActiveAddress();
-    if (!activeAddress) {
-      return result(true, "no active wallet");
+  // ============ Lazy Getters ============
+  private get store(): typeof authStore {
+    if (!this._store) {
+      this._store = authStore;
     }
+    return this._store;
+  }
 
-    const storedAddress = walletService.getStoredAddress();
-    if (!storedAddress || normalizeAddress(storedAddress) !== normalizeAddress(activeAddress)) {
-      authStore.getState().disconnect();
-      return result(true, "wallet cache mismatch");
+  private get wallet(): WalletService {
+    if (!this._wallet) {
+      this._wallet = walletService;
     }
+    return this._wallet;
+  }
 
-    const balance = walletService.getStoredBalance();
-    authStore.getState().setWallet(activeAddress, Number.isNaN(balance) ? 0 : balance);
-    return result(true, "wallet restored", {
-      walletAddress: activeAddress,
-      luxBalance: Number.isNaN(balance) ? 0 : balance
-    });
-  },
+  // ============ Testing Support ============
+  /**
+   * 注入依赖（仅用于测试）
+   */
+  _injectDependencies(store: typeof authStore, wallet: WalletService): void {
+    this._store = store;
+    this._wallet = wallet;
+  }
 
-  async syncFromWalletProvider(walletAddress: string) {
+  // ============ Lifecycle ============
+
+  /**
+   * 订阅状态变化（供 useSyncExternalStore 使用）
+   */
+  subscribe = (listener: () => void): () => void => {
+    return this.store.subscribe(listener);
+  };
+
+  /**
+   * 获取当前状态快照
+   */
+  getSnapshot = (): AuthStore => {
+    return this.store.getState();
+  };
+
+  // ============ Public Methods ============
+
+  /**
+   * 同步钱包连接中状态
+   */
+  syncWalletConnecting(isConnecting: boolean): ControllerResult<void> {
+    if (this.store.getState().isConnecting === isConnecting) {
+      return this.result(true, "wallet connecting state unchanged");
+    }
+    this.store.getState().setConnecting(isConnecting);
+    return this.result(true, isConnecting ? "wallet connecting" : "wallet idle");
+  }
+
+  /**
+   * 从钱包提供者同步状态
+   */
+  async syncFromWalletProvider(walletAddress: string): Promise<ControllerResult<{
+    walletAddress: string;
+    luxBalance: number;
+  } | undefined>> {
     if (!walletAddress) {
-      return result(false, "wallet address missing", undefined, "E_WALLET_UNAVAILABLE");
+      return this.result(false, "wallet address missing", undefined, "E_WALLET_UNAVAILABLE");
     }
 
     try {
-      const balance = await walletService.getBalance(walletAddress);
-      authStore.getState().setWallet(walletAddress, balance);
-      return result(true, "wallet synchronized", {
+      const balance = await this.wallet.getBalance(walletAddress);
+      this.store.getState().setWallet(walletAddress, balance);
+      return this.result(true, "wallet synchronized", {
         walletAddress,
         luxBalance: balance
       });
     } catch (error) {
-      const previousState = authStore.getState();
+      const previousState = this.store.getState();
       const fallbackBalance =
-        normalizeAddress(previousState.walletAddress) === normalizeAddress(walletAddress) ? previousState.luxBalance : 0;
-      authStore.getState().setWallet(walletAddress, fallbackBalance);
-      return resolveWalletError(error, "E_WALLET_NETWORK", "wallet sync failed");
+        this.normalizeAddress(previousState.walletAddress) === this.normalizeAddress(walletAddress)
+          ? previousState.luxBalance
+          : 0;
+      this.store.getState().setWallet(walletAddress, fallbackBalance);
+      return this.resolveWalletError(error, "E_WALLET_NETWORK", "wallet sync failed");
     }
-  },
+  }
 
-  syncWalletDisconnected() {
-    authStore.getState().disconnect();
-    return result(true, "wallet disconnected");
-  },
+  /**
+   * 同步钱包断开状态
+   */
+  syncWalletDisconnected(): ControllerResult<void> {
+    this.store.getState().disconnect();
+    return this.result(true, "wallet disconnected");
+  }
 
-  async connectWallet() {
-    authStore.getState().setConnecting(true);
+  /**
+   * 连接钱包
+   */
+  async connectWallet(): Promise<ControllerResult<{
+    walletAddress: string;
+    luxBalance: number;
+  } | undefined>> {
+    this.store.getState().setConnecting(true);
     try {
-      const connected = await walletService.connectWallet();
-      authStore.getState().setWallet(connected.address, connected.balance);
-      return result(true, "wallet connected", {
+      const connected = await this.wallet.connectWallet();
+      return this.result(true, "wallet connected", {
         walletAddress: connected.address,
         luxBalance: connected.balance
       });
     } catch (error) {
-      authStore.getState().setConnecting(false);
-      return resolveWalletError(error, "E_WALLET_CONNECT_REJECTED", "wallet connect failed");
+      this.store.getState().setConnecting(false);
+      return this.resolveWalletError(error, "E_WALLET_CONNECT_REJECTED", "wallet connect failed");
     }
-  },
+  }
 
-  async disconnectWallet() {
+  /**
+   * 断开钱包
+   */
+  async disconnectWallet(): Promise<ControllerResult<void>> {
     try {
-      await walletService.disconnectWallet();
-      authStore.getState().disconnect();
-      return result(true, "wallet disconnected");
+      await this.wallet.disconnectWallet();
+      this.store.getState().disconnect();
+      return this.result(true, "wallet disconnected");
     } catch (error) {
-      return resolveWalletError(error, "E_WALLET_NETWORK", "wallet disconnect failed");
+      return this.resolveWalletError(error, "E_WALLET_NETWORK", "wallet disconnect failed");
     }
-  },
+  }
 
-  async refreshBalance() {
-    const state = authStore.getState();
+  /**
+   * 刷新余额
+   */
+  async refreshBalance(): Promise<ControllerResult<{ luxBalance: number } | undefined>> {
+    const state = this.store.getState();
     if (!state.walletAddress || !state.isConnected) {
-      return result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
-    }
-
-    try {
-      const balance = await walletService.getBalance(state.walletAddress);
-      authStore.getState().updateBalance(balance);
-      return result(true, "balance refreshed", { luxBalance: balance });
-    } catch (error) {
-      return resolveWalletError(error, "E_WALLET_NETWORK", "wallet balance refresh failed");
-    }
-  },
-
-  async signTransaction(txBytes: Uint8Array) {
-    const state = authStore.getState();
-    if (!state.walletAddress || !state.isConnected) {
-      return result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
+      return this.result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
     }
 
     try {
-      const signed = await walletService.signTransaction(txBytes);
-      return result(true, "transaction signed", signed);
+      const balance = await this.wallet.getBalance(state.walletAddress);
+      this.store.getState().updateBalance(balance);
+      return this.result(true, "balance refreshed", { luxBalance: balance });
     } catch (error) {
-      return resolveWalletError(error, "E_WALLET_SIGN_REJECTED", "wallet sign failed");
+      return this.resolveWalletError(error, "E_WALLET_NETWORK", "wallet balance refresh failed");
     }
-  },
+  }
 
-  async executeEntryPayment(amountLux: number) {
-    const state = authStore.getState();
+  /**
+   * 签名交易
+   */
+  async signTransaction(txBytes: Uint8Array): Promise<ControllerResult<{
+    signature: string;
+    txDigest: string;
+  } | undefined>> {
+    const state = this.store.getState();
     if (!state.walletAddress || !state.isConnected) {
-      return result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
+      return this.result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
+    }
+
+    try {
+      const signed = await this.wallet.signTransaction(txBytes);
+      return this.result(true, "transaction signed", signed);
+    } catch (error) {
+      return this.resolveWalletError(error, "E_WALLET_SIGN_REJECTED", "wallet sign failed");
+    }
+  }
+
+  /**
+   * 执行入场费支付
+   */
+  async executeEntryPayment(amountLux: number): Promise<ControllerResult<{
+    txDigest: string;
+    recipient: string;
+    luxBalance: number;
+  } | undefined>> {
+    const state = this.store.getState();
+    if (!state.walletAddress || !state.isConnected) {
+      return this.result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
     }
 
     if (!PAYMENT_RECIPIENT) {
-      return result(false, "entry payment recipient is not configured", undefined, "E_WALLET_UNAVAILABLE");
+      return this.result(false, "entry payment recipient is not configured", undefined, "E_WALLET_UNAVAILABLE");
     }
 
-    const amountBaseUnits = toBaseUnits(amountLux, LUX_DECIMALS);
+    const amountBaseUnits = this.toBaseUnits(amountLux, LUX_DECIMALS);
     if (amountBaseUnits <= 0n) {
-      return result(false, "invalid entry fee amount", undefined, "E_INSUFFICIENT_BALANCE");
+      return this.result(false, "invalid entry fee amount", undefined, "E_INSUFFICIENT_BALANCE");
     }
 
     try {
-      const payment = await walletService.signAndExecuteEntryPayment({
+      const payment = await this.wallet.signAndExecuteEntryPayment({
         recipient: PAYMENT_RECIPIENT,
         amountBaseUnits,
         coinType: LUX_COIN_TYPE
       });
 
-      const balance = await walletService.getBalance(state.walletAddress);
-      authStore.getState().updateBalance(balance);
+      const balance = await this.wallet.getBalance(state.walletAddress);
+      this.store.getState().updateBalance(balance);
 
-      return result(true, "entry payment executed", {
+      return this.result(true, "entry payment executed", {
         txDigest: payment.txDigest,
         recipient: PAYMENT_RECIPIENT,
         luxBalance: balance
       });
     } catch (error) {
-      return resolveWalletError(error, "E_WALLET_NETWORK", "entry payment transaction failed");
+      return this.resolveWalletError(error, "E_WALLET_NETWORK", "entry payment transaction failed");
     }
   }
-};
+
+  // ============ Private Helpers ============
+
+  private result<T>(
+    ok: boolean,
+    message: string,
+    payload?: T,
+    errorCode?: FuelMissionErrorCode
+  ): ControllerResult<T | undefined> {
+    return { ok, message, payload, errorCode };
+  }
+
+  private resolveWalletError<T>(
+    error: unknown,
+    fallbackCode: FuelMissionErrorCode,
+    fallbackMessage: string
+  ): ControllerResult<T | undefined> {
+    if (error instanceof WalletServiceError) {
+      return this.result(false, error.message, undefined, error.code);
+    }
+    return this.result(false, fallbackMessage, undefined, fallbackCode);
+  }
+
+  private normalizeAddress(address: string | null | undefined): string | null {
+    return address?.trim().toLowerCase() ?? null;
+  }
+
+  private toBaseUnits(amount: number, decimals: number): bigint {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return 0n;
+    }
+
+    const safeDecimals = Number.isFinite(decimals) && decimals >= 0 ? Math.floor(decimals) : 9;
+    const fixed = amount.toFixed(safeDecimals);
+    const [wholePart, fractionPart = ""] = fixed.split(".");
+    const combined = `${wholePart}${fractionPart.padEnd(safeDecimals, "0")}`.replace(/^0+/, "") || "0";
+    return BigInt(combined);
+  }
+}
+
+// 导出单例实例
+export const authService = new AuthService();
+
+// 导出类（用于测试 mock）
+export { AuthService };

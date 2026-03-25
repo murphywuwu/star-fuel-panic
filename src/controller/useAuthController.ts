@@ -1,9 +1,9 @@
 "use client";
 
-import { useCurrentAccount, useCurrentClient, useDAppKit, useWallets, type UiWallet } from "@mysten/dapp-kit-react";
+import { useCurrentAccount, useCurrentClient, useDAppKit, useWalletConnection, useWallets, type UiWallet } from "@mysten/dapp-kit-react";
 import { toBase64 } from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { selectWalletShort } from "@/model/authStore";
 import { authService } from "@/service/authService";
 import { setWalletRuntimeBridge } from "@/service/walletService";
@@ -60,8 +60,10 @@ export function useAuthController() {
   const dAppKit = useDAppKit();
   const wallets = useWallets();
   const account = useCurrentAccount();
+  const walletConnection = useWalletConnection();
   const client = useCurrentClient();
   const decimalsRef = useRef<number | null>(Number.isFinite(DEFAULT_DECIMALS) ? DEFAULT_DECIMALS : null);
+  const [connectOpenSignal, setConnectOpenSignal] = useState(0);
 
   const state = useSyncExternalStore(
     authService.subscribe,
@@ -90,8 +92,8 @@ export function useAuthController() {
           window.localStorage.removeItem("sui:dapp-kit:wallet-connection-info");
         }
       },
-      currentAddress: () => account?.address ?? null,
-      isWalletReady: () => Boolean(account?.address),
+      currentAddress: () => (walletConnection.status === "connected" ? account?.address ?? null : null),
+      isWalletReady: () => walletConnection.status === "connected" && Boolean(account?.address),
       signTransaction: (txBytes: Uint8Array) =>
         dAppKit.signTransaction({
           transaction: toBase64(txBytes)
@@ -122,16 +124,17 @@ export function useAuthController() {
         return balanceToDisplayUnits(response.balance.balance, decimalsRef.current ?? 9);
       }
     });
-  }, [account?.address, client, dAppKit, wallets]);
+  }, [account?.address, client, dAppKit, walletConnection.status, wallets]);
 
   useEffect(() => {
-    authService.hydrateFromStorage();
-  }, []);
+    const providerConnecting = walletConnection.status === "connecting" || walletConnection.status === "reconnecting";
+    authService.syncWalletConnecting(providerConnecting);
+  }, [walletConnection.status]);
 
   useEffect(() => {
-    const providerAddress = account?.address ?? null;
+    const providerAddress = walletConnection.status === "connected" ? account?.address ?? null : null;
     if (!providerAddress) {
-      if (state.isConnected) {
+      if (state.isConnected && walletConnection.status === "disconnected") {
         authService.syncWalletDisconnected();
       }
       return;
@@ -140,7 +143,7 @@ export function useAuthController() {
     if (!state.isConnected || normalizeAddress(state.walletAddress) !== normalizeAddress(providerAddress)) {
       void authService.syncFromWalletProvider(providerAddress);
     }
-  }, [account?.address, state.isConnected, state.walletAddress]);
+  }, [account?.address, state.isConnected, state.walletAddress, walletConnection.status]);
 
   useEffect(() => {
     if (!state.isConnected || !state.walletAddress) {
@@ -158,11 +161,20 @@ export function useAuthController() {
 
   return {
     state,
+    ui: {
+      connectOpenSignal
+    },
     selectors: {
       walletShort: selectWalletShort(state)
     },
     actions: {
-      onConnectWallet: () => authService.connectWallet(),
+      onConnectWallet: async () => {
+        setConnectOpenSignal((prev) => prev + 1);
+        return {
+          ok: true,
+          message: "wallet connect modal opened"
+        };
+      },
       onDisconnectWallet: () => authService.disconnectWallet(),
       onRefreshBalance: () => authService.refreshBalance(),
       onSignTransaction: (txBytes: Uint8Array) => authService.signTransaction(txBytes),
