@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
 import { useFuelMissionController } from "@/controller/useFuelMissionController";
 import type { TeamRole, TeamState } from "@/types/fuelMission";
-import { FuelMissionShell } from "@/view/components/FuelMissionShell";
+import { MatchShell } from "@/view/components/MatchShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
@@ -266,7 +266,7 @@ export function FuelFrogLobbyScreen() {
   };
 
   return (
-    <FuelMissionShell
+    <MatchShell
       title="SQUAD MANAGEMENT / LOBBY"
       subtitle="Create a squad, inspect open squads, pick role, then join and pay on the same team card."
       activeRoute="/planning"
@@ -275,113 +275,43 @@ export function FuelFrogLobbyScreen() {
       roomId={state.room?.roomId}
       staleSnapshot={state.staleSnapshot}
     >
-      <div className="overflow-hidden border border-eve-red/20 bg-[linear-gradient(180deg,rgba(8,8,8,0.96)_0%,rgba(26,26,26,0.96)_100%)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-eve-red/15 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-eve-red">MATCH GATE</span>
-            <span className="border border-eve-yellow/30 bg-eve-yellow/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-eve-yellow">
-              Min Gate {minTeams}
-            </span>
-            <span className="border border-eve-offwhite/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/75">
-              Cap {maxTeams}
-            </span>
-          </div>
-          <span
-            className={cn(
-              "text-[10px] uppercase tracking-[0.14em]",
-              paidTeams >= maxTeams && startRuleMode === "full_paid" ? "text-eve-yellow" : "text-eve-offwhite/60"
-            )}
-          >
-            {startRuleMode === "full_paid" ? "Awaiting full paid lock" : "Force-start rule armed"}
+      <div className="overflow-hidden border border-eve-red/20 bg-[linear-gradient(180deg,rgba(8,8,8,0.96)_0%,rgba(26,26,26,0.96)_100%)] px-4 py-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-eve-red">MATCH GATE</span>
+          <span className="font-mono text-xs text-eve-offwhite/70">
+            {paidTeams}/{maxTeams} teams ready
           </span>
         </div>
 
-        <div className="grid gap-4 px-3 py-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.95fr)]">
-          <div>
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/60">
-              <span>Team Corridor</span>
-              <span className="font-mono text-eve-offwhite/85">{paidTeams} paid / {registeredTeams} registered / {maxTeams} capacity</span>
-            </div>
-            <div className="mt-3 grid grid-cols-5 gap-2 md:grid-cols-10">
-              {Array.from({ length: maxTeams }, (_, index) => {
-                const slotNumber = index + 1;
-                const isPaid = slotNumber <= paidTeams;
-                const isRegistered = !isPaid && slotNumber <= registeredTeams;
-                const reachedMinGate = slotNumber <= minTeams;
+        <div className="relative mt-4 h-3 overflow-hidden rounded-sm bg-eve-grey/60">
+          {minGateRatio > 0 && (
+            <div
+              className="absolute top-0 bottom-0 w-px bg-eve-yellow/90 z-10"
+              style={{ left: `${minGateRatio * 100}%` }}
+            />
+          )}
+          <div
+            className="absolute left-0 top-0 h-full bg-eve-yellow/40 transition-all duration-300"
+            style={{ width: `${registeredRatio * 100}%` }}
+          />
+          <div
+            className="absolute left-0 top-0 h-full bg-eve-red transition-all duration-300"
+            style={{ width: `${paidRatio * 100}%` }}
+          />
+        </div>
 
-                return (
-                  <div
-                    key={slotNumber}
-                    className={cn(
-                      "relative border px-2 py-3 text-center",
-                      isPaid
-                        ? "border-eve-red bg-eve-red/18"
-                        : isRegistered
-                          ? "border-eve-yellow/50 bg-eve-yellow/10"
-                          : "border-eve-offwhite/10 bg-eve-black/55"
-                    )}
-                  >
-                    {reachedMinGate ? (
-                      <div className="absolute inset-x-1 top-1 h-px bg-eve-yellow/80" />
-                    ) : null}
-                    <p
-                      className={cn(
-                        "font-mono text-[10px] uppercase tracking-[0.14em]",
-                        isPaid ? "text-eve-red" : isRegistered ? "text-eve-yellow" : "text-eve-offwhite/35"
-                      )}
-                    >
-                      T{slotNumber}
-                    </p>
-                    <p className="mt-2 text-[9px] uppercase tracking-[0.12em] text-eve-offwhite/70">
-                      {isPaid ? "Paid" : isRegistered ? "Queued" : "Open"}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.12em] text-eve-offwhite/55">
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 bg-eve-red" />
-                Paid lock
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 bg-eve-yellow" />
-                Registered not paid
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-2 w-2 border border-eve-offwhite/30" />
-                Empty slot
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-px w-4 bg-eve-yellow/80" />
-                Min gate marker
-              </span>
-            </div>
+        <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.12em]">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 bg-eve-red" />
+              <span className="text-eve-offwhite/70">Paid {paidTeams}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 bg-eve-yellow/40" />
+              <span className="text-eve-offwhite/70">Registered {registeredTeams}</span>
+            </span>
           </div>
-
-          <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="border border-eve-yellow/20 bg-eve-black/55 px-3 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/55">Registered</p>
-              <p className="mt-1 font-mono text-2xl text-eve-yellow">{registeredTeams}</p>
-              <div className="mt-2 h-1.5 bg-eve-grey/80">
-                <div className="h-full bg-eve-yellow" style={{ width: `${registeredRatio * 100}%` }} />
-              </div>
-            </div>
-            <div className="border border-eve-red/20 bg-eve-black/55 px-3 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/55">Paid</p>
-              <p className="mt-1 font-mono text-2xl text-eve-red">{paidTeams}</p>
-              <div className="mt-2 h-1.5 bg-eve-grey/80">
-                <div className="h-full bg-eve-red" style={{ width: `${paidRatio * 100}%` }} />
-              </div>
-            </div>
-            <div className="border border-eve-offwhite/12 bg-eve-black/55 px-3 py-3">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/55">Pending</p>
-              <p className="mt-1 font-mono text-2xl text-eve-offwhite">{pendingTeams}</p>
-              <p className="mt-2 text-[10px] uppercase tracking-[0.12em] text-eve-offwhite/50">
-                waiting for pay
-              </p>
-            </div>
-          </div>
+          <span className="text-eve-yellow/80">Min {minTeams}</span>
         </div>
       </div>
 
@@ -639,6 +569,6 @@ export function FuelFrogLobbyScreen() {
       <p className="border border-eve-yellow/35 bg-eve-black/70 px-3 py-2 font-mono text-xs uppercase tracking-[0.12em] text-eve-offwhite">
         {message}
       </p>
-    </FuelMissionShell>
+    </MatchShell>
   );
 }

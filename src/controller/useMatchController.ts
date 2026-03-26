@@ -1,53 +1,146 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { scoreStore, selectLiveScore, selectMyScore, selectRecentEvents } from "@/model/scoreStore";
-import { fuelMissionStore } from "@/model/fuelMissionStore";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { matchService } from "@/service/matchService";
+import { matchStreamService, type MatchStreamHealth } from "@/service/matchStreamService";
+import type { MatchScoreboardSnapshot, MatchStreamEvent } from "@/types/match";
+import type { MemberScoreLine, ScoreBoard } from "@/types/fuelMission";
+
+function mergeMatchScoreboard(
+  scoreboard: MatchScoreboardSnapshot,
+  previous: ScoreBoard | null
+): ScoreBoard {
+  const previousMembers = new Map<string, MemberScoreLine[]>(
+    (previous?.teams ?? []).map((team) => [team.teamId, team.members])
+  );
+
+  return {
+    matchId: scoreboard.matchId,
+    lastUpdated: Date.parse(scoreboard.updatedAt) || Date.now(),
+    teams: scoreboard.teams.map((team) => ({
+      teamId: team.teamId,
+      teamName: team.teamName,
+      totalScore: team.score,
+      members: previousMembers.get(team.teamId) ?? []
+    }))
+  };
+}
 
 export function useMatchController() {
-  const missionState = useSyncExternalStore(
-    fuelMissionStore.subscribe,
-    fuelMissionStore.getState,
-    fuelMissionStore.getState
+  const matchState = useSyncExternalStore(
+    matchService.subscribeMatchRuntime,
+    matchService.getMatchRuntimeSnapshot,
+    matchService.getMatchRuntimeSnapshot
   );
   const scoreState = useSyncExternalStore(
-    scoreStore.subscribe,
-    scoreStore.getState,
-    scoreStore.getState
+    matchService.subscribeScore,
+    matchService.getScoreSnapshot,
+    matchService.getScoreSnapshot
   );
 
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const legacyUnsubscribeRef = useRef<(() => void) | null>(null);
+  const publicStreamUnsubscribeRef = useRef<(() => void) | null>(null);
   const activeMatchIdRef = useRef<string | null>(null);
+  const [streamHealth, setStreamHealth] = useState<MatchStreamHealth>("disconnected");
+  const [matchScoreboard, setMatchScoreboard] = useState<MatchScoreboardSnapshot | null>(null);
 
-  const startWatching = useCallback((matchId: string) => {
-    if (!matchId) {
-      return;
-    }
-
-    if (unsubscribeRef.current && activeMatchIdRef.current === matchId) {
-      return;
-    }
-
-    unsubscribeRef.current?.();
-    activeMatchIdRef.current = matchId;
-
-    const stop = matchService.subscribeMatchStream(matchId, {
-      onStatusChange: () => {},
-      onScoreUpdate: (board) => scoreStore.getState().setScoreBoard(board),
-      onScoreEvent: (event) => scoreStore.getState().appendEvent(event),
-      onPanicMode: () => {},
-      onSettlementStart: () => {},
-      onFilterRejected: (audit) => scoreStore.getState().appendRejection(audit)
-    });
-
-    unsubscribeRef.current = stop;
+  const applyScoreboard = useCallback((scoreboard: MatchScoreboardSnapshot) => {
+    setMatchScoreboard(scoreboard);
+    const snapshot = matchService.getScoreSnapshot();
+    snapshot.setScoreBoard(mergeMatchScoreboard(scoreboard, snapshot.scoreBoard));
   }, []);
 
+  const handleStreamEvent = useCallback(
+    (event: MatchStreamEvent) => {
+      if (event.type === "score_update") {
+        applyScoreboard(event.scoreboard);
+        return;
+      }
+
+      if (event.type === "node_status") {
+        setMatchScoreboard((current) => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            targetNodes: event.targetNodes
+          };
+        });
+      }
+    },
+    [applyScoreboard]
+  );
+
+  const startWatching = useCallback(
+    (matchId: string) => {
+      if (!matchId) {
+        return;
+      }
+
+      if (legacyUnsubscribeRef.current && activeMatchIdRef.current === matchId) {
+        return;
+      }
+
+      publicStreamUnsubscribeRef.current?.();
+      publicStreamUnsubscribeRef.current = null;
+      legacyUnsubscribeRef.current?.();
+      legacyUnsubscribeRef.current = null;
+      activeMatchIdRef.current = matchId;
+      setMatchScoreboard(null);
+      setStreamHealth("connecting");
+
+      legacyUnsubscribeRef.current = matchService.subscribeMatchStream(matchId, {
+        onStatusChange: () => {},
+        onRemainingChange: () => {},
+        onScoreUpdate: (board) => matchService.getScoreSnapshot().setScoreBoard(board),
+        onScoreEvent: (event) => matchService.getScoreSnapshot().appendEvent(event),
+        onPanicMode: () => {},
+        onSettlementStart: () => {},
+        onFilterRejected: (audit) => matchService.getScoreSnapshot().appendRejection(audit)
+      });
+
+      void matchStreamService
+        .getScoreboard(matchId)
+        .then((scoreboard) => {
+          if (activeMatchIdRef.current !== matchId) {
+            return;
+          }
+          applyScoreboard(scoreboard);
+        })
+        .catch(() => {
+          if (activeMatchIdRef.current === matchId) {
+            setStreamHealth("stale");
+          }
+        });
+
+      void matchStreamService
+        .subscribe(matchId, handleStreamEvent, setStreamHealth)
+        .then((stopPublicStream) => {
+          if (activeMatchIdRef.current !== matchId) {
+            stopPublicStream();
+            return;
+          }
+          publicStreamUnsubscribeRef.current = stopPublicStream;
+        })
+        .catch(() => {
+          if (activeMatchIdRef.current === matchId) {
+            setStreamHealth("disconnected");
+          }
+        });
+    },
+    [applyScoreboard, handleStreamEvent]
+  );
+
   const stopWatching = useCallback(() => {
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = null;
+    publicStreamUnsubscribeRef.current?.();
+    publicStreamUnsubscribeRef.current = null;
+    legacyUnsubscribeRef.current?.();
+    legacyUnsubscribeRef.current = null;
     activeMatchIdRef.current = null;
+    setMatchScoreboard(null);
+    setStreamHealth("disconnected");
   }, []);
 
   useEffect(() => {
@@ -56,19 +149,34 @@ export function useMatchController() {
     };
   }, [stopWatching]);
 
-  const activeWallet = missionState.contributions[0]?.playerId ?? null;
+  const activeWallet = matchState.contributions[0]?.playerId ?? null;
   const myScore = useMemo(
-    () => (activeWallet ? selectMyScore(scoreState, activeWallet) : null),
+    () => {
+      if (!activeWallet || !scoreState.scoreBoard) {
+        return null;
+      }
+
+      for (const team of scoreState.scoreBoard.teams) {
+        const member = team.members.find((item) => item.walletAddress === activeWallet);
+        if (member) {
+          return member;
+        }
+      }
+
+      return null;
+    },
     [activeWallet, scoreState]
   );
 
   return {
-    status: missionState.status,
-    remainingSec: missionState.remainingSec,
-    isPanic: missionState.isPanic,
+    status: matchState.status,
+    remainingSec: matchState.remainingSec,
+    isPanic: matchState.isPanic,
     scoreBoard: scoreState.scoreBoard,
-    liveTeamScores: selectLiveScore(scoreState),
-    eventFeed: selectRecentEvents(scoreState, 20),
+    matchScoreboard,
+    streamHealth,
+    liveTeamScores: scoreState.scoreBoard?.teams ?? [],
+    eventFeed: scoreState.eventFeed.slice(0, 20),
     rejectionFeed: scoreState.rejectionFeed.slice(0, 20),
     myScore,
     startWatching,

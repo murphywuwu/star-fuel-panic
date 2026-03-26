@@ -1,339 +1,197 @@
-# TODO: Fuel Frog Panic Implementation Backlog
+# TODO: Fuel Frog Panic Execution Backlog
 
-Version: v1.0
-Last Updated: 2026-03-21
-Source Docs: `docs/PRD.md`, `docs/architecture.md`, `docs/SPEC.md`
-
-## Usage Rules
-
-- 一级分类：按功能分类（F-000 ~ F-006）
-- 二级分类：按架构层分类（View / Controller / Service / Model / Data / Contract / QA）
-- 任务状态：
-  - `[ ]` Todo
-  - `[~]` In Progress
-  - `[x]` Done
-- 依赖规则：标注 `depends on: T-xxx`
+Version: v2.6.1
+Last Updated: 2026-03-26
+Source Docs: `docs/PRD.md` v2.6, `docs/architecture.md` v6.0, `docs/SPEC.md` v6.0
+Maintainer: Todo Agent
 
 ---
 
-## F-000 钱包连接与身份（PRD 4.0）
-
-### View Layer
-
-- [x] **T-0001** 实现钱包连接引导页与未连接限制态（浏览可用、操作受限）
-- [x] **T-0002** 实现右上角钱包状态栏（地址缩写、余额、断开）
-
-### Controller Layer
-
-- [x] **T-0003** 新增 `useAuthController`：`connect / disconnect / refreshBalance`
-- [x] **T-0004** 将钱包错误码映射为可展示文案（余额不足、签名拒绝、网络错误）
-
-### Service Layer
-
-- [x] **T-0005** 实现 `walletService.connectWallet()`
-- [x] **T-0006** 实现 `walletService.signTransaction()` 与交易签名失败重试策略
-- [x] **T-0007** 实现 `walletService.getBalance()` 周期刷新
-
-### Model Layer
-
-- [x] **T-0008** 实现 `authStore`（walletAddress/luxBalance/isConnected）
-- [x] **T-0009** 实现 `selectWalletShort` 与连接状态 selector
-
-### QA
-
-- [x] **T-0010** 验证未连接状态下禁止 Join/Pay/Settlement 行为
-
----
-
-## F-007 钱包真实接入修复（Wallet Standard）
-
-### Research / Architecture
-
-- [x] **T-0100** 对照 `docs/eve_bootcamp.md` 与 Sui dApp Kit 文档，确认 Wallet Standard 集成方案
-
-### View / App Integration
-
-- [x] **T-0101** 引入 `DAppKitProvider`（Next.js Client Wrapper）并完成全局接入
-
-### Controller / Service
-
-- [x] **T-0102** 移除 `walletService` 随机地址/随机签名 fallback，改为 Wallet Standard 真连接
-- [x] **T-0103** 实现钱包身份挑战签名（`signPersonalMessage`）与签名校验
-- [x] **T-0104** 在 `useAuthController` 中对齐钱包自动连接状态（account 变化同步 authStore）
-- [x] **T-0107** 将 `pay-entry` 改为真实链上交易执行：前端发起 `signAndExecuteTransaction` 并回填 tx digest
-
-### Env / QA
-
-- [x] **T-0105** 增补钱包接入环境变量与说明（network/rpc/coin）
-- [x] **T-0106** 执行 `pnpm typecheck` 与 `pnpm lint:imports` 验证改造结果
-- [x] **T-0108** 新增 `NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT` 并验证支付链路使用真实 digest
-
----
-
-## F-001 任务发现与比赛大厅（PRD 4.1）
-
-### View Layer
-
-- [x] **T-0011** 实现 `HeatmapScreen`（左图右表双栏联动）
-- [x] **T-0012** 实现 `MatchCard` 字段渲染：奖池、入场费、倒计时
-- [x] **T-0013** 实现并强制展示战队参数：`minTeams/maxTeams/当前报名数/开赛门槛摘要`
-- [x] **T-0014** 实现站点详情弹窗并同步显示同源战队参数（与卡片一致）
-
-### Controller Layer
-
-- [x] **T-0015** 实现 `useMissionController.loadMissions(filters)`
-- [x] **T-0016** 实现任务筛选/排序（按奖池 x 紧急度）与选中任务联动
-
-### Service Layer
-
-- [x] **T-0017** 实现 `missionService.fetchMissions()` 对接 Supabase
-- [x] **T-0018** 实现 mission Realtime 订阅（比赛状态变化/奖池变化）
-
-### Model Layer
-
-- [x] **T-0019** 实现 `missionStore`（missions/loading/selectedMission）
-- [x] **T-0020** 扩展 Mission 类型：`minTeams/maxTeams/entryFee/prizePool`
-
-### Data Layer
-
-- [x] **T-0021** 建立 `missions` 表与索引（含 `min_teams/max_teams` 字段）
-- [x] **T-0022** 配置 `missions` 的只读 RLS（公开可读）
-
-### Edge / Backend
-
-- [x] **T-0023** 实现 `node-scanner`（5s 轮询 NetworkNode）
-- [x] **T-0024** 自动创建紧急任务时写入可配置战队上限（非固定 4）
-
-### QA
-
-- [x] **T-0025** 验证任务卡与详情弹窗中的战队参数一致性
-
----
-
-## F-002 组队、角色锁定与入场支付（PRD 4.2 / 6）
-
-### View Layer
-
-- [x] **T-0026** 实现 `LobbyScreen`（队伍列表、角色槽、锁定按钮）
-- [x] **T-0027** 在组队页顶持续显示战队规模与开赛门槛摘要
-- [x] **T-0028** 实现 `Join & Pay` 按钮置灰逻辑与未达标提示
-- [x] **T-0028A** 收口 `/planning` 页面为纯组队流程：移除任务地图、奖池预览和房间调试入口，仅保留创建战队、查看招募战队、选择角色、锁队与支付
-- [x] **T-0028B** 将组队页顶部的比赛门槛信息压缩为轻量状态条，保留持续展示但移除独立大卡片
-- [x] **T-0028C** 按 PRD 重排 `/planning`：突出“已有战队卡片 + 创建战队按钮”，并保证加入/锁队/支付均可在战队卡片上下文完成
-- [x] **T-0100** 将 `/planning` 顶部比赛门槛摘要升级为可视化进度条，突出 `registered/paid` 进度与开赛门槛
-- [x] **T-0101** 继续优化 `/planning` 顶部比赛信息 UI，弱化原始数字句子感，改成更图形化的门槛面板与状态提示
-
-### Controller Layer
-
-- [x] **T-0029** 实现 `useLobbyController.createTeam/joinTeam/lockTeam`
-- [x] **T-0030** 实现 `useLobbyController.payEntry` 编排（余额校验 -> 签名 -> 后端提交）
-
-### Service Layer
-
-- [x] **T-0031** 实现 `lobbyService.createTeam/joinTeam/lockTeam`
-- [x] **T-0032** 实现 `lobbyService.payEntry()`（提交 txDigest + memberAddresses）
-- [x] **T-0033** 实现 Lobby Realtime 订阅（teams/team_members/match 状态）
-
-### Model Layer
-
-- [x] **T-0034** 实现 `lobbyStore`（match/teams/members/myTeamId）
-- [x] **T-0035** 实现 `selectTeamSlots/selectIsTeamReady/selectMyRole`
-
-### Data Layer
-
-- [x] **T-0036** 建立 `matches/teams/team_members/match_whitelist/match_targets` 表
-- [x] **T-0037** 建立唯一约束：同队钱包唯一、白名单复合主键唯一
-
-### Contract Layer
-
-- [x] **T-0038** 实现 `register_whitelist` 接口调用链（后端到合约）
-
-### Edge / Backend
-
-- [x] **T-0039** 实现 `create-team` Edge Function
-- [x] **T-0040** 实现 `join-team` Edge Function
-- [x] **T-0041** 实现 `lock-team` Edge Function
-- [x] **T-0042** 实现 `pay-entry` Edge Function（验证付款 tx + 写白名单 + 更新队状态）
-
-### QA
-
-- [x] **T-0043** 验证队长付费后，成员地址全部进入白名单
-
----
-
-## F-003 链上归因计分（PRD 5 / 7）
-
-### View Layer
-
-- [x] **T-0044** 实现实时分数板与个人贡献展示
-- [x] **T-0045** 实现弹幕区（score_events 驱动）
-
-### Controller Layer
-
-- [x] **T-0046** 实现 `useMatchController` 的 score stream 绑定与解绑
-
-### Service Layer
-
-- [x] **T-0047** 实现 `matchService.subscribeMatchStream()`
-- [x] **T-0048** 实现 `scoringService` 客户端投影逻辑（仅展示，不改业务真值）
-
-### Model Layer
-
-- [x] **T-0049** 实现 `scoreStore`（scoreBoard/eventFeed）
-- [x] **T-0050** 实现 `selectLiveScore/selectRecentEvents/selectMyScore`
-
-### Data Layer
-
-- [x] **T-0051** 建立 `score_events` 表与唯一键 `UNIQUE(match_id, tx_digest)`
-- [x] **T-0052** 建立 `audit_logs` 表用于过滤拒绝记录
-
-### Edge / Backend
-
-- [x] **T-0053** 实现 `chain-sync`（2s 轮询 FuelEvent）
-- [x] **T-0054** 实现三重过滤：白名单/站点/时间窗口
-- [x] **T-0055** 实现得分公式：`fuel_delta * urgency_weight * panic_multiplier`
-- [x] **T-0056** 实现过滤拒绝审计日志（reason code）
-
-### QA
-
-- [x] **T-0057** 验证非白名单事件不计分
-- [x] **T-0058** 验证窗口外事件不计分
-- [x] **T-0059** 验证重复 tx_digest 不重复记分
-
----
-
-## F-004 比赛状态机与实时反馈（PRD 4.3）
-
-### View Layer
-
-- [x] **T-0060** 实现倒计时与状态标签（Lobby/PreStart/Running/Panic/Settling/Settled）
-- [x] **T-0061** 实现 Panic 模式视觉强化（边框脉冲、横幅、颜色切换）
-- [x] **T-0062** 实现 Optimistic UI 虚线预更新与回退
-- [x] **T-0099** 修复 `/match` 页面显示以对齐 PRD 4.3.2：收敛为“顶栏/得分板/站点状态栏/弹幕区”四区浮窗布局，移除调试导向的大块控制面板
-
-### Controller Layer
-
-- [x] **T-0063** 编排 match 状态变更到 UI 过渡动画
-
-### Service Layer
-
-- [x] **T-0064** 实现 match Realtime 订阅（matches 更新 + panic broadcast）
-
-### Model Layer
-
-- [x] **T-0065** 实现 `matchStore`（status/remainingSec/isPanic）
-
-### Contract Layer
-
-- [x] **T-0066** 实现/对接 `start_match()` 上链调用
-
-### Edge / Backend
-
-- [x] **T-0067** 实现 `match-tick`（1s）：驱动状态机
-- [x] **T-0068** 在剩余 90 秒时广播 `panic_mode`
-- [x] **T-0069** 状态非法迁移写审计日志并阻断
-
-### QA
-
-- [x] **T-0070** 验证状态迁移路径与 PRD 一致
-- [x] **T-0071** 验证 Panic 在最后 90 秒准确触发
-
----
-
-## F-005 结算与分账（PRD 4.4）
-
-### View Layer
-
-- [x] **T-0072** 实现 `SettlementScreen`（总奖池、队伍分配、个人分配、MVP）
-- [x] **T-0073** 实现出口按钮：链上记录 / 分享战报 / 再来一局
-
-### Controller Layer
-
-- [x] **T-0074** 实现 `useSettlementController.loadBill(matchId)`
-
-### Service Layer
-
-- [x] **T-0075** 实现 `settlementService.fetchSettlementBill()`
-
-### Model Layer
-
-- [x] **T-0076** 实现 `settlementStore`（bill/loading）与 `selectMyPayout`
-
-### Data Layer
-
-- [x] **T-0077** 建立 `settlements` 表，约束 `UNIQUE(match_id)`（幂等）
-
-### Contract Layer
-
-- [x] **T-0078** 实现/对接 `end_match_and_settle()` 上链发奖
-
-### Edge / Backend
-
-- [x] **T-0079** 实现 `trigger-settlement`：排名计算 + 两层分配 + 链上提交
-- [x] **T-0080** 实现 `get-settlement-bill`：返回 `SettlementBillDTO`
-- [x] **T-0081** 幂等控制：重复结算请求返回同一结果，不重复出账
-
-### QA
-
-- [x] **T-0082** 验证 1/2/3/≥4 队分配比例符合 PRD
-- [x] **T-0083** 验证个人分配按贡献比分配，0 分成员奖励为 0
-
----
-
-## F-006 防作弊与可观测性（PRD 7.4）
-
-### Service / Edge Layer
-
-- [x] **T-0084** 为 filter rejection 定义 reason code 枚举
-- [x] **T-0085** 为结算失败定义错误分类与告警分级
-- [x] **T-0086** 输出关键指标：event lag / ws latency / settlement success
-
-### Data Layer
-
-- [x] **T-0087** 为 `audit_logs` 增加查询索引（`match_id`, `event_type`, `created_at`）
-
-### QA
-
-- [x] **T-0088** 演练异常链路：RPC 超时、重复结算、非法状态迁移
-
----
-
-## Cross-Feature Infrastructure
-
-### Architecture Governance
-
-- [x] **T-0089** 建立 import lint 规则，确保 `View -> Controller -> Service -> Model` 单向依赖
-- [x] **T-0090** 禁止 View 直接调用 Supabase Client
-
-### Environment & Deployment
-
-- [x] **T-0091** 配置环境变量：`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUI_RPC_URL`
-- [x] **T-0092** 配置 Edge Functions secrets（service role、private keys）
-- [x] **T-0093** 编写部署检查清单（Vercel + Supabase）
-
----
-
-## Testing Milestones
-
-### M1: 主链路可跑通
-
-- [x] **T-0094** 集成回归：`Lobby -> Lock -> Pay -> Running -> Settled`
-
-### M2: 合约与 devnet 验证
-
-- [x] **T-0095** 执行 `sui move test`
-- [x] **T-0096** 执行 devnet `publish/call/query-events` 并记录结果
-
-### M3: 发布前验收
-
-- [x] **T-0097** 验证 UI 强制条款：比赛卡片/详情/组队页战队参数一致展示
-- [x] **T-0098** 验证结算账单可追溯到链上 tx（commitment/settlement）
-
----
-
-## Suggested Critical Path
-
-1. T-001, T-002, T-003, T-0021, T-0036, T-0051, T-0077
-2. T-0038, T-0042, T-0053, T-0067, T-0079
-3. T-0011, T-0026, T-0044, T-0072
-4. T-0094, T-0095, T-0096, T-0097, T-0098
+## 0. One-Screen Execution Summary (Problem / Why / How)
+
+- Problem this execution batch solves:
+  当前 TODO 仍带有 `PRD v2.3 / mission / host_created / official_free_target` 时代的分组与术语，已经无法作为 `PRD v2.6` 的执行源。
+- Why these tasks now:
+  `PRD v2.6` 新增并固化了星系选择规则、`free / precision` 双模式、创建与发布拆分、Lobby 位置推荐、以及 5% 平台抽成；这些都要求 TODO 重新排布关键路径。
+- How we solve it (critical 3-step execution path):
+  1. 先把比赛创建、发布、发现三条 API/前端链路切到 `match / solar-system / network-node` 新口径。
+  2. 再补齐 Team Lobby、Match Runtime、Settlement 对新奖池和新状态机的接口收口。
+  3. 最后完成 projection runtime、worker、devnet 集成和回归测试，收敛遗留 `mission` 兼容层。
+- Expected delivery outcome:
+  `docs/TODO.md` 成为当前唯一可执行待办基线，明确哪些能力已落地，哪些仍需按 PRD v2.6 补齐。
+
+## 0.1 Before vs After (Execution Value)
+
+| Dimension | Before | After |
+|---|---|---|
+| Delivery clarity | TODO 仍引用旧 PRD 和旧模式命名 | TODO 与 PRD v2.6 / SPEC v6.0 对齐 |
+| Delivery speed | 新需求混在旧 backlog 中，难以排关键路径 | 未完成项按依赖顺序收敛到可执行主线 |
+| Delivery confidence | 很难判断哪些是已做能力，哪些是文档欠账 | 每个任务都带状态、依赖、验收信号 |
+
+## 1. Document Control
+
+- Project/App: `Fuel Frog Panic`
+- Related PRD: `docs/PRD.md`
+- Related SPEC: `docs/SPEC.md`
+- Related Architecture: `docs/architecture.md`
+- Template Used: `docs/templates/todo-template.md`
+- Notes:
+  当前文档将旧版细粒度 TODO 聚合为 v2.6 基线任务；任务完成态统一使用表格首列 `Done` 的 `[x]/[ ]` 标记，并结合当前路由/runtime 结构做了最小核对。
+
+## 2. Task Board
+
+### F-000 Entry / Wallet / Auth
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0001 | F-000 | 3.1 | View / Controller | 保持钱包连接引导、地址栏、余额刷新、断开重连链路可用 | 所有比赛/付费行为的前置入口 | - | 首页与侧栏能正确显示 `Connect / Address / Balance / Exit` |
+| [x] | T-0002 | F-000 | 3.1 | Service / Model | 维持 `authService`、`walletService`、`authStore` 与 dApp Kit provider 的真实连接态同步 | 避免假连接和错误余额口径 | T-0001 | 连接后 `authStore.walletAddress/isConnected` 与 UI 一致 |
+| [x] | T-0003 | F-000 | 3.1, 6.1 | Service / API | 保持身份挑战签名与真实支付 digest 回填能力 | 为写接口鉴权和链上归因提供可信身份 | T-0002 | 支付后可拿到真实 tx digest，错误码可透传展示 |
+| [x] | T-0004 | F-000 | 6.2 | QA | 持续回归 `EXIT -> refresh -> CONNECT`、余额显示、连接失败态 | 钱包链路是所有主流程的单点风险 | T-0001 | 回归用例覆盖连接成功、拒签、余额异常、刷新重连 |
+| [x] | T-0005 | F-000 | 3.1 | View / Controller | 将 EVE Vault 连接弹窗改为受控开关，并在 provider 已连接时立即关闭，不再依赖用户手动再点一次 | 当前 connect modal 在登录成功后仍残留，破坏首个主入口体验 | T-0001, T-0002 | 登录成功后 `walletConnection.status=connected` 或 `authStore.isConnected=true` 时弹窗自动消失 |
+| [x] | T-0006 | F-000 | 3.1 | Controller / Service / View | 修复钱包 LUX coin 配置在读取与支付两条链路中的一致性：优先使用链上 coin metadata decimals，避免小额非零余额被格式化成 `0`，并让入场费支付支持真实 LUX coin type | 当前 balance 口径受默认 decimals 和 UI 格式化双重影响；若切到真实 LUX coin type，旧支付实现又只支持 `SUI` | T-0002, T-0004 | 钱包余额在 `decimals=0` 时保持 `500000`，在 `decimals=9` 且原始值为 `500000` 时显示非零值而非 `0`；入场费支付不再因非 `SUI` coin type 被直接拒绝 |
+
+### F-001 Match Creation & Publish
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0100 | F-001 | 4.1, 5.1 | Runtime / API | 保持 `GET /api/solar-systems`、`GET /api/solar-systems/[id]`、`GET /api/solar-systems/map` 作为星系基础查询底座 | v2.6 的星系选择器依赖真实星系与 gate 数据 | - | 路由返回 `systemId/systemName/constellationId/regionId/gateLinks` |
+| [x] | T-0101 | F-001 | 4.1, 5.1, 5.2 | Runtime / API | 新增 `GET /api/constellations`、`GET /api/constellations/{id}`、`GET /api/search`、`GET /api/solar-systems/recommendations` | PRD v2.6 要求搜索优先 + 推荐 + 星座浏览辅助 | T-0100 | 可按紧急节点、名称、可选性返回星座/星系列表和推荐结果 |
+| [x] | T-0102 | F-001 | 3.1 | View / Controller / Model | 实现 `createMatchStore`、`useCreateMatchController` 和创建页 UI，支持 `free / precision`、星系选择、精准模式选点、奖池预览 | 当前创建流程仍偏旧模式，无法完整覆盖 v2.6 | T-0100, T-0101 | 创建页可完整填写 `solarSystemId/targetNodeIds/sponsorshipFee/maxTeams/entryFee/durationHours` |
+| [x] | T-0103 | F-001 | 2.2, 2.4, 4.2, 5.5 | Runtime / API / Type | 将 `official_free_target / host_created` 契约迁移为 `free / precision`，统一 DTO、类型与过滤参数 | 避免旧术语继续扩散到前后端接口 | - | `GET/POST /api/matches` 与共享类型只暴露 `free / precision` |
+| [x] | T-0104 | F-001 | 4.2, 5.5, 6.1 | Runtime / API | 拆分创建与发布：`POST /api/matches` 生成 draft，`POST /api/matches/{id}/publish` 完成赞助费锁定确认 | 对齐 PRD v2.6 的“创建与发布分离” | T-0102, T-0103 | draft 创建成功后必须通过 publish 才进入 `lobby` |
+| [x] | T-0105 | F-001 | 2.6, 5.5, 6.2 | Runtime / Data | 在 publish 阶段校验 `sponsorshipFee >= 500`、星系可选性、精准模式 `1-5` 目标节点，并写入 `match_target_nodes` 快照与幂等键 | 这是创建比赛最核心的业务规则 | T-0104 | 非法参数返回规范错误码；重复 publish 返回同一结果 |
+| [x] | T-0106 | F-001 | 3.1, 4.2 | QA | 补齐自由模式/精准模式创建与发布回归用例 | 新模式与旧接口切换风险高 | T-0104, T-0105 | 覆盖 free/precision、不可选星系、赞助费不足、目标节点越界 |
+
+### F-002 Lobby Discovery & Participation
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0200 | F-002 | 4.1, 4.2 | Runtime / API | 保持 `GET /api/matches`、`GET /api/matches/[id]` 作为比赛大厅的基础读接口 | Lobby 是 PRD v2.6 的主入口 | - | 路由能返回 lobby 比赛列表和详情 |
+| [x] | T-0201 | F-002 | 2.3, 2.4, 4.1, 4.2 | Runtime / API / Type | 对齐 Lobby DTO：强制包含模式标签、目标星系、目标节点说明、总奖池、入场费、战队进度、距离提示 | 当前比赛卡片字段口径仍不完整 | T-0103 | `GET /api/matches` 返回字段可直接驱动 PRD 卡片与详情页 |
+| [x] | T-0202 | F-002 | 3.2 | Model / Service / Controller | 实现 `locationStore`、`useLocationController` 与“我的位置”设置流程 | 距离排序和推荐节点依赖用户当前位置 | T-0100 | 用户可以按 Region -> Constellation -> System 选择当前位置 |
+| [x] | T-0203 | F-002 | 4.1, 5.4 | Runtime / API | 对外暴露 `GET /api/network-nodes/recommendations`，复用现有 `nodeRecommendationRuntime` | 自由模式需要按跳数和紧急度推荐目标节点 | T-0202 | 可按 `currentSystem/maxJumps/urgency/limit` 返回排序后的推荐节点 |
+| [x] | T-0204 | F-002 | 3.2, 4.1 | View / Controller | 在 Lobby 接入模式/距离/状态筛选、比赛详情预览和距离展示 | 完成“发现并参加比赛”的主链路 | T-0201, T-0202, T-0203 | Lobby 可展示筛选结果、详情弹窗和基于 gateLinks 的跳数 |
+| [x] | T-0205 | F-002 | 4.5 | View / API | 将旧 `/missions` 叙事和独立节点地图入口降级为兼容层，不再作为主发现入口 | PM 已明确主入口统一为 Lobby | T-0204 | 默认导航和主 CTA 全部进入 Lobby/Planning 新链路 |
+| [x] | T-0206 | F-002 | 3.2, 4.1 | QA | 补齐“设置位置 -> 浏览列表 -> 查看详情 -> 进入组队大厅”回归 | 新的发现入口需要完整可测 | T-0204, T-0205 | `node --experimental-strip-types --test src/server/matchDiscoveryRuntime.test.ts src/service/locationService.test.ts src/server/nodeRecommendationRuntime.test.ts` 通过，覆盖无位置、无推荐、拓扑缺失、接口错误态 |
+
+### F-003 Team Lobby / Join / Lock / Pay
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0300 | F-003 | 4.3, 5.6 | Runtime / API | 保持 `POST /api/teams`、`/join`、`/leave`、`/lock`、`/pay`、`/refund` 基础链路可用 | 组队与支付是从 Lobby 进入比赛的刚需步骤 | - | 创建、加入、离开、锁队、付款、退款路由全部可调用 |
+| [x] | T-0301 | F-003 | 3.3 | View / Controller / Model | 保持现有组队页、角色槽位、队长操作和支付编排能力 | 现有 `/planning` 已承载大部分队伍流程 | T-0300 | UI 可展示队伍列表、槽位状态、锁队按钮和支付入口 |
+| [x] | T-0302 | F-003 | 5.6 | Runtime / Contract | 保持付款后写入白名单、记录 tx digest、支持锁定前退款规则 | 白名单是链上计分过滤第一道门 | T-0300 | 付款后整队地址进入白名单；锁定前可退，比赛中不可退 |
+| [x] | T-0303 | F-003 | 3.3, 4.3 | Model / Controller / Type | 按 architecture v6.0 收口 `teamLobbyStore` 与 `useTeamLobbyController`，避免继续复用过宽的 `lobbyStore` | 当前前端域边界仍有旧状态混用风险 | T-0204, T-0301 | `/planning` 已切回 Team Lobby，`teamLobbyStore -> teamLobbyService -> useTeamLobbyController` 成为独立 team 域链路，且新 controller 不再直接读 model |
+| [x] | T-0304 | F-003 | 2.1, 2.4, 4.3 | Runtime / API | 对齐错误码和校验：`TEAM_FULL / TEAM_LOCKED / ROLE_SLOT_FULL / PAYMENT_MISMATCH` 等 | 与 SPEC v6.0 保持一致，便于前端直出用户提示 | T-0300 | 典型失败场景返回规范错误码与 retryable 语义 |
+| [x] | T-0306 | F-003 | 2.2, 2.4, 3.3, 4.3 | Runtime / API / View / Controller | 将入队流程改为“申请制”：`POST /join` 返回 `pending`，队长通过 `approve/reject` 审批，前端展示待审批与审批动作 | PRD 已明确加入战队需队长同意/拒绝，当前链路仍是直加入 | T-0303, T-0304 | `teamRuntime`、审批端点与 `TeamLobbyScreen` 已接通 pending / approve / reject / lock / pay 全链路 |
+| [x] | T-0305 | F-003 | 3.3, 4.3 | QA | 在 `draft -> publish -> apply -> approve/reject -> lock -> pay` 新链路下重跑 Team Lobby 回归 | 入队申请审批上线后，旧回归结论不再充分 | T-0104, T-0303, T-0306 | `node --import ./scripts/register-test-loader.mjs --experimental-strip-types --test src/app/api/__tests__/f007-match-flow.test.ts` 通过，覆盖 apply / approve / reject / lock / pay 主链路 |
+
+### F-004 Match Runtime / Scoring / Overlay
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0400 | F-004 | 5.5, 5.7 | Runtime | 保持比赛状态机、`match-tick`、Panic 广播、非法迁移审计逻辑 | `Lobby -> PreStart -> Running -> Panic -> Settling` 是核心玩法主线 | - | 状态迁移符合 PRD，最后 90 秒准确进入 Panic |
+| [x] | T-0401 | F-004 | 5.7 | Runtime / Data | 保持 `chainSyncEngine` 的三重过滤、得分公式、去重和审计日志 | 计分可信度直接决定比赛有效性 | T-0302 | 非白名单/非目标节点/窗口外事件均不计分 |
+| [x] | T-0402 | F-004 | 3.4 | View / Controller / Model | 保持 `/match` 页倒计时、实时分数板、弹幕、Panic 视觉效果 | 前端比赛体验已经具备基础实现，应继续稳定 | T-0400, T-0401 | `/match` 页面能展示状态、剩余时间、得分和事件流 |
+| [x] | T-0403 | F-004 | 4.2, 6.1 | Runtime / API | 补齐 `GET /api/matches/{id}/scoreboard` 与 `GET /api/matches/{id}/stream`（SSE）的公开契约 | SPEC v6.0 已将状态快照与流接口正式化 | T-0401 | 前端不依赖隐式内部订阅，也能按公开接口取数 |
+| [x] | T-0404 | F-004 | 3.4, 4.5 | Codebase Cleanup | 清理前端/服务层残留的 `mission`、`fuelMission` 命名，保留必要兼容层但停止扩散 | 否则新 PRD 术语无法在代码中稳定落地 | T-0103, T-0205 | 新增代码不再引入 `mission` 命名；旧接口集中在兼容层 |
+| [x] | T-0405 | F-004 | 3.4, 5.7 | QA | 维持主流程回归：`Lobby -> Lock -> Pay -> Running -> Panic -> Settling` | 当前已存在的主链路回归仍需保留 | T-0400, T-0401, T-0402 | 关键路径在本地/测试环境可稳定跑通 |
+
+### F-005 Settlement / Revenue Split
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0500 | F-005 | 3.5, 5.8 | View / Controller / Model | 保持结算页、账单加载、个人分账与 MVP 展示能力 | 用户最终感知价值集中在结算页 | - | `/settlement` 可展示奖池、队伍分配、个人分配、MVP |
+| [x] | T-0501 | F-005 | 2.5, 4.4, 5.8 | Runtime / API / Type | 将结算账单口径更新为 `sponsorshipFee + entryFeeTotal + platformSubsidy`，并统一 5% 平台抽成字段 | 当前部分实现仍带旧 `hostPrizePool` 语义 | T-0103, T-0105 | `SettlementBill` 与 PRD/SPEC 字段完全一致，示例计算正确 |
+| [x] | T-0502 | F-005 | 5.8, 6.2 | Runtime / Contract | 保持幂等结算、链上发奖与重复请求回放逻辑 | 结算是高风险资金动作 | T-0401 | 重复结算不会重复出账，能返回同一 payout 结果 |
+| [x] | T-0503 | F-005 | 4.4 | Runtime / API | 保持 `GET /api/matches/{id}/result` 账单接口可用 | 战报页和链上追溯依赖该接口 | T-0500 | 账单接口返回队伍/成员分配细项和 tx 关联信息 |
+| [x] | T-0504 | F-005 | 5.8 | QA | 持续验证 2 队 / 3 队 / 4+ 队比例，以及 0 分成员奖金为 0 | 奖金规则需要稳定可信 | T-0501, T-0502 | 回归覆盖排名比例、贡献占比、MVP 生成 |
+| [x] | T-0505 | F-005 | 4.4, 5.8 | Runtime / API | 新增 `GET /api/matches/{id}/settlement` 状态接口，并和 `result` 读模型分离 | 对齐 PRD 的 `Settling` 等待页与结果页双态 | T-0501 | 结算中与已结算状态可分别查询并驱动不同页面 UI |
+
+### F-006 Projection Runtime / Data / Worker Hardening
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0600 | F-006 | 5.3 | Runtime / API | 保持 `nodeIndexer`、`GET /api/nodes`、`GET /api/nodes/[id]`、过滤统计接口可用 | `network-node` 读模型是 PRD v2.6 的底座数据 | - | 节点列表可按 `urgency/hasMatch/isOnline/typeId/solarSystem` 读取 |
+| [x] | T-0601 | F-006 | 2.3, 5.3 | Runtime / Data | 完成 `LocationRevealedEvent -> coordX/coordY/coordZ/solarSystem` 解析和双 cursor 增量同步，确保星系可选性判断可信 | 星系选择与节点推荐都依赖准确坐标 | T-0600 | `/api/nodes` 坐标和星系字段与链上/索引结果一致 |
+| [x] | T-0602 | F-006 | 6.2 | Data / Runtime | 将剩余本地 mock / 内存读模型迁移到 architecture 规定的投影表：`solar_systems_cache`、`constellation_summaries`、`network_nodes`、`matches`、`match_target_nodes`、`match_stream_events` 等 | 为多 worker 和 Realtime 做准备 | T-0105, T-0201, T-0601 | 关键运行时不再依赖本地静态数据或临时内存对象 |
+| [x] | T-0603 | F-006 | 5.1 | Runtime / Deployment | 抽离并部署 `nodeRuntime`、`matchRuntime`、`chainSyncEngine`、`settlementRuntime` worker，补健康检查和重启策略 | 长连接和状态机不应依赖前端进程存活 | T-0602 | worker 可独立运行并报告健康状态 |
+| [x] | T-0604 | F-006 | 5.1, 5.2 | Runtime / API | 实现 `constellationRuntime` 和对应聚合刷新，为星座浏览与推荐接口提供读模型 | PRD v2.6 新增了星座级交互入口 | T-0602 | 星座列表能返回 `urgentNodeCount/selectableSystemCount/sortScore` |
+| [x] | T-0605 | F-006 | 6.1, 6.2 | API / Platform | 在写接口统一支持 `X-Idempotency-Key`、结构化错误和 `stale=true` 返回规则 | 对齐 SPEC v6.0 的平台契约 | T-0104, T-0505 | 创建、发布、支付、结算接口都支持幂等和统一错误体 |
+| [x] | T-0606 | F-006 | 5.5, 5.6, 5.8 | Contract / Devnet | 用真实 devnet 链路接入赞助费锁定、白名单注册、开赛、结算发奖，替换剩余模拟链路 | 资金与积分动作最终必须落到真实链上 | T-0105, T-0302, T-0501 | 可执行端到端 devnet 调用并记录 tx digest/事件结果 |
+| [x] | T-0607 | F-006 | 6.1 | API / Security | 补齐写接口钱包签名验证中间件 | 避免匿名伪造创建/支付/锁队请求 | T-0003 | 写接口全部要求合法地址、消息和签名组合 |
+
+### F-007 Testing / Observability / Governance
+
+| Done | TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal |
+|---|---|---|---|---|---|---|---|---|
+| [x] | T-0700 | F-007 | Architecture 4.4 | Governance | 保持 import lint 和分层规则，继续强制 `View -> Controller -> Service -> Model` | 防止前端在重构中再次破层 | - | lint 能阻止 View 直连 Service/Model/DB |
+| [x] | T-0701 | F-007 | 6.3, 6.4 | Runtime / Observability | 维持 `event lag / ws latency / settlement success` 等关键指标与审计原因码 | 便于排查链上和流处理问题 | T-0401, T-0502 | 运行时可输出结构化日志和关键指标 |
+| [x] | T-0702 | F-007 | 4.1, 4.2, 4.3 | QA | 为 v2.6 新接口补单测/集成测试：星座搜索、比赛发布、Lobby 位置、推荐节点 | 文档变更最大的一批能力需要回归护栏 | T-0101, T-0104, T-0203 | 新增 API 均有最小测试覆盖 |
+| [x] | T-0703 | F-007 | 3.x, 4.x, 5.x | E2E | 构建全链路 E2E：`Connect -> Create Draft -> Publish -> Join Team -> Pay -> Run -> Settle` | 这是当前最重要的业务闭环 | T-0104, T-0305, T-0505 | 单条 E2E 可覆盖端到端核心路径 |
+| [x] | T-0704 | F-007 | Contract / Devnet | QA | 执行 CLI-first devnet 验证，覆盖 publish / whitelist / start / score / settle | 合约交付必须符合仓库 testing standard | T-0606 | 记录实际命令、关键输出和验证结果 |
+| [x] | T-0705 | F-007 | 6.1, 6.2 | QA | 增补异常流回归：world API stale、拓扑缺失、重复 publish、重复结算、签名失败 | 当前异常路径仍缺系统化回归 | T-0605, T-0607 | 异常流都有明确错误码、重试策略和日志 |
+| [x] | T-0706 | F-007 | Architecture 4.4 | Governance / Refactor | 修复 `useCreateMatchController`、`useLobbyController`、`useMatchController` 的 `controller -> model` 违规，恢复 import lint 通过 | 当前 lint 失败阻塞工程质量基线 | T-0700 | `pnpm lint:imports` 已通过，controller 不再直接 import model |
+| [x] | T-0707 | F-007 | 6.1, 6.2 | Runtime / Type | 修复 `nodeIndexerRuntime`、`nodeRecommendationRuntime`、`locationService.test` 的类型错误，恢复 `pnpm typecheck` | 当前 typecheck 失败阻塞合并与回归 | T-0601, T-0602 | `pnpm typecheck` 已通过 |
+| [x] | T-0708 | F-007 | 4.x, 6.1 | QA / Tooling | 用 test loader 跑通关键 route/runtime 回归，并修复 loader 对相对无扩展名 import 的解析问题 | 当前 node test 环境对 alias/相对路径解析不稳 | T-0703 | `node --import ./scripts/register-test-loader.mjs --experimental-strip-types --test src/app/api/__tests__/f007-match-flow.test.ts` 已通过 |
+| [x] | T-0709 | F-007 | Architecture 4.1, 4.4 | View / Controller | 修复主导航 tab 切换迟滞，并移除比赛页预渲染阶段的 `window is not defined` 风险 | 当前 mission shell 在所有主路由中都挂载钱包弹窗 UI，导致 SSR 不安全且增加路由切换开销 | T-0700 | `pnpm build` 通过，`/lobby -> /planning -> /match -> /settlement` 切换不再被钱包 UI 阻塞 |
+| [x] | T-0710 | F-007 | Architecture 3, 4.4 | View / Controller / Runtime | 优化首页首屏性能，避免 `/lobby` 初始化时同步拉取重型位置数据，并减少 discovery 接口对 8MB 投影文件的重复解析 | 当前页面首屏会预取位置选择器数据，且 runtime 每次请求都同步读取大投影文件，导致页面“出不来”且明显卡顿 | T-0700 | 首屏不再在 picker 关闭时请求 `constellations/recommendations`，`pnpm build` 通过，discovery 接口首字节时间明显下降 |
+| [x] | T-0711 | F-007 | 4.1, 6.1 | View / Controller / Runtime / API | 继续优化位置选择器性能，将 `constellations` 浏览链改为 `region -> constellations -> systems` 分段加载，避免初始返回 500KB 星座列表 | 当前 picker 首次打开仍会下载 2214 条星座摘要，数据量和渲染量都偏大 | T-0710 | picker 初始只请求 region 摘要，展开 region 后再加载 constellations，`/api/constellations` 首包体积显著下降 |
+| [x] | T-0712 | F-007 | 3.2, 4.1 | View / Runtime | 将应用页面中的中文文案统一切换为英文，确保大厅、列表标签、按钮和动态比赛文案都使用英文 | 当前 `/lobby` 及其 discovery runtime 仍混有中文显示文本，不符合项目 UI 语言要求 | T-0711 | 页面中不再出现中文可见文案，`pnpm build` 通过 |
+
+## 3. Ordered Execution Plan (Critical Path)
+
+- [x] `T-0103` - 先统一 `free / precision` 契约，停止旧模式命名继续扩散。
+- [x] `T-0104` - 拆分 draft 与 publish，建立 v2.6 创建主链路。
+- [x] `T-0105` - 落实赞助费门槛、星系可选性、精准模式目标节点校验。
+- [x] `T-0101` - 补齐星座/搜索/推荐接口，支撑创建与发现两端。
+- [x] `T-0201` - 对齐 Lobby 列表与详情 DTO。
+- [x] `T-0202` - 建立位置状态与选择器。
+- [x] `T-0203` - 暴露推荐节点 API，接通自由模式策略辅助。
+- [x] `T-0303` - 把 Team Lobby 状态从宽泛 Lobby 状态中拆出。
+- [x] `T-0306` - 将入队流程改为申请制并补齐队长审批动作。
+- [x] `T-0305` - 回归 `draft -> publish -> apply -> approve/reject -> lock -> pay` 新链路。
+- [x] `T-0501` - 用新奖池与 5% 抽成口径重写账单模型。
+- [x] `T-0505` - 分离 `settlement` 状态接口与 `result` 账单接口。
+- [x] `T-0601` - 收口节点坐标与星系解析，保证选择器判断可信。
+- [x] `T-0602` - 迁移到规范投影表，为 worker 和 Realtime 清路。
+- [x] `T-0603` - 抽离 runtime worker、健康检查和 supervisor。
+- [x] `T-0604` - 完成星座聚合读模型与接口。
+- [x] `T-0605` - 写接口统一支持幂等键、结构化错误与 stale 标记。
+- [x] `T-0606` - 接通 devnet 真链路。
+- [x] `T-0607` - 写接口签名验证中间件完成闭环。
+- [x] `T-0703` - 最后用全链路 E2E 锁定主流程。
+
+## 4. Definition of Done
+
+- 每个标记为 `[x]` 的任务必须满足：
+  - 已标注 `Feature ID / SPEC Section / Layer / Acceptance Signal`。
+  - 不再依赖未关闭的前置阻塞项。
+  - 如涉及公开接口，`docs/SPEC.md` 与实现口径一致。
+- 每个标记为 `[ ]` 的任务在完成时必须：
+  - 同步更新本文件状态。
+  - 如变更业务逻辑或接口，联动更新 `docs/PRD.md` 或 `docs/SPEC.md`。
+  - 如涉及链上能力，补 devnet 验证记录。
+
+## 5. Change Log
+
+- 2026-03-26: 按 `docs/PRD.md` v2.6、`docs/architecture.md` v6.0、`docs/SPEC.md` v6.0 重建 TODO 基线。
+- 2026-03-26: 将旧版以 `mission` 为中心的长清单收敛为当前 feature board，保留已完成能力的 `Done` 状态信号。
+- 2026-03-26: 将节点坐标解析与增量同步任务 `T-0601` 设为 `In Progress`，其余 v2.6 差异项按关键路径重排。
+- 2026-03-26: 根据 PRD 新决策新增 `T-0306`，将 Team Lobby 入队链路调整为申请 + 队长审批模型。
+- 2026-03-26: 完成 `F-003` 的 `T-0303 / T-0305 / T-0306`，`/planning` 已切回 Team Lobby 入口，并以 `teamLobbyStore -> teamLobbyService -> useTeamLobbyController` 收口组队域；审批制入队的 route-level 回归已通过。
+- 2026-03-26: 完成 `F-005` 的 `T-0501 / T-0505`，结算账单切换到 `sponsorshipFee + entryFeeTotal + platformSubsidy` 口径，并新增独立 `GET /api/matches/{id}/settlement` 状态接口。
+- 2026-03-26: 完成 `F-004` 的公开运行时收口，`/match` 页接入 `GET /api/matches/{id}/scoreboard` 与 `GET /api/matches/{id}/stream`（SSE），并将比赛运行链路的新命名收敛到 `matchRuntime` 兼容层。
+- 2026-03-26: 完成 critical path 剩余收口，校正 draft/publish 规则、确认 projection runtime 作为默认读模型，并补齐 `Connect -> Create Draft -> Publish -> Join Team -> Pay -> Run -> Settle` 端到端测试基线。
+- 2026-03-26: 完成 `T-0707`，修复 `nodeRecommendationRuntime`、server relative import 和 `locationService.test` 的类型问题，`pnpm typecheck` 已恢复通过。
+- 2026-03-26: 完成 `T-0706 / T-0708`，将 create/lobby/match controller 的 store 访问收回 service 层，恢复 `pnpm lint:imports` 通过，并让 test loader 支持相对无扩展名 import。
+- 2026-03-26: 完成 `F-002` 的 `T-0204 / T-0206`，`/lobby` 已切到新 Match Lobby 入口，并补齐位置设置、距离提示、详情预览、自由模式推荐与异常态定向回归。
+- 2026-03-26: 完成 `F-006` 的 `T-0601 / T-0603 / T-0604 / T-0605 / T-0606 / T-0607`，新增双 cursor 节点坐标增量同步、投影存储、`constellationRuntime`、runtime worker + `/api/runtime/health`、写接口幂等/签名中间件，并刷新 `docs/devnet-verification-latest.md` 记录最新 devnet 调用结果。
+- 2026-03-26: 完成 `T-0702 / T-0704 / T-0705`，新增 F-007 测试计划、顺序化 F-007 测试脚本，并补齐 stale world API、拓扑缺失、重复 publish、重复 settlement 与签名失败回归。
+- 2026-03-27: 完成 `T-0706`，清理 `useMatchController` 的残留 model 直连后，`node ./scripts/check-layer-imports.mjs` 已重新通过。
+- 2026-03-27: 完成 `T-0709`，将 `WalletConnectBridge` 改为 `ssr: false` 按需加载，并在 `FuelMissionShell` 主导航中加入路由预取；同时为 `/planning` 页补充 `Suspense` 包装，`pnpm build` 已恢复通过。
+- 2026-03-27: 完成 `T-0710`，将 `/lobby` 的位置选择器 bootstrap 改为按需加载，稳定 `useLobbyController` / `useTeamLobbyController` 的 action 引用并为 lobby/team load 加入去重，同时为 `runtimeProjectionStore` 和 `solarSystemRuntime` 增加缓存优先读取策略；本地验证显示 `/lobby`、`/api/matches`、`/api/network-nodes`、`/api/solar-systems/recommendations` 首字节时间均明显下降。
+- 2026-03-27: 完成 `T-0711`，将位置选择器改为 region-first 浏览：`/api/constellations?view=regions` 先返回 region 摘要，展开 region 后再请求对应 constellations，同时 search hit 补充 `regionId` 以直接展开层级；本地验证显示 picker 初始 constellations 首包从约 510KB 降到约 35KB。
+- 2026-03-27: 完成 `T-0712`，将 `/lobby` 页面及 `matchDiscoveryRuntime` 的中文可见文案统一切换为英文，并回扫当前页面路由与 discovery 输出，确认不再存在中文显示文本。
+- 2026-03-27: 完成 `T-0005 / T-0006`，将钱包连接弹窗改为受控 `open` 模式并在 provider 进入 `connected` 时立即关闭；同时把余额换算抽到共享工具，优先读取链上 coin metadata decimals，并将 `NEXT_PUBLIC_LUX_COIN_TYPE` 切到真实 LUX coin type 后的读取与支付链路一并打通。

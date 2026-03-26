@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useFuelMissionController } from "@/controller/useFuelMissionController";
 import { useMatchController } from "@/controller/useMatchController";
-import { FuelMissionShell } from "@/view/components/FuelMissionShell";
+import { useMatchRuntimeController } from "@/controller/useMatchRuntimeController";
+import { MatchShell } from "@/view/components/MatchShell";
 import type { MatchStatus } from "@/types/fuelMission";
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -71,13 +71,15 @@ function statusTone(fillRatio: number) {
 }
 
 export function FuelFrogMatchScreen() {
-  const { state } = useFuelMissionController();
+  const { state } = useMatchRuntimeController();
   const {
     eventFeed,
+    matchScoreboard,
     myScore,
     rejectionFeed,
     scoreBoard,
     startWatching,
+    streamHealth,
     stopWatching
   } = useMatchController();
 
@@ -96,14 +98,33 @@ export function FuelFrogMatchScreen() {
   );
   const leaderScore = Math.max(1, rankedTeams[0]?.totalScore ?? 0);
   const targetNodes = useMemo(
-    () => [...state.nodes].sort((a, b) => a.fillRatio - b.fillRatio).slice(0, 6),
-    [state.nodes]
+    () =>
+      matchScoreboard && matchScoreboard.targetNodes.length > 0
+        ? matchScoreboard.targetNodes
+            .map((node) => ({
+              id: node.objectId,
+              name: node.name,
+              fillRatio: node.fillRatio,
+              detail: `${node.urgency.toUpperCase()} // ${node.isOnline ? "ONLINE" : "OFFLINE"}`
+            }))
+            .sort((a, b) => a.fillRatio - b.fillRatio)
+            .slice(0, 6)
+        : [...state.nodes]
+            .map((node) => ({
+              id: node.nodeId,
+              name: node.name,
+              fillRatio: node.fillRatio,
+              detail: `RISK ${node.riskWeight.toFixed(2)}`
+            }))
+            .sort((a, b) => a.fillRatio - b.fillRatio)
+            .slice(0, 6),
+    [matchScoreboard, state.nodes]
   );
   const visibleEvents = eventFeed.slice(0, 8);
   const visibleRejections = rejectionFeed.slice(0, 4);
 
   return (
-    <FuelMissionShell
+    <MatchShell
       title="MATCH OVERLAY / LIVE WARBOARD"
       subtitle="PRD 4.3 In-game Overlay: top timer, live scoreboard, target-node fuel status, and rolling event feed."
       activeRoute="/match"
@@ -126,6 +147,9 @@ export function FuelFrogMatchScreen() {
             <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-eve-yellow">FUEL FROG PANIC</p>
             <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-eve-offwhite/70">
               Status: {statusLabel(state.status).toUpperCase()} | Match: {state.room?.roomId ?? "match-local"}
+            </p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/55">
+              API Stream: {streamHealth.toUpperCase()}
             </p>
           </div>
           <div className="text-right">
@@ -194,7 +218,7 @@ export function FuelFrogMatchScreen() {
                   const fillPct = Math.round(node.fillRatio * 100);
                   const tone = statusTone(node.fillRatio);
                   return (
-                    <li key={node.nodeId} className="border border-eve-yellow/20 bg-eve-black/75 p-3">
+                    <li key={node.id} className="border border-eve-yellow/20 bg-eve-black/75 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-mono text-sm uppercase tracking-[0.12em] text-eve-offwhite">
                           {tone.icon} {node.name}
@@ -210,7 +234,7 @@ export function FuelFrogMatchScreen() {
                         />
                       </div>
                       <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-eve-offwhite/80">
-                        Fill Ratio: {fillPct}% | Risk {node.riskWeight.toFixed(2)}
+                        Fill Ratio: {fillPct}% | {node.detail}
                       </p>
                     </li>
                   );
@@ -242,6 +266,6 @@ export function FuelFrogMatchScreen() {
           </div>
         </div>
       </section>
-    </FuelMissionShell>
+    </MatchShell>
   );
 }

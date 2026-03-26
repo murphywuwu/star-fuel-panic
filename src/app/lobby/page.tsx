@@ -1,5 +1,5 @@
-import { HeatmapScreen } from "@/view/screens/HeatmapScreen";
+import { LobbyDiscoveryScreen } from "@/view/screens/LobbyDiscoveryScreen";
 
 export default function LobbyPage() {
-  return <HeatmapScreen />;
+  return <LobbyDiscoveryScreen />;
 }

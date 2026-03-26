@@ -9,6 +9,6 @@ const settlementService = fs.readFileSync("src/service/settlementService.ts", "u
 assert.ok(triggerSettlement.includes("settlement_tx"), "trigger-settlement must persist settlement_tx");
 assert.ok(triggerSettlement.includes("result_hash"), "trigger-settlement must persist result_hash");
 assert.ok(getBill.includes("settlement_tx"), "get-settlement-bill must query settlement_tx");
-assert.ok(settlementService.includes("settlementTx"), "frontend settlement service must keep settlementTx field");
+assert.ok(settlementService.includes("payoutTxDigest"), "frontend settlement service must expose payoutTxDigest");
 
-console.log("[qa] pass: settlement bill remains traceable to on-chain commitment/settlement tx fields.");
+console.log("[qa] pass: settlement bill remains traceable to on-chain payout tx fields.");

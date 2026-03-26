@@ -5,8 +5,9 @@ interface SettlementBillProps {
   bill: SettlementBill;
 }
 
-function money(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} LUX`;
+function money(value: string | number) {
+  const amount = typeof value === "string" ? Number(value) : value;
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} LUX`;
 }
 
 function percent(value: number) {
@@ -31,8 +32,16 @@ export function SettlementBill({ bill }: SettlementBillProps) {
                 <td className="border-b border-eve-red/10 px-3 py-2 font-mono">{bill.matchId}</td>
               </tr>
               <tr>
-                <td className="border-b border-eve-red/10 px-3 py-2">Status</td>
-                <td className="border-b border-eve-red/10 px-3 py-2 font-mono uppercase">{bill.status}</td>
+                <td className="border-b border-eve-red/10 px-3 py-2">Sponsorship Fee</td>
+                <td className="border-b border-eve-red/10 px-3 py-2 font-mono">{money(bill.sponsorshipFee)}</td>
+              </tr>
+              <tr>
+                <td className="border-b border-eve-red/10 px-3 py-2">Entry Fee Total</td>
+                <td className="border-b border-eve-red/10 px-3 py-2 font-mono">{money(bill.entryFeeTotal)}</td>
+              </tr>
+              <tr>
+                <td className="border-b border-eve-red/10 px-3 py-2">Platform Subsidy</td>
+                <td className="border-b border-eve-red/10 px-3 py-2 font-mono">{money(bill.platformSubsidy)}</td>
               </tr>
               <tr>
                 <td className="border-b border-eve-red/10 px-3 py-2">Gross Pool</td>
@@ -40,19 +49,17 @@ export function SettlementBill({ bill }: SettlementBillProps) {
               </tr>
               <tr>
                 <td className="border-b border-eve-red/10 px-3 py-2">Platform Fee</td>
-                <td className="border-b border-eve-red/10 px-3 py-2 font-mono">{money(bill.platformFee)}</td>
+                <td className="border-b border-eve-red/10 px-3 py-2 font-mono">
+                  {money(bill.platformFee)} ({percent(bill.platformFeeRate)})
+                </td>
               </tr>
               <tr>
                 <td className="border-b border-eve-red/10 px-3 py-2">Payout Pool</td>
                 <td className="border-b border-eve-red/10 px-3 py-2 font-mono text-eve-red">{money(bill.payoutPool)}</td>
               </tr>
               <tr>
-                <td className="border-b border-eve-red/10 px-3 py-2">Result Hash</td>
-                <td className="border-b border-eve-red/10 px-3 py-2 font-mono text-xs">{bill.resultHash}</td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2">Settlement Tx</td>
-                <td className="px-3 py-2 font-mono text-xs">{bill.settlementTx ?? "PENDING"}</td>
+                <td className="px-3 py-2">Payout Tx Digest</td>
+                <td className="px-3 py-2 font-mono text-xs">{bill.payoutTxDigest ?? "PENDING"}</td>
               </tr>
             </tbody>
           </table>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
 import { useFuelMissionController } from "@/controller/useFuelMissionController";
-import { FuelMissionShell } from "@/view/components/FuelMissionShell";
+import { MatchShell } from "@/view/components/MatchShell";
 import { BillTable, EarningsCard, ScoreSummary } from "@/view/components/SettlementModules";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
@@ -38,7 +38,7 @@ export function FuelFrogSettlementScreen() {
   };
 
   return (
-    <FuelMissionShell
+    <MatchShell
       title="MISSION SUCCESS"
       subtitle="Read score, verify bill flow, and confirm your final payout."
       activeRoute="/settlement"
@@ -78,6 +78,6 @@ export function FuelFrogSettlementScreen() {
           {message}
         </p>
       </TacticalPanel>
-    </FuelMissionShell>
+    </MatchShell>
   );
 }

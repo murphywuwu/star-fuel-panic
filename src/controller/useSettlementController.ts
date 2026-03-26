@@ -10,14 +10,16 @@ import {
 } from "@/model/settlementStore";
 import { settlementService } from "@/service/settlementService";
 import type { ControllerResult } from "@/types/common";
-import type { MemberPayout, MvpInfo, SettlementBill } from "@/types/settlement";
+import type { MemberPayout, MvpInfo, SettlementBill, SettlementStatus } from "@/types/settlement";
 
 interface SettlementControllerState {
+  status: SettlementStatus | null;
   bill: SettlementBill | null;
   loading: boolean;
   error: string | null;
   myPayout: MemberPayout | null;
   mvp: MvpInfo | null;
+  loadStatus: (matchId: string) => Promise<ControllerResult<void>>;
   loadBill: (matchId: string) => Promise<ControllerResult<void>>;
 }
 
@@ -47,11 +49,34 @@ export function useSettlementController(): SettlementControllerState {
   );
   const mvp = useMemo(() => selectMvp(settlementState), [settlementState]);
 
+  const loadStatus = useCallback(async (matchId: string): Promise<ControllerResult<void>> => {
+    settlementStore.getState().setLoading(true);
+    settlementStore.getState().setError(null);
+    try {
+      const status = await settlementService.getSettlementStatus(matchId);
+      settlementStore.getState().setStatus(status);
+      return {
+        ok: true,
+        message: "SETTLEMENT_STATUS_LOADED"
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "SETTLEMENT_STATUS_LOAD_FAILED";
+      settlementStore.getState().setError(message);
+      return {
+        ok: false,
+        errorCode: "SETTLEMENT_STATUS_LOAD_FAILED",
+        message
+      };
+    } finally {
+      settlementStore.getState().setLoading(false);
+    }
+  }, []);
+
   const loadBill = useCallback(async (matchId: string): Promise<ControllerResult<void>> => {
     settlementStore.getState().setLoading(true);
     settlementStore.getState().setError(null);
     try {
-      const bill = await settlementService.fetchSettlementBill(matchId);
+      const bill = await settlementService.getSettlementBill(matchId);
       settlementStore.getState().setBill(bill);
       return {
         ok: true,
@@ -71,11 +96,13 @@ export function useSettlementController(): SettlementControllerState {
   }, []);
 
   return {
+    status: settlementState.status,
     bill: settlementState.bill,
     loading: settlementState.loading,
     error: settlementState.error,
     myPayout,
     mvp,
+    loadStatus,
     loadBill
   };
 }

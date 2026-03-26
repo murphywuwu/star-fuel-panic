@@ -1,538 +1,411 @@
-# Fuel Frog Panic — 技术架构设计
+# Fuel Frog Panic — Architecture Baseline
 
-Version: v4.0
-Last Updated: 2026-03-21
-Source: `docs/PRD.md` v2.0
-
----
-
-## 1. 技术栈总览
-
-| 层 | 技术选型 | 选型理由 |
-|---|---|---|
-| 前端 | Next.js 14 (App Router) + React 18 + Zustand + Tailwind CSS | SSR/SSG 支持、TypeScript 全栈统一、轻量状态管理 |
-| 后端 | Supabase (PostgreSQL + Realtime + Edge Functions + Auth) | 零运维、内置 WS 实时订阅、Row Level Security、与前端同构 TS |
-| 缓存 | Supabase Edge + 前端 Zustand 缓存 | Supabase Realtime 已提供 pub/sub 能力，无需独立 Redis |
-| 合约 | Sui Move | EVE Frontier 原生链、SharedObject 可公开读取 |
-| 部署 | Vercel (前端) + Supabase Cloud (后端) | Hackathon 快速交付，免运维 |
-
-### 1.1 为什么选 Supabase 而不是自建 NestJS
-
-本项目是 **Hackathon Demo**，核心约束是交付速度。Supabase 提供：
-
-- **PostgreSQL 开箱即用**：表、索引、RLS 权限策略直接在 Dashboard 管理
-- **Realtime 内置**：`supabase.channel()` 直接订阅表变更和自定义广播，替代手写 WebSocket 服务
-- **Edge Functions**：TypeScript 无服务器函数，处理链上事件归因、结算触发等后端逻辑
-- **Auth**：可对接自定义钱包签名验证，无需自建 session 管理
-
-对于后续生产化，可平滑迁移至 NestJS + 独立 PostgreSQL + Redis。
+Version: v6.0
+Last Updated: 2026-03-26
+Source: `docs/PRD.md` v2.6
 
 ---
 
-## 2. 系统架构总图
+## 1. v2.6 Baseline Changes
 
+本次架构基线以 PRD v2.6 为准，替换旧文档中已经过期的玩法和契约：
+
+- 比赛模式以 `free`（自由模式）和 `precision`（精准模式）为唯一对外模式，不再以“主办方定制赛 / official match / host prize pool”作为主模型。
+- 创建比赛时，`solarSystemId` 必填；`sponsorshipFee >= 500 LUX` 必填；`targetNodeIds` 仅在精准模式下必填，数量为 1-5。
+- 星系选择成为前置流程，系统可选性由 `isOnline && isPublic` 的节点存在性决定。
+- Lobby 是任务发现主入口；位置设置、比赛筛选、推荐节点都收敛到 Lobby，不再以独立节点地图页作为默认入口。
+- 结算口径更新为：`grossPool = sponsorshipFee + entryFeeTotal + platformSubsidy`，平台统一抽成 5%，剩余 95% 进入玩家奖池。
+- PRD 的旧术语 `mission`、`nodes` 可保留为兼容实现名，但文档与新接口统一采用 `match`、`network-node` 口径。
+
+---
+
+## 2. Architecture Principles
+
+| 原则 | 约束 |
+|---|---|
+| 前端单向分层 | 必须严格执行 `View -> Controller -> Service -> Model`，View 不能直接读写 Zustand 或请求 BFF。 |
+| 链上事实优先 | 计分、燃料状态、白名单、支付、开赛/结算时间窗口的信任根来自 Sui 链上对象与事件。 |
+| 链下投影负责体验 | 星系列表、比赛大厅、实时得分板、弹幕、房间状态、推荐节点由后端投影和缓存提供，不能反向篡改链上事实。 |
+| 读写分离 | 读接口返回投影读模型；写接口只接收命令并触发运行时处理，禁止在 View 中拼装业务规则。 |
+| 幂等优先 | 所有会创建资产锁定、支付确认、开赛、结算的写操作都必须具备幂等键和状态去重。 |
+| 实时链路独立 | 链上事件监听、得分计算、房态流转和结算处理不依赖前端在线状态，前端只消费结果。 |
+| 兼容当前仓库 | 当前代码中的 `mission*`、`/api/nodes`、`/api/missions` 可作为兼容层存在，但不应继续扩散到新设计。 |
+
+---
+
+## 3. System Context
+
+```text
+Players
+  ├─ Web Dashboard (browser)
+  └─ In-game Overlay (EVE WebView)
+          │
+          ▼
+Frontend (Next.js App Router)
+  ├─ View Layer
+  ├─ Controller Layer
+  ├─ Service Layer
+  └─ Model Layer (Zustand only)
+          │
+          ▼
+BFF / Runtime Layer
+  ├─ Route Handlers
+  ├─ solarSystemRuntime
+  ├─ constellationRuntime
+  ├─ nodeRuntime
+  ├─ nodeRecommendationRuntime
+  ├─ matchRuntime
+  ├─ teamRuntime
+  ├─ chainSyncEngine
+  └─ settlementRuntime
+          │
+          ├─ Supabase / PostgreSQL / Realtime
+          ├─ Sui RPC + Event Stream
+          └─ EVE Frontier world metadata API
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Players                                   │
-│  EVE Frontier WebView (浮窗)  ←→  Web Dashboard (浏览器)         │
-└──────────────┬──────────────────────────┬───────────────────────┘
-               │  HTTPS + WSS             │
-┌──────────────▼──────────────────────────▼───────────────────────┐
-│                    Next.js Frontend (Vercel)                      │
-│                                                                   │
-│  ┌─────────┐  ┌────────────┐  ┌───────────┐  ┌───────────────┐ │
-│  │  View   │→ │ Controller │→ │  Service  │→ │ Model(Zustand)│ │
-│  │ (pages/ │  │ (hooks)    │  │ (api/ws)  │  │ (store)       │ │
-│  │  comps) │  │            │  │           │  │               │ │
-│  └─────────┘  └────────────┘  └─────┬─────┘  └───────────────┘ │
-│                                     │ REST + Realtime subscribe  │
-└─────────────────────────────────────┼───────────────────────────┘
-                                      │
-┌─────────────────────────────────────▼───────────────────────────┐
-│                     Supabase Cloud                                │
-│                                                                   │
-│  ┌────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
-│  │  PostgreSQL     │  │  Realtime Engine │  │  Edge Functions │ │
-│  │                │  │                  │  │                 │ │
-│  │  · missions    │  │  · table changes │  │  · chain-sync   │ │
-│  │  · rooms       │  │  · broadcast     │  │  · attribution  │ │
-│  │  · teams       │  │    channels      │  │  · settlement   │ │
-│  │  · matches     │  │                  │  │  · node-scanner │ │
-│  │  · scores      │  └──────────────────┘  └────────┬────────┘ │
-│  │  · settlements │                                  │          │
-│  │  · audit_logs  │                                  │          │
-│  └────────────────┘                                  │          │
-│                                                      │          │
-└──────────────────────────────────────────────────────┼──────────┘
-                                                       │ Sui RPC
-┌──────────────────────────────────────────────────────▼──────────┐
-│                       Sui Blockchain                              │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  EVE Frontier Contracts (world::fuel)                     │   │
-│  │  · deposit_fuel() → FuelEvent(DEPOSITED)                  │   │
-│  │  · NetworkNode SharedObject (fuel_quantity, capacity)      │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Fuel Frog Panic Contracts (自研)                         │   │
-│  │  · create_match() / start_match() / end_match()          │   │
-│  │  · register_whitelist(match_id, addresses[])              │   │
-│  │  · deposit_entry_fee(match_id, amount)                    │   │
-│  │  · settle_and_payout(match_id, payout_plan)               │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
+
+### 3.1 Product Technical Architecture Diagram
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                  View Layer                                 │
+│ React / Next.js UI rendering and user interaction                           │
+│ (Lobby, Planning, Match Runtime, Settlement, In-game Overlay, Wallet Entry) │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ User actions / state display
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                               Controller Layer                              │
+│ Custom hooks orchestrating use-cases and UI workflows                       │
+│ (useLobbyController, useCreateMatchController, useTeamLobbyController,      │
+│  useMatchRuntimeController, useSettlementController, useAuthController)     │
+└───────────────────┬──────────────────────────────────┬───────────────────────┘
+                    │ Coordinate business calls         │ Read / update state
+                    ▼                                   ▼
+┌──────────────────────────────────────┐  ┌───────────────────────────────────┐
+│            Service Layer             │  │            Model Layer            │
+│ API clients + stream adapters        │  │ Zustand stores by domain          │
+│ (match/team/solarSystem/recommend/   │  │ (auth/create/lobby/location/team │
+│  stream/settlement services)         │  │  Lobby/matchRuntime/settlement)  │
+└───────────────────┬──────────────────┘  └───────────────────────────────────┘
+                    │ HTTP / WS calls
+                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         BFF / Runtime Layer (Next API)                      │
+│ Route handlers + domain runtimes                                            │
+│ (matchRuntime, teamRuntime, solarSystemRuntime, constellationRuntime,       │
+│  nodeRuntime, nodeRecommendationRuntime, chainSyncEngine, settlementRuntime)│
+└──────────────────────────┬──────────────────────────────┬────────────────────┘
+                           │ Read/write projections        │ Chain/world reads
+                           ▼                               ▼
+┌───────────────────────────────────────────┐   ┌──────────────────────────────┐
+│     Supabase / PostgreSQL / Realtime     │   │      On-chain / External      │
+│ matches, teams, team_members,            │   │ Sui RPC + Event Stream        │
+│ team_join_applications, team_payments,   │   │ EVE World Metadata API        │
+│ match_whitelists, network_nodes,         │   │                                │
+│ match_scores, match_stream_events,       │   │                                │
+│ settlements, solar_systems_cache,        │   │                                │
+│ constellation_summaries                  │   │                                │
+└───────────────────────────────────────────┘   └──────────────────────────────┘
 ```
 
 ---
 
-## 3. 前端分层架构（强制）
+## 4. Frontend Architecture
 
-### 3.1 四层单向依赖
+### 4.1 Route Baseline
 
-```
-View  ──→  Controller  ──→  Service  ──→  Model
-(渲染)     (编排)          (副作用)      (状态)
-```
+当前仓库中，前端入口建议按以下边界解释：
 
-**硬规则**：
-- View 只能 import Controller
-- Controller 只能 import Service
-- Service 只能 import Model
-- Model 不依赖任何上层
-- 禁止跨层调用、禁止循环依赖
+| Route | 责任 |
+|---|---|
+| `/` | 钱包接入、玩家身份建立、进入 Lobby 的前置引导。 |
+| `/lobby` | 比赛发现主入口；比赛列表、筛选、比赛详情预览、位置设置。 |
+| `/planning` | 创建比赛、创建/加入战队、锁队、支付报名费。 |
+| `/match` | 比赛进行中主视图；浏览器模式与游戏内浮窗共用同一领域状态。 |
+| `/settlement` | 结算等待页与战报页。 |
+| `/nodes-map` | 仅作为精准模式选点的内部视图或兼容入口，不再作为独立任务发现入口。 |
 
-### 3.2 各层职责
+### 4.2 Domain Module Ownership
 
-| 层 | 职责 | 典型文件 | 允许做 | 禁止做 |
+| Domain | View | Controller | Service | Model |
 |---|---|---|---|---|
-| **View** | 渲染 UI、捕获用户交互 | `view/screens/*.tsx`, `view/components/*.tsx` | 读 Controller 暴露的 hooks、调用 Controller handler | 直接调用 API、直接读写 Zustand、包含业务逻辑 |
-| **Controller** | 编排用例、校验输入、映射错误 | `controller/use*.ts` | 调用 Service 方法、组合多个 Service 调用 | 直接操作 Model、直接发起网络请求 |
-| **Service** | 封装所有副作用（REST/WS/链上查询）、执行业务策略 | `service/*Service.ts`, `service/*Gateway.ts` | 调用后端 API、订阅 WS、读写 Zustand Store | 直接渲染 UI、被 View 直接调用 |
-| **Model** | Zustand Store，单一前端状态源 | `model/*Store.ts` | 定义 state/actions/selectors | 依赖 View/Controller/Service |
+| Entry / Auth | 钱包接入、身份状态条 | `useAuthController` | `authService`, `walletService` | `authStore` |
+| Match Creation | 模式切换、星系选择器、精准模式节点地图、奖池预览 | `useCreateMatchController` | `matchService`, `solarSystemService`, `networkNodeService` | `createMatchStore` |
+| Lobby Discovery | 比赛卡片、筛选器、比赛详情预览、位置选择器 | `useLobbyController`, `useLocationController` | `matchService`, `solarSystemService`, `nodeRecommendationService` | `lobbyStore`, `locationStore` |
+| Team Lobby | 战队列表、角色槽、锁队、付费 | `useTeamLobbyController` | `teamService` | `teamLobbyStore` |
+| Match Runtime / Overlay | 倒计时、得分板、目标节点面板、弹幕、Panic 横幅 | `useMatchRuntimeController` | `matchStreamService`, `scoreService` | `matchRuntimeStore` |
+| Settlement | 结算等待页、队伍分账、个人分账、MVP | `useSettlementController` | `settlementService` | `settlementStore` |
 
-### 3.3 目录结构
+### 4.3 State Ownership
 
-```
-src/
-├── app/                          # Next.js App Router 路由
-│   ├── page.tsx                  # 首页 → 钱包连接引导
-│   ├── lobby/page.tsx            # 组队大厅
-│   ├── match/page.tsx            # 比赛进行（浮窗）
-│   ├── settlement/page.tsx       # 结算战报
-│   └── layout.tsx                # 全局 Layout + Provider
-│
-├── view/
-│   ├── screens/                  # 页面级组件
-│   │   ├── HeatmapScreen.tsx     # 星系热力图 + 比赛大厅
-│   │   ├── LobbyScreen.tsx       # 组队大厅
-│   │   ├── MatchScreen.tsx       # 比赛浮窗
-│   │   └── SettlementScreen.tsx  # 结算战报
-│   └── components/               # 可复用组件
-│       ├── NodeMap.tsx           # 星系地图（Canvas/SVG）
-│       ├── MatchCard.tsx         # 比赛卡片
-│       ├── TeamSlotPanel.tsx     # 组队角色槽
-│       ├── ScoreBoard.tsx        # 实时得分板
-│       ├── EventFeed.tsx         # 弹幕区
-│       ├── CountdownBar.tsx      # 倒计时
-│       ├── PanicOverlay.tsx      # Panic 模式视觉覆盖
-│       ├── SettlementBill.tsx    # 分账表
-│       └── WalletStatus.tsx      # 钱包状态栏
-│
-├── controller/
-│   ├── useMissionController.ts   # 任务发现用例
-│   ├── useLobbyController.ts     # 组队流程用例
-│   ├── useMatchController.ts     # 比赛进行用例
-│   └── useSettlementController.ts # 结算用例
-│
-├── service/
-│   ├── missionService.ts         # 任务查询 + 排序
-│   ├── lobbyService.ts           # 房间/战队/角色 CRUD
-│   ├── matchService.ts           # 比赛状态 + WS 订阅
-│   ├── scoringService.ts         # 得分投影 + 弹幕
-│   ├── settlementService.ts      # 结算请求 + 账单加载
-│   ├── walletService.ts          # 钱包连接 + 签名
-│   └── supabaseClient.ts         # Supabase 客户端实例
-│
-├── model/
-│   ├── authStore.ts              # 钱包连接状态
-│   ├── missionStore.ts           # 任务列表
-│   ├── lobbyStore.ts             # 房间 + 战队 + 角色
-│   ├── matchStore.ts             # 比赛状态机 + 倒计时
-│   ├── scoreStore.ts             # 实时得分 + 弹幕 feed
-│   └── settlementStore.ts        # 结算账单
-│
-└── types/
-    ├── mission.ts                # 任务相关类型
-    ├── lobby.ts                  # 房间/战队/角色类型
-    ├── match.ts                  # 比赛状态机类型
-    ├── score.ts                  # 计分相关类型
-    ├── settlement.ts             # 结算相关类型
-    └── common.ts                 # 通用类型（ControllerResult 等）
-```
+| Store | 所有权 | 持久化 | 说明 |
+|---|---|---|---|
+| `authStore` | 当前钱包地址、连接状态、玩家基础资料 | Session | 钱包断开时必须清空依赖状态。 |
+| `createMatchStore` | 创建比赛草稿、选中星系、选中节点、校验错误 | Memory | 仅服务创建流程；发布成功后重置。 |
+| `lobbyStore` | 比赛列表、筛选条件、选中比赛、分页状态 | Memory | 所有比赛发现逻辑的唯一前端状态源。 |
+| `locationStore` | 玩家当前位置、位置选择器状态、距离缓存 | Local + Memory | 仅保存玩家主动设置的位置，不保存链上位置推断。 |
+| `teamLobbyStore` | 战队列表、成员槽位、锁定状态、支付状态 | Memory | 和比赛详情解耦，避免跨页面脏状态。 |
+| `matchRuntimeStore` | 当前阶段、剩余时间、得分板、目标节点状态、弹幕、流健康度 | Memory | 只来自 `/status` 快照和 WS/Realtime 事件。 |
+| `settlementStore` | 结算状态、账单、MVP、分享数据 | Memory | 结算完成后只读。 |
 
-### 3.4 典型请求流（以"队长支付入场费"为例）
+### 4.4 Frontend Dependency Rules
 
-```
-View: PayButton.onClick()
-  → Controller: useLobbyController().onPayEntry({ matchId, teamId })
-    → 校验：钱包已连接？余额足够？队伍已锁定？
-    → Service: lobbyService.payEntry({ matchId, teamId, walletAddress })
-      → 调用钱包签名 LUX 转账 tx
-      → 调用 Supabase Edge Function 注册白名单
-      → 写入 Model: lobbyStore.setTeamStatus(teamId, 'paid')
-    → 返回 ControllerResult<PayEntryResult>
-  → View: 显示支付成功 / 错误提示
+- View 只能调用 Controller 暴露的状态和动作。
+- Controller 只做参数整形、错误态映射、页面编排，不直接请求数据库、不直接操作 store。
+- Service 负责调用 BFF、订阅实时流、写入 Zustand actions。
+- Model 只能承载状态、actions、selectors，不能发请求、不能依赖 DOM。
+- 精准模式的节点地图只是一种 View 组件，不构成新的领域边界；它仍属于 Match Creation 域。
+- 浏览器比赛页和游戏内浮窗必须共享同一份 `matchRuntimeStore` 读模型，避免两套计分语义。
+
+---
+
+## 5. Backend Runtime Ownership
+
+### 5.1 Runtime Matrix
+
+| Runtime | 职责 | 读取 | 写入 | 侧效归属 |
+|---|---|---|---|---|
+| `solarSystemRuntime` | 同步星系元数据、单星系详情、gateLinks、搜索基础数据 | world metadata API | `solar_systems_cache` | 外部 world API 拉取、缓存刷新 |
+| `constellationRuntime` | 维护星座视图、推荐星系、系统可选性聚合 | `solar_systems_cache`, `network_nodes` | `constellation_summaries` | 聚合刷新，无链上写入 |
+| `nodeRuntime` | 维护 `NetworkNode` 读模型、5 秒刷新燃料比和紧急度 | Sui objects + events | `network_nodes` | 批量 RPC 轮询、节点投影 |
+| `nodeRecommendationRuntime` | 基于位置和拓扑计算推荐节点 | `network_nodes`, `solar_systems_cache`, `matches` | 无持久写入或可选缓存 | 推荐算法执行 |
+| `matchRuntime` | 创建草稿、发布比赛、比赛列表、状态机、开赛条件校验 | `matches`, `teams`, `team_payments`, `network_nodes` | `matches`, `match_target_nodes`, `match_stream_events` | 比赛状态迁移、发布幂等 |
+| `teamRuntime` | 创建战队、入队申请、队长审批、锁队、报名支付确认、白名单快照写入 | `matches`, `teams`, `team_members`, `team_join_applications` | `teams`, `team_members`, `team_join_applications`, `team_payments`, `match_whitelists` | 申请审批编排、钱包支付校验、白名单编排 |
+| `chainSyncEngine` | 监听 `FuelEvent(DEPOSITED)`、交易溯源、三重过滤、记分广播 | Sui event stream, tx blocks, `match_whitelists`, `matches` | `fuel_events`, `match_scores`, `match_stream_events` | 链上订阅、事件去重 |
+| `settlementRuntime` | 冻结分数、计算平台费与分账、执行链上发奖、生成账单 | `match_scores`, `team_payments`, `matches`, `teams` | `settlements`, `matches`, `match_stream_events` | 结算单飞锁、链上转账 |
+
+### 5.2 Route Handler Ownership
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Discovery Module                                                             │
+│ Owner Runtime: solarSystemRuntime + constellationRuntime                     │
+│ Routes:                                                                       │
+│ - GET /api/solar-systems                                                     │
+│ - GET /api/solar-systems/[id]                                                │
+│ - GET /api/constellations                                                    │
+│ - GET /api/search                                                            │
+│ - GET /api/solar-systems/recommendations                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Node Module                                                                  │
+│ Owner Runtime: nodeRuntime + nodeRecommendationRuntime                       │
+│ Routes:                                                                       │
+│ - GET /api/network-nodes                                                     │
+│ - GET /api/network-nodes/recommendations                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Match Module                                                                 │
+│ Owner Runtime: matchRuntime                                                  │
+│ Routes:                                                                       │
+│ - GET /api/matches                                                           │
+│ - GET /api/matches/[id]                                                      │
+│ - GET /api/matches/[id]/status                                               │
+│ - GET /api/matches/[id]/scoreboard                                           │
+│ - POST /api/matches/[id]/publish                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Team Module                                                                  │
+│ Owner Runtime: teamRuntime                                                   │
+│ Routes:                                                                       │
+│ - GET /api/matches/[id]/teams                                                │
+│ - POST /api/teams                                                            │
+│ - POST /api/teams/[id]/join                                                  │
+│ - POST /api/teams/[id]/applications/[applicationId]/approve                 │
+│ - POST /api/teams/[id]/applications/[applicationId]/reject                  │
+│ - POST /api/teams/[id]/leave                                                 │
+│ - POST /api/teams/[id]/lock                                                  │
+│ - POST /api/teams/[id]/pay                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Settlement Module                                                            │
+│ Owner Runtime: settlementRuntime                                             │
+│ Routes:                                                                       │
+│ - GET /api/matches/[id]/result                                               │
+│ - GET /api/matches/[id]/settlement                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Realtime Stream Module                                                       │
+│ Owner Runtime: matchRuntime + chainSyncEngine + settlementRuntime            │
+│ Routes:                                                                       │
+│ - GET /api/matches/[id]/stream (SSE)                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Runtime Ops                                                                  │
+│ Owner Runtime: runtimeSupervisor + workerHealth                              │
+│ Routes:                                                                       │
+│ - GET /api/runtime/health                                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. 后端架构（Supabase）
+## 6. Data Ownership and Storage
 
-### 4.1 数据库表设计
+### 6.1 On-chain vs Off-chain Boundary
 
-```sql
--- 任务（由 node-scanner 自动生成）
-missions
-  id            UUID PK
-  assembly_id   TEXT NOT NULL          -- Sui NetworkNode ObjectID
-  node_name     TEXT
-  fill_ratio    DECIMAL(5,4)           -- 0.0000 ~ 1.0000
-  urgency       TEXT CHECK (urgency IN ('critical','warning','safe'))
-  prize_pool    BIGINT DEFAULT 0       -- 总奖池（lamports）
-  entry_fee     BIGINT NOT NULL        -- 每人入场费
-  min_teams     INT NOT NULL DEFAULT 1 -- 开赛至少需要的战队数（与 PRD 开赛规则一致）
-  max_teams     INT NOT NULL         -- 每局可配置战队上限（如 4/10/16+），非固定 4；可另设平台 global cap
-  min_players   INT DEFAULT 3
-  status        TEXT DEFAULT 'open'    -- open / in_progress / settled / expired
-  created_at    TIMESTAMPTZ DEFAULT now()
-
--- 房间（一场比赛 = 一个房间）
-matches
-  id            UUID PK
-  mission_id    UUID FK → missions.id
-  status        TEXT DEFAULT 'lobby'   -- lobby / pre_start / running / panic / settling / settled
-  start_at      TIMESTAMPTZ            -- 比赛开始时间
-  end_at        TIMESTAMPTZ            -- 比赛结束时间
-  panic_at      TIMESTAMPTZ            -- 进入 Panic 的时间
-  start_tx      TEXT                   -- start_match() tx digest
-  end_tx        TEXT                   -- end_match() tx digest
-  created_at    TIMESTAMPTZ DEFAULT now()
-
--- 战队
-teams
-  id            UUID PK
-  match_id      UUID FK → matches.id
-  captain_wallet TEXT NOT NULL
-  team_name     TEXT
-  max_size      INT DEFAULT 8
-  status        TEXT DEFAULT 'forming' -- forming / locked / paid / ready
-  total_score   BIGINT DEFAULT 0
-  rank          INT                    -- 结算后写入
-  prize_amount  BIGINT                 -- 结算后写入
-  created_at    TIMESTAMPTZ DEFAULT now()
-
--- 队员
-team_members
-  id            UUID PK
-  team_id       UUID FK → teams.id
-  wallet_address TEXT NOT NULL
-  role          TEXT CHECK (role IN ('collector','hauler','escort'))
-  personal_score BIGINT DEFAULT 0
-  prize_amount   BIGINT                -- 结算后写入
-  joined_at     TIMESTAMPTZ DEFAULT now()
-  UNIQUE(team_id, wallet_address)
-
--- 白名单（队长付费后写入，归因三重过滤 Filter 1 数据源）
-match_whitelist
-  match_id      UUID FK → matches.id
-  wallet_address TEXT NOT NULL
-  registered_at TIMESTAMPTZ DEFAULT now()
-  PRIMARY KEY (match_id, wallet_address)
-
--- 比赛目标站点（归因三重过滤 Filter 2 数据源）
-match_targets
-  match_id      UUID FK → matches.id
-  assembly_id   TEXT NOT NULL
-  PRIMARY KEY (match_id, assembly_id)
-
--- 归因计分事件（通过三重过滤后持久化）
-score_events
-  id            UUID PK
-  match_id      UUID FK → matches.id
-  team_id       UUID FK → teams.id
-  member_wallet TEXT NOT NULL
-  tx_digest     TEXT NOT NULL
-  assembly_id   TEXT NOT NULL
-  old_quantity  BIGINT
-  new_quantity  BIGINT
-  fuel_delta    BIGINT                 -- new - old
-  fill_ratio_at DECIMAL(5,4)           -- 注入时刻的 fill_ratio
-  urgency_weight DECIMAL(3,1)          -- 3.0 / 1.5 / 1.0
-  panic_multiplier DECIMAL(3,1)        -- 1.0 / 1.5
-  score         BIGINT                 -- 最终得分
-  chain_ts      TIMESTAMPTZ            -- 链上时间戳
-  created_at    TIMESTAMPTZ DEFAULT now()
-  UNIQUE(match_id, tx_digest)
-
--- 结算记录
-settlements
-  id            UUID PK
-  match_id      UUID FK → matches.id  UNIQUE
-  gross_pool    BIGINT
-  platform_fee  BIGINT DEFAULT 0
-  payout_pool   BIGINT
-  result_hash   TEXT                   -- 结算数据的确定性哈希
-  commitment_tx TEXT                   -- 链上 commitment tx digest
-  settlement_tx TEXT                   -- 链上 settlement tx digest
-  status        TEXT DEFAULT 'pending' -- pending / committed / settled / failed
-  created_at    TIMESTAMPTZ DEFAULT now()
-
--- 审计日志
-audit_logs
-  id            UUID PK
-  match_id      UUID
-  event_type    TEXT                   -- filter_rejected / settlement_triggered / ...
-  detail        JSONB
-  created_at    TIMESTAMPTZ DEFAULT now()
-```
-
-### 4.2 Supabase Realtime 通道设计
-
-前端通过 Supabase Realtime 订阅以下数据变更，无需自建 WebSocket：
-
-| 订阅方式 | 目标 | 前端用途 |
+| 数据 | 信任根 | 说明 |
 |---|---|---|
-| **Table Changes** on `matches` | 比赛状态变更 | 状态机切换（lobby → running → settled） |
-| **Table Changes** on `teams` | 战队状态/得分变更 | 得分板更新、队伍锁定状态 |
-| **Table Changes** on `team_members` | 成员入队/得分变更 | 角色槽位实时同步 |
-| **Table Changes** on `score_events` INSERT | 新计分事件 | 弹幕 feed + 得分跳动 |
-| **Broadcast** channel `match:{matchId}` | 自定义消息 | Panic 模式切换、倒计时同步、结算进度 |
+| `FuelEvent(DEPOSITED)` | On-chain | 唯一计分事件源。 |
+| `NetworkNode.fuel_quantity / fuel_max_capacity / status / location` | On-chain | 节点油量、在线状态、位置公开事实。 |
+| 赞助费锁定 / 入场费支付 | On-chain | 所有资产出入都必须有 tx digest。 |
+| 白名单注册 | On-chain or signed immutable off-chain snapshot referenced by tx | 作为三重过滤第一层信任根。 |
+| 比赛开始 / 结束窗口 | On-chain timestamp or tx confirmation + off-chain mirrored status | 对记分时间窗可审计。 |
+| 比赛列表、筛选、星系可选性、推荐节点、实时得分板、弹幕 | Off-chain projection | 基于链上事实派生，服务体验层。 |
+| 结算账单展示、MVP、排名页 | Off-chain projection + on-chain payout result | 展示层以投影为主，金额和转账以链上结果校验。 |
 
-### 4.3 Edge Functions（后端逻辑）
+### 6.2 Canonical Supabase Tables
 
-| 函数名 | 触发方式 | 职责 |
+| Table | Owner | 关键字段 |
 |---|---|---|
-| `node-scanner` | Cron (每 5 秒) | 轮询 Sui RPC 获取 NetworkNode 状态，更新 missions 表，自动创建紧急比赛 |
-| `chain-sync` | Cron (每 2 秒) | 订阅 FuelEvent(DEPOSITED)，执行三重过滤归因，写入 score_events |
-| `match-tick` | Cron (每 1 秒) | 检查所有 running 状态比赛，处理倒计时、Panic 切换、到时结束 |
-| `pay-entry` | HTTP (前端调用) | 验证钱包签名和付款 tx，写入白名单，更新 teams 状态 |
-| `trigger-settlement` | 内部调用 (match-tick) | 比赛结束后执行：汇总得分 → 计算排名 → 计算分账 → 提交链上结算 |
-| `get-settlement-bill` | HTTP (前端调用) | 查询完整分账明细返回给前端 |
+| `solar_systems_cache` | `solarSystemRuntime` | `system_id`, `system_name`, `constellation_id`, `region_id`, `gate_links`, `updated_at` |
+| `constellation_summaries` | `constellationRuntime` | `constellation_id`, `system_count`, `urgent_node_count`, `selectable_system_count`, `updated_at` |
+| `network_nodes` | `nodeRuntime` | `object_id`, `solar_system_id`, `fill_ratio`, `urgency`, `is_online`, `is_public`, `active_match_id`（UI 主展示投影） |
+| `matches` | `matchRuntime` | `id`, `mode`, `status`, `solar_system_id`, `sponsorship_fee`, `entry_fee`, `max_teams`, `duration_hours`, `publish_tx_digest` |
+| `match_target_nodes` | `matchRuntime` | `match_id`, `node_object_id`, `captured_fill_ratio`, `captured_urgency` |
+| `teams` | `teamRuntime` | `id`, `match_id`, `captain_address`, `status`, `member_count`, `is_locked`, `payment_status` |
+| `team_members` | `teamRuntime` | `team_id`, `wallet_address`, `role`, `joined_at` |
+| `team_join_applications` | `teamRuntime` | `id`, `team_id`, `applicant_address`, `role`, `status(pending/approved/rejected)`, `reason`, `reviewed_at`, `reviewed_by` |
+| `team_payments` | `teamRuntime` | `team_id`, `tx_digest`, `amount`, `confirmed_at` |
+| `match_whitelists` | `teamRuntime` | `match_id`, `wallet_address`, `team_id`, `source_payment_tx` |
+| `fuel_events` | `chainSyncEngine` | `tx_digest`, `event_seq`, `match_id`, `sender`, `assembly_id`, `fuel_added`, `score_delta` |
+| `match_scores` | `chainSyncEngine` | `match_id`, `team_id`, `wallet_address`, `total_score`, `last_event_at` |
+| `settlements` | `settlementRuntime` | `match_id`, `gross_pool`, `platform_fee`, `payout_pool`, `payout_tx_digest`, `settled_at` |
+| `match_stream_events` | `matchRuntime` family | `match_id`, `event_type`, `payload`, `created_at` |
+| `idempotency_keys` | write route middleware | `scope`, `key`, `request_hash`, `status`, `created_at` |
+| `worker_health` | runtimeSupervisor | `worker`, `status`, `heartbeat_at`, `restart_count`, `last_error` |
 
 ---
 
-## 5. 合约架构（Sui Move）
+## 7. Critical Flows
 
-### 5.1 链上职责边界
+### 7.1 Create Match and Publish
 
-**必须上链**（PRD 第 11 章定义）：
+1. View 填写创建草稿，Controller 调用 `matchService.createDraft`.
+2. `POST /api/matches` 只做业务校验和草稿创建，返回 `matchId`.
+3. 客户端发起赞助费锁定交易，获得 `publishTxDigest`.
+4. `POST /api/matches/{id}/publish` 校验：
+   - 比赛仍为 `draft`
+   - `sponsorshipFee >= 500`
+   - `solarSystemId` 对应的目标星系满足 selectable 规则
+   - 精准模式下 `targetNodeIds.length` 在 1-5 之间，且节点属于目标星系
+5. `matchRuntime` 将比赛状态切为 `lobby`，刷新 `match_target_nodes` 与节点展示投影；`network_nodes.active_match_id` 仅作为 UI 主展示引用，不作为唯一占用键。
+6. Lobby 读模型可见该比赛。
 
-| 数据 | 链上形式 | 原因 |
+### 7.2 Lobby Discovery and Location Recommendation
+
+1. Lobby 首屏拉取 `GET /api/matches?status=lobby`.
+2. 位置选择器读取 `GET /api/solar-systems` 和 `GET /api/search`.
+3. 选定当前位置后，`locationStore` 记录 `systemId`.
+4. 自由模式卡片可调用 `GET /api/network-nodes/recommendations` 获取推荐节点。
+5. 距离显示由 `solarSystemRuntime` 的 gateLinks 拓扑计算，结果写入读模型，不在前端做路径搜索。
+
+### 7.3 Team Apply, Approve/Reject, Lock, Pay
+
+1. 玩家进入 `/planning`，读取比赛详情与战队列表。
+2. 队长创建战队；玩家通过 `POST /api/teams/{id}/join` 提交入队申请（`pending`）。
+3. 队长通过 `approve/reject` 审批申请；仅 `approved` 申请会转为正式成员并占用角色槽位。
+4. 队长执行锁队，锁队后成员名单冻结，拒绝新申请和离队。
+5. 队长发起链上入场费支付，金额为 `entryFee * memberCount`。
+6. `POST /api/teams/{id}/pay` 校验支付交易并写入 `team_payments`。
+7. `teamRuntime` 同步白名单快照，比赛可进入开赛条件判断。
+
+### 7.4 Live Scoring
+
+1. `chainSyncEngine` 订阅 `FuelEvent(DEPOSITED)`.
+2. 对每个事件执行交易溯源，获取 `sender` 与 `timestamp`.
+3. 执行三重过滤：
+   - `sender` 在本局白名单
+   - 自由模式下节点属于目标星系；精准模式下节点在目标节点集
+   - 时间戳位于 `[startedAt, endedAt]`
+4. 计算 `fuelAdded * urgencyWeight * panicMultiplier`.
+5. 更新 `match_scores`，并通过 `match_stream_events` 广播 `score_update`.
+6. 前端只消费流，不自行计算最终得分。
+
+### 7.5 Settlement
+
+1. `matchRuntime` 将比赛从 `running/panic` 切换到 `settling`.
+2. `settlementRuntime` 获取最终得分快照，计算 `grossPool`, `platformFee`, `payoutPool`.
+3. 按 PRD 排名比例计算队伍奖金，再按个人贡献占比分配到个人。
+4. 发起链上奖励转账，保存 `payoutTxDigest`.
+5. 结算成功后将比赛标记为 `settled`，生成结果账单。
+6. `/settlement` 页面读取只读账单和链上结果引用。
+
+---
+
+## 8. Side-effects, Retry, and Idempotency
+
+- 所有写接口必须接受 `X-Idempotency-Key`。
+- `POST /api/matches` 以 `creatorAddress + idempotencyKey` 幂等。
+- `POST /api/matches/{id}/publish` 以 `matchId + publishTxDigest` 幂等。
+- `POST /api/teams/{id}/join` 以 `teamId + applicantAddress + role` 幂等（pending 期间重复提交回放同一申请）。
+- `POST /api/teams/{id}/applications/{applicationId}/approve|reject` 以 `applicationId + action` 幂等。
+- `POST /api/teams/{id}/pay` 以 `teamId + payTxDigest` 幂等，重复请求只能回放同一确认结果。
+- `chainSyncEngine` 以 `txDigest + eventSeq` 去重，允许事件流至少一次投递。
+- `matchRuntime` 的状态迁移必须做 compare-and-set，禁止双 worker 重复推进。
+- `settlementRuntime` 采用单飞锁，保证每场比赛最多一次有效结算。
+- 读取 world metadata API 失败时允许返回缓存，但必须在响应中携带 `stale=true` 标记。
+
+---
+
+## 9. Error Contract and Observability
+
+### 9.1 Error Contract
+
+| 层 | 错误类型 | 处理方式 |
 |---|---|---|
-| 玩家送油动作 | `deposit_fuel()` → `FuelEvent(DEPOSITED)` | 唯一计分数据源，不可伪造 |
-| 站点燃料状态 | `NetworkNode` SharedObject | EVE 原生链上数据 |
-| 入场费支付 | LUX 转账 tx | 涉及资产 |
-| 参赛白名单 | Match Object 内的地址列表 | 归因信任根 |
-| 比赛开始/结束 | `start_match()` / `end_match()` tx | 锁定计分时间窗口 |
-| 奖励发放 | LUX 转账 | 涉及资产出账 |
+| View | 表单校验错误 | 仅展示可纠正提示，不做重试。 |
+| Controller | 业务态错误映射 | 统一映射为用户可读文案和 CTA。 |
+| Service | 网络 / 超时 / 冲突 | 透传错误码，标记是否可重试。 |
+| Runtime | 链上校验失败 / 状态冲突 / 外部依赖失败 | 记录结构化日志，返回统一 `ApiError`。 |
 
-**链下存储**（见上方 §4.1 数据库表）：
+### 9.2 Required Telemetry
 
-比赛房间元信息、战队组成、角色分配、实时得分累加、弹幕消息、fill_ratio 缓存、Optimistic UI 状态。
+| 指标 | 目标 |
+|---|---|
+| `score_delivery_latency_ms` | < 1000ms |
+| `danmaku_latency_ms` | < 500ms |
+| `node_snapshot_age_seconds` | <= 5s |
+| `match_publish_latency_ms` | < 3000ms（不含钱包签名等待） |
+| `settlement_duration_seconds` | 10-30s |
+| `world_cache_staleness_seconds` | 可观测，超阈值报警 |
 
-### 5.2 自研合约模块接口
+所有结构化日志必须至少包含：
 
-```
-module fuel_frog_panic::match {
-  // 创建比赛，锁定目标站点和费率
-  public entry fun create_match(
-    mission_assembly_ids: vector<address>,
-    entry_fee_per_person: u64,
-    platform_subsidy: u64,
-    ctx: &mut TxContext
-  )
-
-  // 白名单注册（队长付费后由后端调用）
-  public entry fun register_whitelist(
-    match_obj: &mut Match,
-    addresses: vector<address>,
-    ctx: &mut TxContext
-  )
-
-  // 开赛锚定（后端在倒计时归零后调用）
-  public entry fun start_match(
-    match_obj: &mut Match,
-    ctx: &mut TxContext
-  )
-
-  // 结束比赛 + 发放奖励（后端结算后调用）
-  public entry fun end_match_and_settle(
-    match_obj: &mut Match,
-    result_hash: vector<u8>,
-    payout_addresses: vector<address>,
-    payout_amounts: vector<u64>,
-    ctx: &mut TxContext
-  )
-}
-```
-
-### 5.3 数据流总览
-
-```
-EVE Frontier (Sui)
-│
-├─ NetworkNode.fuel_quantity         ──读取──▶  Edge: node-scanner → missions 表
-├─ FuelEvent(DEPOSITED)              ──监听──▶  Edge: chain-sync → 三重过滤 → score_events 表
-├─ deposit_fuel() tx.sender          ──查询──▶  Edge: chain-sync → 白名单比对
-│
-├─ create_match()                    ◀──写入──  Edge: node-scanner（自动创建紧急比赛）
-├─ register_whitelist()              ◀──写入──  Edge: pay-entry（队长付费时）
-├─ start_match()                     ◀──写入──  Edge: match-tick（倒计时归零时）
-├─ end_match_and_settle()            ◀──写入──  Edge: trigger-settlement（比赛结束时）
-│
-Supabase (Off-chain)
-├─ missions, matches, teams          ←→ 前端 REST + Realtime
-├─ score_events                      → 前端 Realtime（弹幕 + 得分）
-├─ settlements                       → 前端 REST（结算账单）
-└─ audit_logs                        → 内部审计
-```
+- `requestId`
+- `matchId`（如有）
+- `teamId`（如有）
+- `walletAddress`（如有）
+- `txDigest`（如有）
+- `runtime`
+- `errorCode`（失败时）
 
 ---
 
-## 6. 比赛状态机
+## 10. PRD Traceability
 
-PRD 4.3.6 定义的状态机，后端 `match-tick` 函数负责驱动：
-
-```
-┌──────────┐
-│  Lobby   │  等待战队报名
-└────┬─────┘
-     │ 满员 or 最低人数倒计时归零
-     ▼
-┌──────────┐
-│ PreStart │  30 秒准备倒计时
-└────┬─────┘
-     │ 倒计时归零 → 调用 start_match()
-     ▼
-┌──────────┐
-│ Running  │  10 分钟竞技（前 8.5 分钟 Normal Mode）
-└────┬─────┘
-     │ 剩余 ≤ 90 秒
-     ▼
-┌──────────┐
-│  Panic   │  最后 90 秒（得分 ×1.5）
-└────┬─────┘
-     │ 倒计时归零 → 调用 end_match_and_settle()
-     ▼
-┌──────────┐
-│ Settling │  链上结算处理中（10–30 秒）
-└────┬─────┘
-     │ 链上 tx 确认
-     ▼
-┌──────────┐
-│ Settled  │  结算完成，可查看战报
-└──────────┘
-```
-
-非法状态迁移返回错误并写入 `audit_logs`。
+| PRD 章节 | 架构落点 |
+|---|---|
+| 4.1 创建 & 发布比赛 | 第 4.2 节 Match Creation 域、第 5 节 `solarSystemRuntime/constellationRuntime/matchRuntime`、第 7.1 流程 |
+| 4.2 创建战队 | 第 4.2 节 Team Lobby 域、第 5 节 `teamRuntime`、第 7.3 流程 |
+| 4.3 发现 & 参加比赛 | 第 4.2 节 Lobby Discovery 域、第 7.2 流程 |
+| 4.4 启动比赛 | 第 5 节 `matchRuntime/chainSyncEngine`、第 7.4 流程 |
+| 4.5 自动分账 | 第 5 节 `settlementRuntime`、第 7.5 流程 |
+| 5 技术架构要点 | 第 3-9 节整体实现 |
+| 8 链上 / 链下边界 | 第 6 节数据所有权边界 |
 
 ---
 
-## 7. 归因计分管道（核心链路）
+## 11. Architecture Decision Notes
 
-PRD 第 7 章三重过滤，在 `chain-sync` Edge Function 中执行：
-
-```
-FuelEvent(DEPOSITED) 到达
-  │
-  ├─ Filter 1: sender ∈ match_whitelist?
-  │   └─ 否 → 丢弃 + 记录 audit_log(filter_rejected, reason=not_whitelisted)
-  │
-  ├─ Filter 2: assembly_id ∈ match_targets?
-  │   └─ 否 → 丢弃 + 记录 audit_log(filter_rejected, reason=wrong_target)
-  │
-  ├─ Filter 3: chain_timestamp ∈ [match.start_at, match.end_at]?
-  │   └─ 否 → 丢弃 + 记录 audit_log(filter_rejected, reason=out_of_window)
-  │
-  ▼ 全部通过
-  计算得分:
-    fuel_delta = new_quantity - old_quantity
-    fill_ratio_at = old_quantity / max_capacity  (注入时刻)
-    urgency_weight = fill_ratio_at < 0.20 ? 3.0 : fill_ratio_at < 0.50 ? 1.5 : 1.0
-    panic_multiplier = match.status == 'panic' ? 1.5 : 1.0
-    score = fuel_delta × urgency_weight × panic_multiplier
-  │
-  ▼
-  写入 score_events 表（UNIQUE on match_id + tx_digest 防重）
-  更新 team_members.personal_score += score
-  更新 teams.total_score += score
-  │
-  ▼
-  Supabase Realtime 自动广播变更 → 前端收到更新
-```
-
----
-
-## 8. 结算流程
-
-PRD 4.4 定义的二层分配机制：
-
-```
-match-tick 检测到比赛时间归零
-  │
-  ▼
-matches.status → 'settling'
-  │
-  ▼
-trigger-settlement Edge Function 执行:
-  │
-  ├─ 1. 汇总: 查询所有 teams (按 total_score DESC 排名)
-  │
-  ├─ 2. 第一层分配 (队伍级):
-  │     按参赛队数决定比例 → PRD 4.4.3
-  │     1队: 100%(达标) | 2队: 70/30 | 3+队: 60/30/10
-  │
-  ├─ 3. 第二层分配 (个人级):
-  │     team_prize × (member_score / team_total_score) → PRD 4.4.4
-  │
-  ├─ 4. 写入 settlements 表
-  │
-  ├─ 5. 调用 end_match_and_settle() 链上发放 LUX
-  │
-  ├─ 6. 确认 tx 成功 → settlements.status = 'settled'
-  │     matches.status → 'settled'
-  │
-  └─ 失败 → settlements.status = 'failed' + audit_log
-```
-
-### 8.1 幂等保障
-
-- `settlements` 表 `match_id` UNIQUE 约束，同一场比赛只能结算一次
-- `score_events` 表 `(match_id, tx_digest)` UNIQUE，同一笔链上交易不会重复计分
-
----
-
-## 9. 安全与防作弊
-
-| 威胁 | 对策 | 架构实现点 |
-|---|---|---|
-| 非参赛者链上送油被计分 | Filter 1 白名单校验 | chain-sync → match_whitelist |
-| 给非目标站送油刷分 | Filter 2 站点校验 | chain-sync → match_targets |
-| 比赛时间窗口外提交 | Filter 3 时间窗口 | chain-sync → matches.start_at/end_at |
-| 少量多次维持红色刷高分 | 权重以注入时刻 fill_ratio 计算 | score_events.fill_ratio_at |
-| 重复提交同一 tx | tx_digest UNIQUE 约束 | score_events UNIQUE(match_id, tx_digest) |
-| 重复触发结算 | match_id UNIQUE + 状态检查 | settlements UNIQUE(match_id) |
-| 身份伪造 | 钱包签名验证 | pay-entry Edge Function |
-
----
-
-## 10. 性能指标（NFRs）
-
-| 指标 | 目标 | 实现策略 |
-|---|---|---|
-| 弹幕延迟（链上事件 → 前端展示）| < 3s | chain-sync 2s 轮询 + Realtime 即时推送 |
-| 得分更新延迟 | < 3s | score_events INSERT → Realtime 自动广播 |
-| 站点油量刷新 | 5s | node-scanner Cron 周期 |
-| 同时进行比赛数 | ≥ 20 | Supabase 连接池 + Edge Function 并发 |
-| Optimistic UI 回退 | < 5s | 前端超时检测 + 状态回滚 |
+- 兼容层可以保留旧路由与旧服务名，但新增实现必须以本文件中的领域边界和接口命名为准。
+- `draft` 与 `cancelled` 为内部状态，用于支撑“先创建草稿后发布”和“未开赛退款”两类流程；公开大厅默认不返回这两类状态。
+- 自由模式的记分边界以目标星系为准；精准模式的记分边界以发布时冻结的 `targetNodeIds` 为准。
+- `activeMatchId` 不是节点与比赛的一对一强约束字段；节点与比赛的规范关系以 `matches.solar_system_id` 和 `match_target_nodes` 为准。

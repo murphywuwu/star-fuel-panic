@@ -6,36 +6,52 @@ import { ConnectModal } from "@mysten/dapp-kit-react/ui";
 
 interface WalletConnectBridgeProps {
   openSignal: number;
-  isConnected: boolean;
+  shouldClose: boolean;
 }
 
 function isEveWallet(wallet: UiWallet) {
   return wallet.name.toLowerCase().includes("eve");
 }
 
-export function WalletConnectBridge({ openSignal, isConnected }: WalletConnectBridgeProps) {
+export function WalletConnectBridge({ openSignal, shouldClose }: WalletConnectBridgeProps) {
   const connectModalRef = useRef<ComponentRef<typeof ConnectModal> | null>(null);
-  const [modalKey, setModalKey] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    if (isConnected) {
-      void (connectModalRef.current as { close?: (returnValue?: string) => void } | null)?.close?.("connected");
+    const modal = connectModalRef.current as (EventTarget & {
+      addEventListener?: (type: string, listener: EventListener) => void;
+      removeEventListener?: (type: string, listener: EventListener) => void;
+    }) | null;
+
+    if (!modal?.addEventListener || !modal?.removeEventListener) {
+      return undefined;
     }
-  }, [isConnected]);
+
+    const handleClosed = () => {
+      setIsOpen(false);
+    };
+
+    modal.addEventListener("closed", handleClosed);
+    return () => {
+      modal.removeEventListener("closed", handleClosed);
+    };
+  }, []);
 
   useEffect(() => {
     if (openSignal <= 0) {
       return;
     }
 
-    setModalKey((prev) => prev + 1);
-
-    const timer = setTimeout(() => {
-      void (connectModalRef.current as { show?: () => void } | null)?.show?.();
-    }, 100);
-
-    return () => clearTimeout(timer);
+    setIsOpen(true);
   }, [openSignal]);
 
-  return <ConnectModal key={modalKey} ref={connectModalRef} filterFn={isEveWallet} />;
+  useEffect(() => {
+    if (!shouldClose) {
+      return;
+    }
+
+    setIsOpen(false);
+  }, [shouldClose]);
+
+  return <ConnectModal open={isOpen} ref={connectModalRef} filterFn={isEveWallet} />;
 }

@@ -1,18 +1,27 @@
 export type PlayerRole = "collector" | "hauler" | "escort" | "dispatcher";
 
-export type SettlementStatus = "pending" | "committed" | "settled" | "failed";
+export type SettlementState = "pending" | "running" | "succeeded" | "failed";
 
 export interface SettlementBill {
   matchId: string;
-  grossPool: number;
-  platformFee: number;
-  payoutPool: number;
-  resultHash: string;
-  commitmentTx: string | null;
-  settlementTx: string | null;
-  status: SettlementStatus;
+  sponsorshipFee: string;
+  entryFeeTotal: string;
+  platformSubsidy: string;
+  grossPool: string;
+  platformFeeRate: 0.05;
+  platformFee: string;
+  payoutPool: string;
+  payoutTxDigest: string | null;
   teamBreakdown: TeamPayout[];
   mvp: MvpInfo | null;
+}
+
+export interface SettlementStatus {
+  matchId: string;
+  status: SettlementState;
+  progress: number;
+  payoutTxDigest: string | null;
+  updatedAt: string;
 }
 
 export interface TeamPayout {
@@ -21,7 +30,7 @@ export interface TeamPayout {
   rank: number;
   totalScore: number;
   prizeRatio: number;
-  prizeAmount: number;
+  prizeAmount: string;
   members: MemberPayout[];
 }
 
@@ -30,14 +39,14 @@ export interface MemberPayout {
   role: PlayerRole;
   personalScore: number;
   contributionRatio: number;
-  prizeAmount: number;
+  prizeAmount: string;
 }
 
 export interface MvpInfo {
   walletAddress: string;
+  teamId: string;
   role: PlayerRole;
-  totalScore: number;
-  teamName: string;
+  score: number;
 }
 
 export const PAYOUT_RATIOS: Record<number, number[]> = {

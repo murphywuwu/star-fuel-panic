@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMissionController } from "@/controller/useMissionController";
 import type { Mission, MissionSortBy, UrgencyLevel } from "@/types/mission";
-import { FuelMissionShell } from "@/view/components/FuelMissionShell";
+import { MatchShell } from "@/view/components/MatchShell";
 import { MatchCard } from "@/view/components/MatchCard";
 import { NodeDetailOverlay } from "@/view/components/NodeDetailOverlay";
 import { NodeMap } from "@/view/components/NodeMap";
@@ -74,7 +74,7 @@ export function HeatmapScreen() {
   };
 
   return (
-    <FuelMissionShell
+    <MatchShell
       title="SYSTEM MAP / FUELING MATCH BOARD"
       subtitle="Split view. Prioritize matches with the biggest pools and the highest urgency."
       activeRoute="/lobby"
@@ -160,6 +160,6 @@ export function HeatmapScreen() {
       </section>
 
       <NodeDetailOverlay mission={detailMission} onClose={() => setDetailOpen(false)} open={detailOpen} />
-    </FuelMissionShell>
+    </MatchShell>
   );
 }

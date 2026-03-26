@@ -1,5 +1,10 @@
-import { FuelFrogLobbyScreen } from "@/view/screens/FuelFrogLobbyScreen";
+import { Suspense } from "react";
+import { TeamLobbyScreen } from "@/view/screens/TeamLobbyScreen";
 
 export default function PlanningPage() {
-  return <FuelFrogLobbyScreen />;
+  return (
+    <Suspense fallback={null}>
+      <TeamLobbyScreen />
+    </Suspense>
+  );
 }

@@ -1,4 +1,4 @@
-import type { Mission, MissionFilters } from "@/types/mission";
+import type { Mission, MissionFilters } from "../types/mission.ts";
 
 const URGENCY_WEIGHT: Record<Mission["urgency"], number> = {
   critical: 3,
@@ -199,6 +199,18 @@ export function listMissions(filters: MissionFilters = {}) {
   }));
 }
 
+export function getMissionById(missionId: string) {
+  tickRuntime();
+  const mission = missions.find((item) => item.id === missionId);
+  if (!mission) {
+    return null;
+  }
+  return {
+    ...mission,
+    participatingTeams: [...mission.participatingTeams]
+  };
+}
+
 export function upsertMission(nextMission: Mission) {
   const index = missions.findIndex((mission) => mission.id === nextMission.id);
   if (index < 0) {
@@ -207,4 +219,9 @@ export function upsertMission(nextMission: Mission) {
   }
 
   missions = missions.map((mission) => (mission.id === nextMission.id ? nextMission : mission));
+}
+
+export function resetMissionRuntime() {
+  missions = SEED_MISSIONS.map((mission) => ({ ...mission, participatingTeams: [...mission.participatingTeams] }));
+  lastTickMs = Date.now();
 }

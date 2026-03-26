@@ -18,7 +18,7 @@ Required variables:
 
 Notes:
 
-- 当前前端入场费交易实现默认走 `SUI`（`0x2::sui::SUI`）转账路径。
+- 当前前端余额查询与入场费交易都走 `NEXT_PUBLIC_LUX_COIN_TYPE` 配置；发布前必须确认该值与目标网络上的真实 LUX coin type 一致。
 
 Optional variables:
 
@@ -107,4 +107,4 @@ bash scripts/devnet-verify.sh
 2. Complete one flow: `create-team -> join-team -> lock-team -> pay-entry`.
 3. Confirm `match_whitelist` contains all member addresses.
 4. Confirm `match-tick` can advance `lobby -> pre_start -> running -> panic -> settling -> settled`.
-5. Confirm settlement bill includes `resultHash`, `commitmentTx`, `settlementTx`.
+5. Confirm settlement bill includes `sponsorshipFee`, `entryFeeTotal`, `platformSubsidy`, `platformFee`, `payoutPool`, and `payoutTxDigest`.

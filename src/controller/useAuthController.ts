@@ -8,6 +8,7 @@ import { selectWalletShort } from "@/model/authStore";
 import { authService } from "@/service/authService";
 import { setWalletRuntimeBridge } from "@/service/walletService";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
+import { balanceToDisplayUnits, normalizeWalletDecimals } from "@/utils/walletBalance";
 
 const WALLET_ERROR_LABEL: Partial<Record<FuelMissionErrorCode, string>> = {
   E_WALLET_NOT_CONNECTED: "WALLET NOT CONNECTED",
@@ -20,6 +21,7 @@ const WALLET_ERROR_LABEL: Partial<Record<FuelMissionErrorCode, string>> = {
 
 const DEFAULT_COIN_TYPE = process.env.NEXT_PUBLIC_LUX_COIN_TYPE?.trim() || "0x2::sui::SUI";
 const DEFAULT_DECIMALS = Number(process.env.NEXT_PUBLIC_LUX_DECIMALS ?? Number.NaN);
+const CONFIGURED_DECIMALS = Number.isFinite(DEFAULT_DECIMALS) ? Math.floor(DEFAULT_DECIMALS) : null;
 
 function normalizeAddress(address: string | null | undefined) {
   return address?.trim().toLowerCase() ?? null;
@@ -28,25 +30,6 @@ function normalizeAddress(address: string | null | undefined) {
 function pickPreferredWallet(wallets: UiWallet[]) {
   const eveWallet = wallets.find((wallet) => wallet.name.toLowerCase().includes("eve"));
   return eveWallet ?? wallets[0] ?? null;
-}
-
-function balanceToDisplayUnits(rawBalance: string, decimals: number) {
-  const safeDecimals = Number.isFinite(decimals) && decimals >= 0 ? Math.floor(decimals) : 9;
-  try {
-    const amount = BigInt(rawBalance);
-    const divisor = 10n ** BigInt(safeDecimals);
-    const whole = amount / divisor;
-    const fraction = amount % divisor;
-    const fractionText = safeDecimals === 0 ? "" : fraction.toString().padStart(safeDecimals, "0").slice(0, 6);
-    const asNumber = Number(fractionText.length > 0 ? `${whole.toString()}.${fractionText}` : whole.toString());
-    return Number.isFinite(asNumber) ? asNumber : 0;
-  } catch {
-    const parsed = Number(rawBalance);
-    if (!Number.isFinite(parsed)) {
-      return 0;
-    }
-    return parsed / 10 ** safeDecimals;
-  }
 }
 
 export function walletErrorMessage(errorCode?: FuelMissionErrorCode | string, fallbackMessage?: string) {
@@ -62,7 +45,8 @@ export function useAuthController() {
   const account = useCurrentAccount();
   const walletConnection = useWalletConnection();
   const client = useCurrentClient();
-  const decimalsRef = useRef<number | null>(Number.isFinite(DEFAULT_DECIMALS) ? DEFAULT_DECIMALS : null);
+  const decimalsRef = useRef<number | null>(null);
+  const decimalsPromiseRef = useRef<Promise<number> | null>(null);
   const [connectOpenSignal, setConnectOpenSignal] = useState(0);
 
   const state = useSyncExternalStore(
@@ -72,6 +56,32 @@ export function useAuthController() {
   );
 
   useEffect(() => {
+    decimalsRef.current = null;
+    decimalsPromiseRef.current = null;
+  }, [client]);
+
+  useEffect(() => {
+    const resolveCoinDecimals = async () => {
+      if (decimalsRef.current !== null) {
+        return decimalsRef.current;
+      }
+
+      if (!decimalsPromiseRef.current) {
+        decimalsPromiseRef.current = client.core
+          .getCoinMetadata({
+            coinType: DEFAULT_COIN_TYPE
+          })
+          .then((response) => normalizeWalletDecimals(response.coinMetadata?.decimals, CONFIGURED_DECIMALS))
+          .catch(() => normalizeWalletDecimals(undefined, CONFIGURED_DECIMALS))
+          .then((decimals) => {
+            decimalsRef.current = decimals;
+            return decimals;
+          });
+      }
+
+      return decimalsPromiseRef.current;
+    };
+
     setWalletRuntimeBridge({
       connect: async () => {
         const preferredWallet = pickPreferredWallet(wallets);
@@ -113,15 +123,15 @@ export function useAuthController() {
         throw new Error("wallet execution returned no digest");
       },
       getBalance: async (address: string) => {
-        if (decimalsRef.current === null) {
-          decimalsRef.current = 9;
-        }
+        const [response, decimals] = await Promise.all([
+          client.core.getBalance({
+            owner: address,
+            coinType: DEFAULT_COIN_TYPE
+          }),
+          resolveCoinDecimals()
+        ]);
 
-        const response = await client.core.getBalance({
-          owner: address,
-          coinType: DEFAULT_COIN_TYPE
-        });
-        return balanceToDisplayUnits(response.balance.balance, decimalsRef.current ?? 9);
+        return balanceToDisplayUnits(response.balance.balance, decimals);
       }
     });
   }, [account?.address, client, dAppKit, walletConnection.status, wallets]);

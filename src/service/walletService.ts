@@ -1,6 +1,6 @@
 import { fromBase64 } from "@mysten/sui/utils";
 import { verifyTransactionSignature } from "@mysten/sui/verify";
-import { Transaction } from "@mysten/sui/transactions";
+import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
 
 const LEGACY_STORAGE_IDENTITY_PROOF_KEY = "ffp.wallet.identity_proof";
@@ -161,19 +161,17 @@ class WalletServiceImpl {
       throw new WalletServiceError("E_WALLET_NOT_CONNECTED", "wallet not connected");
     }
 
-    if (input.coinType !== "0x2::sui::SUI") {
-      throw new WalletServiceError(
-        "E_WALLET_UNAVAILABLE",
-        `unsupported coin type for client transfer: ${input.coinType}`
-      );
-    }
-
     if (input.amountBaseUnits <= 0n) {
       throw new WalletServiceError("E_INSUFFICIENT_BALANCE", "invalid payment amount");
     }
 
     const tx = new Transaction();
-    const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(input.amountBaseUnits)]);
+    tx.setSender(address);
+    const paymentCoin = coinWithBalance({
+      balance: input.amountBaseUnits,
+      type: input.coinType,
+      useGasCoin: input.coinType === "0x2::sui::SUI"
+    });
     tx.transferObjects([paymentCoin], input.recipient);
 
     let lastError: unknown;

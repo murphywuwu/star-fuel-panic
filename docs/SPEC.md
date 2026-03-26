@@ -1,928 +1,1219 @@
-# SPEC: Fuel Frog Panic — 接口契约与实现规格
+# SPEC: Fuel Frog Panic — Interface Contracts
 
-Version: v4.0
-Last Updated: 2026-03-21
-Source PRD: `docs/PRD.md` v2.0
-Source Architecture: `docs/architecture.md` v4.0
-
----
-
-## 0. 实现目标
-
-将 PRD 中的 **10 分钟限时对局闭环**（任务发现 → 组队 → 比赛 → 结算）落地为：
-1. 前端 `View → Controller → Service → Model` 四层精确接口
-2. 后端 Supabase（PostgreSQL + Realtime + Edge Functions）完整 API 契约
-3. Sui 合约交互接口
-4. 共享 DTO / 错误码 / 状态机定义
+Version: v6.0
+Last Updated: 2026-03-26
+Source PRD: `docs/PRD.md` v2.6
+Source Architecture: `docs/architecture.md` v6.0
 
 ---
 
-## 1. 共享类型定义（`types/`）
+## 0. Scope
 
-### 1.1 通用类型 (`types/common.ts`)
+本 SPEC 只覆盖 PRD v2.6 已批准范围内的实现契约：
 
-```typescript
-type ControllerResult<T> = {
-  ok: boolean;
-  data?: T;
-  error?: {
-    code: ErrorCode;
-    message: string;
-  };
+- 比赛创建：自由模式、精准模式、星系选择、赞助费锁定、发布。
+- 比赛发现：Lobby 列表、筛选、位置设置、距离提示、推荐节点。
+- 组队：创建、加入、离开、锁队、报名付费。
+- 比赛运行：状态机、实时流、计分、Panic Mode。
+- 结算：平台抽成、队伍奖金、个人奖金、账单与结果查询。
+
+兼容说明：
+
+- 新的规范名称统一使用 `match`、`network-node`、`solar-system`。
+- 旧实现中的 `mission`、`nodes` 命名可以保留为兼容层，但不再作为新增接口的规范命名。
+
+---
+
+## 1. PRD Acceptance Mapping
+
+| PRD 章节 | 验收点 | SPEC 落点 |
+|---|---|---|
+| 4.1 创建 & 发布比赛 | 两种模式、星系选择、赞助费 >= 500、精准模式选点、创建与发布分离 | 第 2.4 节、第 3.1 节、第 4.2 节 `POST /api/matches` 和 `POST /api/matches/{id}/publish` |
+| 4.2 创建战队 | 创建/加入/离开战队、角色槽、锁队 | 第 2.4 节、第 3.3 节、第 4.3 节 |
+| 4.3 发现 & 参加比赛 | Lobby 列表、位置选择、距离、推荐节点、比赛详情 | 第 2.3 节、第 3.2 节、第 4.1 节和第 4.2 节读接口 |
+| 4.4 启动比赛 | 状态机、得分板、流事件、三重过滤、Panic Mode | 第 2.5 节、第 3.4 节、第 4.2 节 `status/scoreboard/stream`、第 5.7 节 |
+| 4.5 自动分账 | 5% 平台抽成、95% 玩家奖池、排名分配、个人贡献占比 | 第 2.5 节、第 3.5 节、第 4.4 节、第 5.8 节 |
+| 8 链上 / 链下边界 | 上链事实、链下读模型 | 第 5 节运行时契约、第 6 节错误/幂等/观测契约 |
+
+---
+
+## 2. Shared Contract Types
+
+### 2.1 Common Envelope
+
+```ts
+type ApiResult<T> =
+  | {
+      ok: true;
+      data: T;
+      requestId: string;
+      stale?: boolean;
+    }
+  | {
+      ok: false;
+      error: ApiError;
+      requestId: string;
+      stale?: boolean;
+    };
+
+type ApiError = {
+  code: ErrorCode;
+  message: string;
+  retryable: boolean;
+  details?: Record<string, string | number | boolean>;
 };
 
 type ErrorCode =
-  | 'WALLET_NOT_CONNECTED'
-  | 'INSUFFICIENT_BALANCE'
   | 'INVALID_INPUT'
-  | 'ROOM_NOT_JOINABLE'
-  | 'ROLE_ALREADY_TAKEN'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'RATE_LIMITED'
+  | 'SYSTEM_NOT_SELECTABLE'
+  | 'SYSTEM_NOT_FOUND'
+  | 'NODE_NOT_FOUND'
+  | 'NODE_NOT_IN_SYSTEM'
+  | 'TARGET_NODE_REQUIRED'
+  | 'TARGET_NODE_LIMIT_EXCEEDED'
+  | 'SPONSORSHIP_TOO_LOW'
+  | 'ENTRY_FEE_OUT_OF_RANGE'
+  | 'DURATION_OUT_OF_RANGE'
+  | 'MATCH_NOT_PUBLISHABLE'
+  | 'MATCH_NOT_JOINABLE'
+  | 'MATCH_NOT_RUNNING'
+  | 'MATCH_NOT_SETTLABLE'
+  | 'TEAM_FULL'
+  | 'TEAM_LOCKED'
   | 'TEAM_NOT_LOCKED'
-  | 'TEAM_ALREADY_PAID'
-  | 'MATCH_NOT_STARTABLE'
-  | 'MATCH_ALREADY_ENDED'
-  | 'SETTLEMENT_IN_PROGRESS'
-  | 'SETTLEMENT_FAILED'
+  | 'ROLE_SLOT_FULL'
+  | 'PAYMENT_MISMATCH'
+  | 'PAYMENT_ALREADY_CONFIRMED'
   | 'CHAIN_SYNC_ERROR'
-  | 'TX_REJECTED'
-  | 'NETWORK_ERROR'
+  | 'STREAM_UNAVAILABLE'
   | 'UNKNOWN';
+```
 
-type UrgencyLevel = 'critical' | 'warning' | 'safe';
-type MatchStatus = 'lobby' | 'pre_start' | 'running' | 'panic' | 'settling' | 'settled';
+### 2.2 Enums
+
+```ts
+type MatchMode = 'free' | 'precision';
+
+type MatchStatus =
+  | 'draft'
+  | 'lobby'
+  | 'prestart'
+  | 'running'
+  | 'panic'
+  | 'settling'
+  | 'settled'
+  | 'cancelled';
+
 type TeamStatus = 'forming' | 'locked' | 'paid' | 'ready';
+
 type PlayerRole = 'collector' | 'hauler' | 'escort';
+
+type TeamApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+type NodeUrgency = 'critical' | 'warning' | 'safe';
+
+type SelectableState = 'selectable' | 'no_nodes' | 'offline_only' | 'not_public';
+
+type SearchResultType = 'constellation' | 'system';
+
+type MatchStreamEventType =
+  | 'score_update'
+  | 'phase_change'
+  | 'panic_mode'
+  | 'node_status'
+  | 'settlement_start'
+  | 'settlement_complete'
+  | 'heartbeat';
 ```
 
-### 1.2 任务类型 (`types/mission.ts`)
+### 2.3 Discovery DTOs
 
-```typescript
-type Mission = {
-  id: string;
-  assemblyId: string;
-  nodeName: string;
-  fillRatio: number;          // 0.0 ~ 1.0
-  urgency: UrgencyLevel;
-  prizePool: number;          // LUX
-  entryFee: number;           // LUX per person
-  minTeams: number;           // 开赛至少需要的战队数（通常 ≥1）
-  maxTeams: number;           // 本局战队上限：每局可配置（如 4/10/16+），非 PRD 写死 4
-  minPlayers: number;
-  status: 'open' | 'in_progress' | 'settled' | 'expired';
-  createdAt: string;
+```ts
+type ConstellationSummary = {
+  constellationId: number;
+  constellationName: string;
+  regionId: number;
+  systemCount: number;
+  selectableSystemCount: number;
+  urgentNodeCount: number;
+  warningNodeCount: number;
+  sortScore: number;
 };
 
-type MissionSortBy = 'urgency' | 'prize_pool' | 'created_at';
+type RegionSummary = {
+  regionId: number;
+  constellationCount: number;
+  selectableSystemCount: number;
+  urgentNodeCount: number;
+  warningNodeCount: number;
+  sortScore: number;
+};
 
-type MissionFilters = {
-  sortBy?: MissionSortBy;
-  urgency?: UrgencyLevel;
-  status?: Mission['status'];
-  limit?: number;
+type SolarSystemSummary = {
+  systemId: number;
+  systemName: string;
+  constellationId: number;
+  constellationName: string;
+  regionId: number;
+  nodeCount: number;
+  urgentNodeCount: number;
+  warningNodeCount: number;
+  selectableState: SelectableState;
+};
+
+type SolarSystemDetail = SolarSystemSummary & {
+  gateLinks: Array<{
+    destinationSystemId: number;
+    destinationSystemName: string;
+  }>;
+};
+
+type SolarSystemRecommendation = {
+  system: SolarSystemSummary;
+  topUrgency: NodeUrgency;
+  summary: string;
+};
+
+type SearchHit = {
+  type: SearchResultType;
+  id: number;
+  label: string;
+  regionId?: number;
+  constellationId?: number;
+  constellationName?: string;
+  selectableState?: SelectableState;
+};
+
+type UserLocation = {
+  systemId: number;
+  systemName: string;
+  constellationId: number;
+  regionId: number;
+  updatedAt: string;
+};
+
+type NetworkNode = {
+  id: string;
+  objectId: string;
+  name: string;
+  typeId: number;
+  ownerAddress: string;
+  ownerCapId: string | null;
+  isPublic: boolean;
+  coordX: number | null;
+  coordY: number | null;
+  coordZ: number | null;
+  solarSystem: number;
+  fuelQuantity: string;
+  fuelMaxCapacity: string;
+  fuelTypeId: number | null;
+  fuelBurnRate: string | null;
+  isBurning: boolean;
+  fillRatio: number;
+  urgency: NodeUrgency;
+  maxEnergyProduction: string | null;
+  currentEnergyProduction: string | null;
+  isOnline: boolean;
+  connectedAssemblyIds: string[];
+  description: string | null;
+  imageUrl: string | null;
+  lastUpdatedOnChain: string;
+  updatedAt: string;
+  activeMatchId: string | null;
+};
+
+type NodeRecommendation = {
+  node: NetworkNode;
+  distanceHops: number;
+  urgencyWeight: number;
+  score: number;
+  reason: string;
 };
 ```
 
-### 1.3 大厅类型 (`types/lobby.ts`)
+### 2.4 Match and Team DTOs
 
-```typescript
-type Match = {
+```ts
+type MatchSummary = {
   id: string;
-  missionId: string;
-  status: MatchStatus;
-  startAt: string | null;
-  endAt: string | null;
-  panicAt: string | null;
-  startTx: string | null;
-  endTx: string | null;
+  name: string;
+  mode: MatchMode;
+  status: Exclude<MatchStatus, 'draft' | 'cancelled'>;
+  solarSystemId: number;
+  solarSystemName: string;
+  constellationId: number;
+  constellationName: string;
+  targetNodeCount: number;
+  sponsorshipFee: string;
+  entryFee: string;
+  grossPool: string;
+  platformFeeRate: 0.05;
+  minTeams: 2;
+  maxTeams: number;
+  registeredTeams: number;
+  durationHours: number;
+  distanceHops: number | null;
+  startsAt: string | null;
   createdAt: string;
 };
 
-type Team = {
-  id: string;
-  matchId: string;
-  captainWallet: string;
-  teamName: string;
-  maxSize: number;
-  status: TeamStatus;
-  totalScore: number;
-  rank: number | null;
-  prizeAmount: number | null;
-  createdAt: string;
+type TargetNodeSnapshot = {
+  objectId: string;
+  name: string;
+  fillRatio: number;
+  urgency: NodeUrgency;
+  isOnline: boolean;
+};
+
+type MatchDetail = MatchSummary & {
+  description?: string | null;
+  targetNodes: TargetNodeSnapshot[];
+  entryFeeRequired: boolean;
+  publishTxDigest: string | null;
+  countdownEndsAt: string | null;
+  createdBy: string;
+};
+
+type RoleSlots = {
+  collector: number;
+  hauler: number;
+  escort: number;
 };
 
 type TeamMember = {
-  id: string;
-  teamId: string;
   walletAddress: string;
   role: PlayerRole;
-  personalScore: number;
-  prizeAmount: number | null;
   joinedAt: string;
+  personalScore: number;
+  prizeAmount: string | null;
 };
 
-type CreateTeamInput = {
-  matchId: string;
-  teamName: string;
-  maxSize: number;               // 3 ~ 8
-  roleSlots: PlayerRole[];       // 预设角色配置
-};
-
-type JoinTeamInput = {
-  teamId: string;
-  walletAddress: string;
-  role: PlayerRole;
-};
-
-type LockTeamInput = {
-  teamId: string;
-  captainWallet: string;         // 校验队长身份
-};
-
-type PayEntryInput = {
-  matchId: string;
-  teamId: string;
-  captainWallet: string;
-  txDigest: string;              // 队长付款的链上 tx digest
-  memberAddresses: string[];     // 全队钱包地址（写入白名单）
-};
-```
-
-### 1.4 计分类型 (`types/score.ts`)
-
-```typescript
-type ScoreEvent = {
+type TeamDetail = {
   id: string;
   matchId: string;
-  teamId: string;
-  memberWallet: string;
-  txDigest: string;
-  assemblyId: string;
-  oldQuantity: number;
-  newQuantity: number;
-  fuelDelta: number;
-  fillRatioAt: number;           // 注入时刻的 fill_ratio
-  urgencyWeight: number;         // 3.0 / 1.5 / 1.0
-  panicMultiplier: number;       // 1.0 / 1.5
-  score: number;                 // 最终得分
-  chainTs: string;
+  name: string;
+  captainAddress: string;
+  status: TeamStatus;
+  maxMembers: number;
+  memberCount: number;
+  roleSlots: RoleSlots;
+  members: TeamMember[];
+  paymentAmount: string;
+  paymentTxDigest: string | null;
   createdAt: string;
 };
 
-type ScoreBoard = {
-  matchId: string;
-  teams: TeamScore[];
-  lastUpdated: string;
-};
-
-type TeamScore = {
+type TeamJoinApplication = {
+  applicationId: string;
   teamId: string;
-  teamName: string;
-  totalScore: number;
-  members: MemberScore[];
+  applicantAddress: string;
+  role: PlayerRole;
+  status: TeamApplicationStatus;
+  reason?: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
 };
 
-type MemberScore = {
-  walletAddress: string;
+type CreateMatchRequest = {
+  name?: string;
+  mode: MatchMode;
+  solarSystemId: number;
+  targetNodeIds?: string[];
+  sponsorshipFee: number;
+  maxTeams: number;
+  entryFee: number;
+  durationHours: number;
+};
+
+type PublishMatchRequest = {
+  publishTxDigest: string;
+};
+
+type CreateTeamRequest = {
+  matchId: string;
+  name: string;
+  maxMembers: number;
+  roleSlots: RoleSlots;
+};
+
+type JoinTeamRequest = {
   role: PlayerRole;
-  personalScore: number;
-  contributionRatio: number;     // 个人得分 / 队伍总分
+};
+
+type JoinTeamResponse = {
+  applicationId: string;
+  status: TeamApplicationStatus;
+};
+
+type PayTeamRequest = {
+  matchId: string;
+  payTxDigest: string;
 };
 ```
 
-### 1.5 结算类型 (`types/settlement.ts`)
+### 2.5 Runtime and Settlement DTOs
 
-```typescript
-type SettlementBill = {
+```ts
+type MatchStatusSnapshot = {
   matchId: string;
-  grossPool: number;
-  platformFee: number;
-  payoutPool: number;
-  resultHash: string;
-  commitmentTx: string | null;
-  settlementTx: string | null;
-  status: 'pending' | 'committed' | 'settled' | 'failed';
-  teamBreakdown: TeamPayout[];
-  mvp: MvpInfo | null;
+  status: Exclude<MatchStatus, 'draft' | 'cancelled'>;
+  remainingSeconds: number;
+  publicCountdownSeconds: number | null;
+  registeredTeams: number;
+  maxTeams: number;
+  panicStartsAt: string | null;
+  startedAt: string | null;
+  endsAt: string | null;
+  serverTime: string;
 };
 
-type TeamPayout = {
-  teamId: string;
-  teamName: string;
-  rank: number;
-  totalScore: number;
-  prizeRatio: number;            // e.g. 0.70
-  prizeAmount: number;
-  members: MemberPayout[];
-};
-
-type MemberPayout = {
-  walletAddress: string;
-  role: PlayerRole;
-  personalScore: number;
-  contributionRatio: number;
-  prizeAmount: number;
+type ScoreboardSnapshot = {
+  matchId: string;
+  status: MatchStatusSnapshot['status'];
+  remainingSeconds: number;
+  panicMode: boolean;
+  teams: Array<{
+    teamId: string;
+    teamName: string;
+    score: number;
+    rank: number;
+  }>;
+  targetNodes: Array<{
+    objectId: string;
+    name: string;
+    fillRatio: number;
+    urgency: NodeUrgency;
+    isOnline: boolean;
+  }>;
+  updatedAt: string;
 };
 
 type MvpInfo = {
   walletAddress: string;
+  teamId: string;
+  score: number;
   role: PlayerRole;
-  totalScore: number;
-  teamName: string;
 };
 
-// PRD 4.4.3 分配比例
-const PAYOUT_RATIOS: Record<number, number[]> = {
-  1: [1.0],                      // 单队挑战赛（达标时）
-  2: [0.70, 0.30],
-  3: [0.60, 0.30, 0.10],
-};
-// ≥4 队同样使用 3 队比例，仅前 3 名参与分配
-```
-
-### 1.6 防作弊与可观测性类型 (`types/antiCheat.ts`)
-
-```typescript
-type FilterRejectionReason =
-  | 'NOT_IN_MATCH_WHITELIST'
-  | 'TARGET_NODE_MISMATCH'
-  | 'EVENT_OUTSIDE_MATCH_WINDOW'
-  | 'DUPLICATE_EVENT_ID'
-  | 'INVALID_PHASE'
-  | 'INVALID_EVENT_PAYLOAD'
-  | 'INVALID_FUEL_DELTA';
-
-type SettlementFailureCode =
-  | 'SETTLEMENT_RPC_TIMEOUT'
-  | 'SETTLEMENT_TX_REJECTED'
-  | 'SETTLEMENT_IDEMPOTENCY_CONFLICT'
-  | 'SETTLEMENT_INVALID_STATE'
-  | 'SETTLEMENT_UNKNOWN';
-
-type AlertSeverity = 'info' | 'warning' | 'critical';
-
-type ObservabilityMetrics = {
-  eventLagMs: { latest: number; avg: number; p95: number; sampleCount: number };
-  wsLatencyMs: { latest: number; avg: number; p95: number; sampleCount: number };
-  settlementSuccess: { attempts: number; successes: number; rate: number };
-};
-
-type AuditLog = {
-  id: string;
-  action: string;
-  detail: string;
-  timestamp: number;
-  eventType?: string;
-  reasonCode?: FilterRejectionReason | SettlementFailureCode | 'INVALID_STATE_TRANSITION';
-  severity?: AlertSeverity;
-};
-```
-
----
-
-## 2. 前端四层接口契约
-
-### 2.1 Model Layer（Zustand Stores）
-
-#### `model/authStore.ts`
-
-```typescript
-type AuthState = {
-  walletAddress: string | null;
-  luxBalance: number;
-  isConnected: boolean;
-};
-
-type AuthActions = {
-  setWallet: (address: string, balance: number) => void;
-  disconnect: () => void;
-  updateBalance: (balance: number) => void;
-};
-
-// selectors
-selectIsConnected: (state) => state.isConnected;
-selectWalletShort: (state) => `${addr.slice(0,6)}...${addr.slice(-4)}`;
-```
-
-#### `model/missionStore.ts`
-
-```typescript
-type MissionState = {
-  missions: Mission[];
-  loading: boolean;
-  selectedMissionId: string | null;
-};
-
-type MissionActions = {
-  setMissions: (missions: Mission[]) => void;
-  setLoading: (v: boolean) => void;
-  selectMission: (id: string) => void;
-};
-
-// selectors
-selectSortedMissions: (state) => Mission[];   // 按 urgency × prizePool 排序
-selectSelectedMission: (state) => Mission | null;
-```
-
-#### `model/lobbyStore.ts`
-
-```typescript
-type LobbyState = {
-  currentMatch: Match | null;
-  teams: Team[];
-  members: TeamMember[];         // 当前 match 下所有成员
-  myTeamId: string | null;
-};
-
-type LobbyActions = {
-  setMatch: (match: Match) => void;
-  setTeams: (teams: Team[]) => void;
-  setMembers: (members: TeamMember[]) => void;
-  setMyTeam: (teamId: string) => void;
-  updateTeamStatus: (teamId: string, status: TeamStatus) => void;
-  addMember: (member: TeamMember) => void;
-  reset: () => void;
-};
-
-// selectors
-selectMyTeam: (state) => Team | null;
-selectMyRole: (state) => PlayerRole | null;
-selectTeamSlots: (teamId: string) => { role: PlayerRole; filled: boolean; member?: TeamMember }[];
-selectIsTeamReady: (teamId: string) => boolean;
-```
-
-#### `model/matchStore.ts`
-
-```typescript
-type MatchState = {
-  status: MatchStatus;
-  remainingSec: number;
-  isPanic: boolean;
-};
-
-type MatchActions = {
-  setStatus: (status: MatchStatus) => void;
-  setRemaining: (sec: number) => void;
-  setPanic: (v: boolean) => void;
-};
-```
-
-#### `model/scoreStore.ts`
-
-```typescript
-type ScoreState = {
-  scoreBoard: ScoreBoard | null;
-  eventFeed: ScoreEvent[];       // 最近 N 条弹幕
-};
-
-type ScoreActions = {
-  setScoreBoard: (board: ScoreBoard) => void;
-  appendEvent: (event: ScoreEvent) => void;
-  clearFeed: () => void;
-};
-
-// selectors
-selectTeamScores: (state) => TeamScore[];
-selectMyScore: (state) => MemberScore | null;
-selectRecentEvents: (state, limit: number) => ScoreEvent[];
-```
-
-#### `model/settlementStore.ts`
-
-```typescript
-type SettlementState = {
-  bill: SettlementBill | null;
-  loading: boolean;
-};
-
-type SettlementActions = {
-  setBill: (bill: SettlementBill) => void;
-  setLoading: (v: boolean) => void;
-};
-
-// selectors
-selectMyPayout: (state) => MemberPayout | null;
-selectMvp: (state) => MvpInfo | null;
-```
-
----
-
-### 2.2 Service Layer
-
-#### `service/walletService.ts`
-
-```typescript
-connectWallet(): Promise<{ address: string; balance: number }>;
-disconnectWallet(): Promise<void>;
-signTransaction(txBytes: Uint8Array): Promise<{ signature: string; txDigest: string }>;
-signAndExecuteEntryPayment(input: { recipient: string; amountBaseUnits: bigint; coinType: string }): Promise<{ txDigest: string }>;
-getBalance(address: string): Promise<number>;
-```
-
-- 实现约束：
-  - 前端必须通过 Sui Wallet Standard（`@mysten/dapp-kit-react`）接入钱包，不允许随机地址/随机签名 fallback。
-  - `connectWallet` 必须执行一次 `signPersonalMessage` 身份挑战，并校验签名与连接地址一致。
-  - 当前客户端支付实现基于 `tx.gas` 拆分，默认支持 `0x2::sui::SUI`；如需非 SUI 代币支付需补充 coin object 选择与合并逻辑。
-
-#### `service/missionService.ts`
-
-```typescript
-fetchMissions(filters: MissionFilters): Promise<Mission[]>;
-subscribeMissionUpdates(callback: (mission: Mission) => void): () => void;
-```
-
-#### `service/lobbyService.ts`
-
-```typescript
-fetchMatch(matchId: string): Promise<Match>;
-fetchTeams(matchId: string): Promise<Team[]>;
-fetchMembers(matchId: string): Promise<TeamMember[]>;
-
-createTeam(input: CreateTeamInput): Promise<Team>;
-joinTeam(input: JoinTeamInput): Promise<TeamMember>;
-lockTeam(input: LockTeamInput): Promise<Team>;
-payEntry(input: PayEntryInput): Promise<{ whitelistCount: number }>;
-
-subscribeLobbyUpdates(matchId: string, callbacks: {
-  onTeamChange: (team: Team) => void;
-  onMemberChange: (member: TeamMember) => void;
-  onMatchChange: (match: Match) => void;
-}): () => void;
-```
-
-#### `service/matchService.ts`
-
-```typescript
-subscribeMatchStream(matchId: string, callbacks: {
-  onStatusChange: (status: MatchStatus) => void;
-  onScoreUpdate: (board: ScoreBoard) => void;
-  onScoreEvent: (event: ScoreEvent) => void;
-  onPanicMode: () => void;
-  onSettlementStart: () => void;
-}): () => void;
-
-unsubscribeMatchStream(matchId: string): void;
-```
-
-#### `service/settlementService.ts`
-
-```typescript
-fetchSettlementBill(matchId: string): Promise<SettlementBill>;
-```
-
----
-
-### 2.3 Controller Layer（React Hooks）
-
-#### `controller/useMissionController.ts`
-
-```typescript
-useMissionController(): {
-  missions: Mission[];
-  loading: boolean;
-  selectedMission: Mission | null;
-  loadMissions: (filters?: MissionFilters) => Promise<ControllerResult<void>>;
-  selectMission: (missionId: string) => void;
-};
-```
-
-#### `controller/useLobbyController.ts`
-
-```typescript
-useLobbyController(): {
-  match: Match | null;
-  teams: Team[];
-  myTeam: Team | null;
-  myRole: PlayerRole | null;
-  teamSlots: (teamId: string) => TeamSlot[];
-  isTeamReady: boolean;
-
-  enterMatch: (matchId: string) => Promise<ControllerResult<void>>;
-  createTeam: (input: CreateTeamInput) => Promise<ControllerResult<Team>>;
-  joinTeam: (input: JoinTeamInput) => Promise<ControllerResult<TeamMember>>;
-  lockTeam: () => Promise<ControllerResult<void>>;
-  payEntry: () => Promise<ControllerResult<void>>;
-  leaveLobby: () => void;
-};
-```
-
-**payEntry 编排逻辑**：
-1. 检查 `authStore.isConnected` → 否则 `WALLET_NOT_CONNECTED`
-2. 检查 `authStore.luxBalance >= entryFee × memberCount` → 否则 `INSUFFICIENT_BALANCE`
-3. 检查 `myTeam.status === 'locked'` → 否则 `TEAM_NOT_LOCKED`
-4. 调用 `walletService.signAndExecuteEntryPayment()` 执行链上转账并获取真实 tx digest
-5. 调用 `lobbyService.payEntry()` 提交 tx digest，后端注册白名单
-6. 更新 `lobbyStore.updateTeamStatus(teamId, 'paid')`
-
-#### `controller/useMatchController.ts`
-
-```typescript
-useMatchController(): {
-  status: MatchStatus;
-  remainingSec: number;
-  isPanic: boolean;
-  scoreBoard: ScoreBoard | null;
-  eventFeed: ScoreEvent[];
-
-  startWatching: (matchId: string) => void;
-  stopWatching: () => void;
-};
-```
-
-**startWatching 编排逻辑**：
-1. 调用 `matchService.subscribeMatchStream(matchId, callbacks)`
-2. 各 callback 将数据写入对应 Store:
-   - `onStatusChange` → `matchStore.setStatus()`
-   - `onScoreUpdate` → `scoreStore.setScoreBoard()`
-   - `onScoreEvent` → `scoreStore.appendEvent()`
-   - `onPanicMode` → `matchStore.setPanic(true)`
-   - `onSettlementStart` → `matchStore.setStatus('settling')`
-
-#### `controller/useSettlementController.ts`
-
-```typescript
-useSettlementController(): {
-  bill: SettlementBill | null;
-  loading: boolean;
-  myPayout: MemberPayout | null;
+type SettlementBill = {
+  matchId: string;
+  sponsorshipFee: string;
+  entryFeeTotal: string;
+  platformSubsidy: string;
+  grossPool: string;
+  platformFeeRate: 0.05;
+  platformFee: string;
+  payoutPool: string;
+  payoutTxDigest: string | null;
+  teamBreakdown: Array<{
+    teamId: string;
+    teamName: string;
+    rank: number;
+    totalScore: number;
+    prizeRatio: number;
+    prizeAmount: string;
+    members: Array<{
+      walletAddress: string;
+      role: PlayerRole;
+      personalScore: number;
+      contributionRatio: number;
+      prizeAmount: string;
+    }>;
+  }>;
   mvp: MvpInfo | null;
+};
 
-  loadBill: (matchId: string) => Promise<ControllerResult<void>>;
+type SettlementStatus = {
+  matchId: string;
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  progress: number;
+  payoutTxDigest: string | null;
+  updatedAt: string;
+};
+
+type MatchStreamEvent =
+  | {
+      type: 'score_update';
+      matchId: string;
+      scoreboard: ScoreboardSnapshot;
+    }
+  | {
+      type: 'phase_change' | 'panic_mode';
+      matchId: string;
+      status: MatchStatusSnapshot;
+    }
+  | {
+      type: 'node_status';
+      matchId: string;
+      targetNodes: ScoreboardSnapshot['targetNodes'];
+    }
+  | {
+      type: 'settlement_start';
+      matchId: string;
+      progress: number;
+    }
+  | {
+      type: 'settlement_complete';
+      matchId: string;
+      result: SettlementBill;
+    }
+  | {
+      type: 'heartbeat';
+      matchId: string;
+      serverTime: string;
+    };
+```
+
+### 2.6 Derived Rules
+
+- `fillRatio = fuelQuantity / fuelMaxCapacity`
+- `urgency = critical` when `fillRatio < 0.2`
+- `urgency = warning` when `0.2 <= fillRatio < 0.5`
+- `urgency = safe` when `fillRatio >= 0.5`
+- `grossPool = sponsorshipFee + entryFeeTotal + platformSubsidy`
+- `platformFee = floor(grossPool * 0.05)`
+- `payoutPool = grossPool - platformFee`
+- 队伍奖金比例：
+  - 2 队：`[0.7, 0.3]`
+  - 3 队或以上：`[0.6, 0.3, 0.1]`
+- 个人奖金：`teamPrize * personalScore / teamTotalScore`，最后一名成员吸收舍入余数。
+- 自由模式的 `eligibleNodeSet` 以目标星系内节点为准。
+- 精准模式的 `eligibleNodeSet` 以发布时冻结的 `targetNodeIds` 为准。
+- Panic Mode 固定为比赛结束前最后 90 秒，乘数为 `1.5x`。
+
+---
+
+## 3. Frontend Layer Contracts
+
+### 3.1 Match Creation
+
+View 事件：
+
+- `onModeChange(mode)`
+- `onOpenSystemPicker()`
+- `onSystemSelect(systemId)`
+- `onTargetNodeToggle(objectId)`
+- `onFieldChange(key, value)`
+- `onCreateDraft()`
+- `onPublish(publishTxDigest)`
+
+```ts
+type CreateMatchDraft = {
+  name: string;
+  mode: MatchMode;
+  solarSystemId: number | null;
+  targetNodeIds: string[];
+  sponsorshipFee: number;
+  maxTeams: number;
+  entryFee: number;
+  durationHours: number;
+};
+
+interface CreateMatchController {
+  draft: CreateMatchDraft;
+  selectableSystems: SolarSystemSummary[];
+  recommendedSystems: SolarSystemRecommendation[];
+  selectedSystem: SolarSystemDetail | null;
+  systemNodes: NetworkNode[];
+  validation: Partial<Record<keyof CreateMatchDraft | 'form', string>>;
+  isSubmitting: boolean;
+  actions: {
+    setMode(mode: MatchMode): void;
+    searchSystems(query: string): Promise<void>;
+    selectSystem(systemId: number): Promise<void>;
+    toggleTargetNode(objectId: string): void;
+    setField<K extends keyof CreateMatchDraft>(key: K, value: CreateMatchDraft[K]): void;
+    createDraft(): Promise<{ matchId: string }>;
+    publish(matchId: string, publishTxDigest: string): Promise<MatchDetail>;
+    reset(): void;
+  };
+}
+
+interface MatchService {
+  listMatches(query: ListMatchesQuery): Promise<MatchSummary[]>;
+  getMatch(matchId: string): Promise<MatchDetail>;
+  createDraft(input: CreateMatchRequest): Promise<{ matchId: string }>;
+  publishMatch(matchId: string, input: PublishMatchRequest): Promise<MatchDetail>;
+}
+
+interface CreateMatchStoreState {
+  draft: CreateMatchDraft;
+  selectedSystem: SolarSystemDetail | null;
+  selectableSystems: SolarSystemSummary[];
+  recommendedSystems: SolarSystemRecommendation[];
+  systemNodes: NetworkNode[];
+  validation: Partial<Record<string, string>>;
+  isSubmitting: boolean;
+  setDraft(patch: Partial<CreateMatchDraft>): void;
+  setSelectedSystem(system: SolarSystemDetail | null): void;
+  setSystemNodes(nodes: NetworkNode[]): void;
+  setValidation(errors: Partial<Record<string, string>>): void;
+  reset(): void;
+}
+```
+
+Selectors:
+
+- `selectCanCreateMatch`
+- `selectRequiresTargetNodes`
+- `selectPrizePreview`
+
+### 3.2 Lobby Discovery and Location
+
+View 事件：
+
+- `onFilterChange(filters)`
+- `onOpenMatch(matchId)`
+- `onOpenLocationPicker()`
+- `onLocationSelect(systemId)`
+- `onRequestRecommendations(matchId)`
+
+```ts
+type ListMatchesQuery = {
+  status?: 'lobby' | 'prestart' | 'running' | 'settled';
+  mode?: 'all' | MatchMode;
+  limit?: number;
+  offset?: number;
+  currentSystemId?: number;
+};
+
+type LobbyFilters = {
+  mode: 'all' | MatchMode;
+  status: 'lobby' | 'prestart' | 'running' | 'settled';
+  maxDistanceHops?: number;
+};
+
+interface LobbyController {
+  filters: LobbyFilters;
+  matches: MatchSummary[];
+  selectedMatch: MatchDetail | null;
+  location: UserLocation | null;
+  recommendations: Record<string, NodeRecommendation[]>;
+  isLoading: boolean;
+  actions: {
+    load(): Promise<void>;
+    setFilters(filters: Partial<LobbyFilters>): Promise<void>;
+    openMatch(matchId: string): Promise<void>;
+    setLocation(system: SolarSystemSummary): void;
+    loadRecommendations(matchId: string): Promise<void>;
+  };
+}
+
+interface SolarSystemService {
+  listConstellations(query: ListConstellationsQuery): Promise<ConstellationSummary[]>;
+  getConstellation(constellationId: number): Promise<{
+    constellation: ConstellationSummary;
+    systems: SolarSystemSummary[];
+  }>;
+  search(query: SearchQuery): Promise<SearchHit[]>;
+  listSystems(query: ListSolarSystemsQuery): Promise<SolarSystemSummary[]>;
+  getSystem(systemId: number): Promise<SolarSystemDetail>;
+  listRecommendedSystems(limit?: number): Promise<SolarSystemRecommendation[]>;
+}
+
+interface NodeRecommendationService {
+  getRecommendations(input: GetNodeRecommendationsQuery): Promise<NodeRecommendation[]>;
+}
+
+interface LobbyStoreState {
+  filters: LobbyFilters;
+  matches: MatchSummary[];
+  selectedMatch: MatchDetail | null;
+  isLoading: boolean;
+  setFilters(filters: Partial<LobbyFilters>): void;
+  setMatches(matches: MatchSummary[]): void;
+  setSelectedMatch(match: MatchDetail | null): void;
+}
+
+interface LocationStoreState {
+  location: UserLocation | null;
+  pickerResults: SolarSystemSummary[];
+  setLocation(system: SolarSystemSummary): void;
+  clearLocation(): void;
+  setPickerResults(systems: SolarSystemSummary[]): void;
+}
+```
+
+Selectors:
+
+- `selectVisibleMatches`
+- `selectDistanceLabel(matchId)`
+- `selectHasLocation`
+
+### 3.3 Team Lobby
+
+View 事件：
+
+- `onCreateTeam(payload)`
+- `onJoinTeam(teamId, role)`
+- `onApproveJoinApplication(teamId, applicationId)`
+- `onRejectJoinApplication(teamId, applicationId, reason?)`
+- `onLeaveTeam(teamId)`
+- `onLockTeam(teamId)`
+- `onPayTeam(teamId, payTxDigest)`
+
+```ts
+interface TeamLobbyController {
+  match: MatchDetail | null;
+  teams: TeamDetail[];
+  currentWalletAddress: string | null;
+  actions: {
+    load(matchId: string): Promise<void>;
+    createTeam(input: CreateTeamRequest): Promise<TeamDetail>;
+    joinTeam(teamId: string, input: JoinTeamRequest): Promise<JoinTeamResponse>;
+    approveJoinApplication(teamId: string, applicationId: string): Promise<TeamDetail>;
+    rejectJoinApplication(teamId: string, applicationId: string, reason?: string): Promise<TeamDetail>;
+    leaveTeam(teamId: string): Promise<TeamDetail>;
+    lockTeam(teamId: string): Promise<TeamDetail>;
+    payTeam(teamId: string, input: PayTeamRequest): Promise<TeamDetail>;
+  };
+}
+
+interface TeamService {
+  listTeams(matchId: string): Promise<TeamDetail[]>;
+  createTeam(input: CreateTeamRequest): Promise<TeamDetail>;
+  joinTeam(teamId: string, input: JoinTeamRequest): Promise<JoinTeamResponse>;
+  approveJoinApplication(teamId: string, applicationId: string): Promise<TeamDetail>;
+  rejectJoinApplication(teamId: string, applicationId: string, reason?: string): Promise<TeamDetail>;
+  leaveTeam(teamId: string): Promise<TeamDetail>;
+  lockTeam(teamId: string): Promise<TeamDetail>;
+  payTeam(teamId: string, input: PayTeamRequest): Promise<TeamDetail>;
+}
+
+interface TeamLobbyStoreState {
+  matchId: string | null;
+  teams: TeamDetail[];
+  isMutating: boolean;
+  setMatchId(matchId: string | null): void;
+  setTeams(teams: TeamDetail[]): void;
+  upsertTeam(team: TeamDetail): void;
+}
+```
+
+Selectors:
+
+- `selectOpenTeams`
+- `selectCurrentPlayerTeam`
+- `selectPaymentAmount(teamId)`
+
+### 3.4 Match Runtime and Overlay
+
+View 事件：
+
+- `onConnectStream(matchId)`
+- `onReconnect()`
+- `onRefreshStatus()`
+
+```ts
+interface MatchRuntimeController {
+  status: MatchStatusSnapshot | null;
+  scoreboard: ScoreboardSnapshot | null;
+  streamHealth: 'connecting' | 'healthy' | 'stale' | 'disconnected';
+  actions: {
+    loadStatus(matchId: string): Promise<void>;
+    loadScoreboard(matchId: string): Promise<void>;
+    connect(matchId: string): Promise<() => void>;
+  };
+}
+
+interface MatchStreamService {
+  getStatus(matchId: string): Promise<MatchStatusSnapshot>;
+  getScoreboard(matchId: string): Promise<ScoreboardSnapshot>;
+  subscribe(matchId: string, onEvent: (event: MatchStreamEvent) => void): Promise<() => void>;
+}
+
+interface MatchRuntimeStoreState {
+  status: MatchStatusSnapshot | null;
+  scoreboard: ScoreboardSnapshot | null;
+  streamHealth: 'connecting' | 'healthy' | 'stale' | 'disconnected';
+  lastEventAt: string | null;
+  setStatus(status: MatchStatusSnapshot): void;
+  setScoreboard(scoreboard: ScoreboardSnapshot): void;
+  applyStreamEvent(event: MatchStreamEvent): void;
+  setStreamHealth(health: MatchRuntimeStoreState['streamHealth']): void;
+}
+```
+
+Selectors:
+
+- `selectPanicMode`
+- `selectRemainingLabel`
+- `selectLeadingTeam`
+
+### 3.5 Settlement
+
+View 事件：
+
+- `onLoadResult(matchId)`
+- `onRefreshSettlement(matchId)`
+
+```ts
+interface SettlementController {
+  status: SettlementStatus | null;
+  bill: SettlementBill | null;
+  actions: {
+    loadStatus(matchId: string): Promise<void>;
+    loadBill(matchId: string): Promise<void>;
+  };
+}
+
+interface SettlementService {
+  getSettlementStatus(matchId: string): Promise<SettlementStatus>;
+  getSettlementBill(matchId: string): Promise<SettlementBill>;
+}
+
+interface SettlementStoreState {
+  status: SettlementStatus | null;
+  bill: SettlementBill | null;
+  setStatus(status: SettlementStatus): void;
+  setBill(bill: SettlementBill): void;
+  reset(): void;
+}
+```
+
+Selectors:
+
+- `selectWinningTeam`
+- `selectMvp`
+- `selectTotalPlayerPayout`
+
+---
+
+## 4. HTTP and Stream Contracts
+
+### 4.1 Discovery APIs
+
+#### `GET /api/constellations`
+
+```ts
+type ListConstellationsQuery = {
+  view?: 'regions';
+  regionId?: number;
 };
 ```
 
----
+Responses:
 
-### 2.4 View Layer（组件接口）
+```ts
+type ListConstellationRegionsResponse = {
+  regions: RegionSummary[];
+  stale?: boolean;
+};
 
-View 只 import Controller hooks，通过 hooks 获取状态和操作方法：
-
-| 组件 | 使用的 Controller | 关键交互 |
-|---|---|---|
-| `HeatmapScreen` | `useMissionController` | 加载/筛选任务、点击站点进入组队 |
-| `NodeMap` | `useMissionController` | 渲染站点颜色 + 金色光圈 |
-| `MatchCard` | `useMissionController` | 展示比赛卡片、点击进入 Lobby |
-| `LobbyScreen` | `useLobbyController` | 创建/加入战队、选角色、锁定、支付 |
-| `TeamSlotPanel` | `useLobbyController` | 渲染角色槽位三态 |
-| `MatchScreen` | `useMatchController` | 倒计时、得分板、弹幕、Panic 视觉 |
-| `ScoreBoard` | `useMatchController` | 双队得分进度条 |
-| `EventFeed` | `useMatchController` | 弹幕滚动 |
-| `PanicOverlay` | `useMatchController` | 橙红脉冲 + ×1.5 横幅 |
-| `SettlementScreen` | `useSettlementController` | 战报 + 分账表 + MVP |
-| `SettlementBill` | `useSettlementController` | 渲染二层分配明细 |
-| `WalletStatus` | `useAuthStore` (仅读取) | 钱包地址 + 余额 + 断开 |
-
----
-
-## 3. 后端接口契约（Supabase）
-
-### 3.1 数据库读操作（Supabase Client 直读）
-
-前端 Service 通过 Supabase JS Client 直接查询：
-
-```typescript
-// missionService.fetchMissions
-supabase
-  .from('missions')
-  .select('*')
-  .eq('status', 'open')
-  .order('fill_ratio', { ascending: true })
-  .limit(filters.limit ?? 20);
-
-// lobbyService.fetchTeams
-supabase
-  .from('teams')
-  .select('*, team_members(*)')
-  .eq('match_id', matchId);
+type ListConstellationsResponse = {
+  constellations: ConstellationSummary[];
+  stale?: boolean;
+};
 ```
 
-Row Level Security 策略：
-- `missions`: 所有人可读
-- `matches`, `teams`, `team_members`: 所有已连接钱包用户可读
-- `score_events`: 同一 match 参与者可读
-- `settlements`: 同一 match 参与者可读
-- 写操作: 仅通过 Edge Functions（service_role）
+- `view=regions`
+  - 返回 region 摘要列表，供位置选择器先展示第一层。
+- `regionId=<number>`
+  - 只返回该 region 下的 `constellations`，供第二层按需展开。
+- 默认
+  - 返回全部 `constellations`，保留兼容读取方式。
 
-### 3.2 Edge Function API
+#### `GET /api/constellations/{constellationId}`
 
-#### `POST /functions/v1/create-team`
+Response:
 
-```typescript
-// Request
-{ matchId: string; teamName: string; maxSize: number; roleSlots: PlayerRole[]; captainWallet: string }
-
-// Response 200
-{ team: Team }
-
-// Errors
-400: INVALID_INPUT (maxSize 不在 3-8 范围)
-404: match 不存在或非 lobby 状态
-409: 该钱包已在本场比赛中
+```ts
+ApiResult<{
+  constellation: ConstellationSummary;
+  systems: SolarSystemSummary[];
+}>
 ```
 
-#### `POST /functions/v1/join-team`
+#### `GET /api/search`
 
-```typescript
-// Request
-{ teamId: string; walletAddress: string; role: PlayerRole }
-
-// Response 200
-{ member: TeamMember }
-
-// Errors
-400: INVALID_INPUT
-404: team 不存在
-409: ROLE_ALREADY_TAKEN / 队伍已满 / 该钱包已在队中
+```ts
+type SearchQuery = {
+  q: string;
+  type?: 'all' | 'constellation' | 'system';
+};
 ```
 
-#### `POST /functions/v1/lock-team`
+Response: `ApiResult<{ items: SearchHit[] }>`
 
-```typescript
-// Request
-{ teamId: string; captainWallet: string }
+- `SearchHit.regionId`
+  - constellation/system 命中都应带上 `regionId`，便于前端直接展开对应 region。
 
-// Response 200
-{ team: Team }
+#### `GET /api/solar-systems/recommendations`
 
-// Errors
-403: 非队长操作
-409: 角色槽未满 / 已锁定
+Query: `limit?: number`
+
+Response: `ApiResult<{ items: SolarSystemRecommendation[] }>`
+
+#### `GET /api/solar-systems`
+
+```ts
+type ListSolarSystemsQuery = {
+  constellationId?: number;
+  q?: string;
+  limit?: number;
+  offset?: number;
+};
 ```
 
-#### `POST /functions/v1/pay-entry`
+Response: `ApiResult<{ items: SolarSystemSummary[]; nextOffset: number | null }>`
 
-```typescript
-// Request
-{ matchId: string; teamId: string; captainWallet: string; txDigest: string; memberAddresses: string[] }
+#### `GET /api/solar-systems/{systemId}`
 
-// Response 200
-{ whitelistCount: number; teamStatus: 'paid' }
+Response:
 
-// 内部逻辑
-1. 验证 txDigest 对应的链上 tx：sender 匹配、金额正确
-2. 向 match_whitelist 批量插入 memberAddresses
-3. 调用合约 register_whitelist(matchId, addresses)
-4. 更新 teams.status = 'paid'
-
-// Errors
-400: tx 验证失败 / 金额不足
-403: 非队长
-409: TEAM_ALREADY_PAID
+```ts
+ApiResult<{
+  system: SolarSystemDetail;
+  nodes: NetworkNode[];
+}>
 ```
 
-#### `GET /functions/v1/get-settlement-bill?matchId=xxx`
+#### `GET /api/network-nodes`
 
-```typescript
-// Response 200
-{ bill: SettlementBill }
+Query:
 
-// Alias (兼容旧调用)
-GET /functions/v1/settlement-bill?matchId=xxx
-
-// Errors
-404: match 不存在
-409: 比赛尚未结算完成
+```ts
+type ListNetworkNodesQuery = {
+  solarSystem: number;
+};
 ```
 
-### 3.3 Supabase Realtime 订阅契约
+Response: `ApiResult<{ items: NetworkNode[] }>`
 
-#### Lobby 实时同步
+#### `GET /api/network-nodes/recommendations`
 
-```typescript
-// 订阅 teams 表变更
-supabase
-  .channel(`lobby:${matchId}`)
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'teams',
-    filter: `match_id=eq.${matchId}`,
-  }, (payload) => callbacks.onTeamChange(payload.new as Team))
-  .on('postgres_changes', {
-    event: '*',
-    schema: 'public',
-    table: 'team_members',
-    filter: `team_id=in.(${teamIds.join(',')})`,
-  }, (payload) => callbacks.onMemberChange(payload.new as TeamMember))
-  .subscribe();
+```ts
+type GetNodeRecommendationsQuery = {
+  currentSystem: number;
+  targetMatchId?: string;
+  maxJumps?: number;
+  urgency?: Array<NodeUrgency>;
+  limit?: number;
+};
 ```
 
-#### Match 实时计分流
+Response: `ApiResult<{ items: NodeRecommendation[] }>`
 
-```typescript
-// 订阅比赛状态 + 计分事件
-supabase
-  .channel(`match:${matchId}`)
-  .on('postgres_changes', {
-    event: 'UPDATE',
-    schema: 'public',
-    table: 'matches',
-    filter: `id=eq.${matchId}`,
-  }, (payload) => {
-    const match = payload.new as Match;
-    callbacks.onStatusChange(match.status);
-  })
-  .on('postgres_changes', {
-    event: 'UPDATE',
-    schema: 'public',
-    table: 'teams',
-    filter: `match_id=eq.${matchId}`,
-  }, (payload) => {
-    // 重新构建 ScoreBoard
-  })
-  .on('postgres_changes', {
-    event: 'INSERT',
-    schema: 'public',
-    table: 'score_events',
-    filter: `match_id=eq.${matchId}`,
-  }, (payload) => callbacks.onScoreEvent(payload.new as ScoreEvent))
-  .on('broadcast', { event: 'panic_mode' }, () => callbacks.onPanicMode())
-  .subscribe();
+### 4.2 Match APIs
+
+#### `GET /api/matches`
+
+Response: `ApiResult<{ items: MatchSummary[]; nextOffset: number | null }>`
+
+Rules:
+
+- 公开列表不返回 `draft` 和 `cancelled`。
+- 如果 `currentSystemId` 存在，服务端负责填充 `distanceHops`。
+
+#### `GET /api/matches/{matchId}`
+
+Response: `ApiResult<MatchDetail>`
+
+#### `POST /api/matches`
+
+Headers:
+
+- `X-Idempotency-Key: string`
+
+Request: `CreateMatchRequest`
+
+Response:
+
+```ts
+ApiResult<{
+  matchId: string;
+  status: 'draft';
+}>
 ```
 
----
+校验规则：
 
-## 4. 合约交互契约
+- `name` 可缺省；缺省时由服务端按模式和目标星系生成默认名称
+- `sponsorshipFee >= 500`
+- `2 <= maxTeams <= 16`
+- `0 <= entryFee <= 1000`
+- `1 <= durationHours <= 72`
+- `solarSystemId` 对应的目标星系必须满足 selectable 规则
+- 精准模式必须有 `1-5` 个 `targetNodeIds`
 
-### 4.1 外部合约（EVE Frontier，只读）
+#### `POST /api/matches/{matchId}/publish`
 
-```typescript
-// 读取 NetworkNode 状态
-sui.getObject(assemblyId): {
-  fuel_quantity: number;
-  fuel_max_capacity: number;
+Headers:
+
+- `X-Idempotency-Key: string`
+
+Request: `PublishMatchRequest`
+
+Response: `ApiResult<MatchDetail>`
+
+校验规则：
+
+- 比赛必须仍为 `draft`
+- `publishTxDigest` 必须可验证，且金额等于 `sponsorshipFee`
+- 精准模式目标节点必须全部属于目标星系
+
+#### `GET /api/matches/{matchId}/status`
+
+Response: `ApiResult<MatchStatusSnapshot>`
+
+#### `GET /api/matches/{matchId}/scoreboard`
+
+Response: `ApiResult<ScoreboardSnapshot>`
+
+#### `GET /api/matches/{matchId}/stream`（SSE）
+
+Payload: `MatchStreamEvent`
+
+传输说明：
+
+- 使用 `text/event-stream`
+- 前端通过 `EventSource` 订阅同一路径
+- 每条 SSE `data` 负载仍然遵循 `MatchStreamEvent`
+
+最低必须推送：
+
+- `score_update`
+- `phase_change`
+- `panic_mode`
+- `settlement_start`
+
+### 4.3 Team APIs
+
+#### `GET /api/matches/{matchId}/teams`
+
+Response: `ApiResult<{ items: TeamDetail[] }>`
+
+#### `POST /api/teams`
+
+Headers:
+
+- `X-Idempotency-Key: string`
+
+Request: `CreateTeamRequest`
+
+Response: `ApiResult<TeamDetail>`
+
+校验规则：
+
+- `3 <= maxMembers <= 8`
+- `roleSlots.collector + roleSlots.hauler + roleSlots.escort = maxMembers`
+- 比赛必须处于 `lobby`
+
+#### `POST /api/teams/{teamId}/join`
+
+Request: `JoinTeamRequest`
+
+Response: `ApiResult<JoinTeamResponse>`
+
+规则：
+
+- 创建入队申请后，默认返回 `status = pending`。
+- 申请通过前不占用正式成员槽位，不计入 `memberCount`。
+- 同一钱包地址在同一战队仅允许 1 条 `pending` 申请。
+
+#### `POST /api/teams/{teamId}/applications/{applicationId}/approve`
+
+Response: `ApiResult<TeamDetail>`
+
+规则：
+
+- 仅队长可调用。
+- 仅 `pending` 申请可批准。
+- 批准后申请状态改为 `approved`，并占用目标角色槽位。
+
+#### `POST /api/teams/{teamId}/applications/{applicationId}/reject`
+
+Request:
+
+```ts
+{
+  reason?: string;
 }
-
-// 查询 FuelEvent(DEPOSITED)
-sui.queryEvents({
-  MoveEventType: 'world::fuel::FuelEvent',
-  startTime, endTime
-}): FuelEvent[]
-
-// 通过 tx 获取 sender
-sui.getTransactionBlock(txDigest): {
-  sender: string;
-  timestampMs: number;
-}
 ```
 
-### 4.2 自研合约（fuel_frog_panic::match）
+Response: `ApiResult<TeamDetail>`
 
-| 函数 | 调用方 | 参数 | 链上效果 |
-|---|---|---|---|
-| `create_match` | node-scanner | assemblyIds, entryFee, subsidy | 创建 Match Object + FeePool |
-| `register_whitelist` | pay-entry | matchObj, addresses | 向白名单追加地址 |
-| `start_match` | match-tick | matchObj | 记录 start_timestamp |
-| `end_match_and_settle` | trigger-settlement | matchObj, resultHash, payoutAddrs, payoutAmts | 执行 LUX 分发、冻结 Match |
+规则：
+
+- 仅队长可调用。
+- 仅 `pending` 申请可拒绝。
+- 拒绝后申请状态改为 `rejected`，且不占用角色槽位。
+
+#### `POST /api/teams/{teamId}/leave`
+
+Response: `ApiResult<TeamDetail>`
+
+规则：
+
+- 已锁队或已付费的战队不可离开。
+- 队长离开时若仍有成员，必须先转移队长或解散；v2.6 默认返回 `CONFLICT`。
+
+#### `POST /api/teams/{teamId}/lock`
+
+Response: `ApiResult<TeamDetail>`
+
+规则：
+
+- 仅队长可锁队。
+- 成员数必须等于 `maxMembers`。
+- 锁队后不允许继续加入或离开。
+
+#### `POST /api/teams/{teamId}/pay`
+
+Headers:
+
+- `X-Idempotency-Key: string`
+
+Request: `PayTeamRequest`
+
+Response: `ApiResult<TeamDetail>`
+
+规则：
+
+- 仅队长可调用。
+- `payTxDigest` 对应支付金额必须等于 `entryFee * memberCount`。
+- 成功后写入白名单快照。
+
+### 4.4 Settlement APIs
+
+#### `GET /api/matches/{matchId}/result`
+
+Response: `ApiResult<SettlementBill>`
+
+#### `GET /api/matches/{matchId}/settlement`
+
+Response: `ApiResult<SettlementStatus>`
+
+### 4.5 Legacy Alias Policy
+
+- 若保留 `/api/nodes`，其响应必须与 `/api/network-nodes` 完全同构。
+- 若保留 `/api/missions`，其返回结构必须与 `/api/matches` 完全同构。
+- 新代码不得继续依赖旧别名。
 
 ---
 
-## 5. 比赛状态机（精确定义）
+## 5. Runtime Contracts
 
-```
-lobby ──→ pre_start ──→ running ──→ panic ──→ settling ──→ settled
-```
+### 5.1 `solarSystemRuntime`
 
-| 当前状态 | 触发条件 | 目标状态 | 副作用 |
-|---|---|---|---|
-| `lobby` | 满员 OR 最低人数倒计时归零 | `pre_start` | 开始 30s 准备倒计时 |
-| `pre_start` | 30s 倒计时归零 | `running` | 调用 `start_match()` 上链 |
-| `running` | 剩余 ≤ 90s | `panic` | 广播 panic_mode，得分 ×1.5 |
-| `panic` | 0s 倒计时归零 | `settling` | 调用 `end_match_and_settle()` |
-| `settling` | 链上 tx 确认 | `settled` | 更新 settlements.status |
+- 输入：world metadata API、缓存刷新指令。
+- 输出：`solar_systems_cache`、单星系详情、gateLinks。
+- 失败策略：外部 API 失败时可回退到最近缓存，并在响应中设置 `stale=true`。
 
-非法迁移处理：返回错误码 `MATCH_NOT_STARTABLE` 或 `INVALID_INPUT`，写入 `audit_logs`。
+### 5.2 `constellationRuntime`
 
----
+- 输入：`solar_systems_cache`、`network_nodes`。
+- 输出：`constellation_summaries`、推荐星系、搜索结果。
+- 规则：
+  - 星系 `selectable` 的判断来自该星系是否存在 `isOnline && isPublic` 的节点。
+  - 推荐星系按紧急节点优先，再按可选系统数和名称排序。
 
-## 6. 计分规则（PRD 第 5/7 章精确映射）
+### 5.3 `nodeRuntime`
 
-```
-score = fuel_delta × urgency_weight × panic_multiplier
-```
+- 输入：Sui `NetworkNode` 对象和相关位置/状态事件。
+- 输出：`network_nodes` 读模型。
+- 刷新频率：5 秒。
+- 规则：
+  - 必须输出 PRD 0.6 定义的 `/api/network-nodes` 统一字段口径。
+  - `activeMatchId` 只来自平台比赛展示投影，不是链上原生字段，也不代表节点只能被单个比赛引用。
 
-| 变量 | 来源 | 取值规则 |
-|---|---|---|
-| `fuel_delta` | `FuelEvent.new_quantity - old_quantity` | 正整数 |
-| `urgency_weight` | 注入时刻 `fill_ratio_at` | < 0.20 → 3.0; < 0.50 → 1.5; ≥ 0.50 → 1.0 |
-| `panic_multiplier` | `match.status` | `panic` → 1.5; 其他 → 1.0 |
+### 5.4 `nodeRecommendationRuntime`
 
-最高单次系数：3.0 × 1.5 = **4.5x**
+- 输入：`network_nodes`、`solar_systems_cache`、当前位置、可选比赛。
+- 输出：推荐节点列表。
+- 规则：
+  - 仅对自由模式提供推荐。
+  - 距离采用 gateLinks 跳数。
+  - 分数可按 `urgencyWeight * distanceWeight` 计算，但前端只消费结果，不复算。
 
-归因三重过滤（PRD 7.2）：
-1. **白名单校验**：`sender ∈ match_whitelist` → 否则丢弃
-2. **站点校验**：`assembly_id ∈ match_targets` → 否则丢弃
-3. **时间窗口**：`chain_ts ∈ [match.start_at, match.end_at]` → 否则丢弃
+### 5.5 `matchRuntime`
 
-Filter rejection 统一 reason code（写入 `audit_logs.reason_code`）：
+- 输入：创建命令、发布命令、比赛列表查询、定时器 tick。
+- 输出：`matches`、`match_target_nodes`、`match_stream_events`。
+- 规则：
+  - `minTeams` 固定为 `2`。
+  - 大厅等待期支持“满员即刻开赛”和“最低人数公开倒计时开赛”两类触发。
+  - `draft -> lobby` 只能通过 publish 进入。
+  - `running -> panic` 在最后 90 秒触发。
+  - 状态迁移必须 CAS，防止重复推进。
 
-| 过滤场景 | reason code |
-|---|---|
-| 钱包未入本局白名单 | `NOT_IN_MATCH_WHITELIST` |
-| 事件站点不在本局目标列表 | `TARGET_NODE_MISMATCH` |
-| 事件时间戳不在比赛窗口 | `EVENT_OUTSIDE_MATCH_WINDOW` |
-| 同一 event/tx 重复进入 | `DUPLICATE_EVENT_ID` |
-| 比赛状态非法（非 running/panic） | `INVALID_PHASE` |
-| 事件载荷缺字段或数值非法 | `INVALID_EVENT_PAYLOAD` |
-| 链上事件油量变化无效（`new <= old`） | `INVALID_FUEL_DELTA` |
+### 5.6 `teamRuntime`
 
-可观测性指标输出（F-006）：
+- 输入：创建/加入/离开/锁队/支付命令。
+- 输出：`teams`、`team_members`、`team_payments`、`match_whitelists`。
+- 规则：
+  - 角色槽必须遵守 `roleSlots` 上限。
+  - 锁队后成员名单冻结。
+  - 支付确认成功后，整队地址一次性写入白名单快照。
 
-| 指标 | 口径 |
-|---|---|
-| `event_lag_ms` | `now - chain_timestamp_ms` |
-| `ws_latency_ms` | `now - ws_published_at_ms` |
-| `settlement_success_rate` | `successes / attempts`（失败重试也计入 attempts） |
+### 5.7 `chainSyncEngine`
 
----
+- 输入：Sui `FuelEvent(DEPOSITED)`、交易块详情、比赛白名单、比赛状态。
+- 输出：`fuel_events`、`match_scores`、`match_stream_events`。
+- 去重键：`txDigest + eventSeq`。
+- 三重过滤：
+  - `sender` 在白名单内
+  - 自由模式节点在目标星系内；精准模式节点在冻结目标节点集内
+  - `timestamp` 位于比赛时间窗口内
+- 计分公式：
+  - `fuelAdded * urgencyWeight * panicMultiplier`
+  - `urgencyWeight` 以注入时刻的 `fillRatio` 计算
 
-## 7. 结算分配规则（PRD 4.4 精确映射）
+### 5.8 `settlementRuntime`
 
-### 7.1 第一层：队伍级分配
-
-| 参赛队数 | 冠军 | 亚军 | 季军 | 第 4+ |
-|---|---|---|---|---|
-| 1 | 100%（达标时） | — | — | — |
-| 2 | 70% | 30% | — | — |
-| 3 | 60% | 30% | 10% | — |
-| ≥ 4 | 60% | 30% | 10% | 0% |
-
-单队挑战赛：10 分钟内 `fill_ratio` 提升至 ≥ 80% 为达标。
-
-### 7.2 第二层：个人级分配
-
-```
-member_prize = team_prize × (member_score / team_total_score)
-```
-
-得分为 0 的成员，奖励为 0（杜绝挂机蹭分）。
-
-### 7.3 退款规则
-
-| 时间节点 | 政策 |
-|---|---|
-| 队长锁定前 | 可退全额（未付款无需退） |
-| 锁定后 30 秒准备期内 | 不可退款 |
-| 比赛进行中 | 不可退款 |
-| 比赛结算后 | 奖励自动发放 |
-
-### 7.4 结算失败分类与告警分级（F-006）
-
-| failure code | 触发场景 | severity | 错误码映射 |
-|---|---|---|---|
-| `SETTLEMENT_RPC_TIMEOUT` | 结算调用链超时 | `critical` | `E_SETTLEMENT_RPC_TIMEOUT` |
-| `SETTLEMENT_TX_REJECTED` | 链上 tx 被拒绝或回滚 | `critical` | `E_SETTLEMENT_TX_REJECTED` |
-| `SETTLEMENT_IDEMPOTENCY_CONFLICT` | 结算幂等状态异常 | `warning` | `E_SETTLEMENT_IDEMPOTENCY_CONFLICT` |
-| `SETTLEMENT_INVALID_STATE` | 非法状态触发结算 | `warning` | `E_SETTLEMENT_INVALID_STATE` |
-| `SETTLEMENT_UNKNOWN` | 未知异常 | `critical` | `E_SETTLEMENT_UNKNOWN` |
-
-约束：
-- 每次失败都写一条 `audit_logs`，`event_type = settlement_failed`。
-- 告警写入 `settlement_alerts`（或等价内存模型）并保留最近 N 条。
-- `settlement_success_rate` 必须包含失败样本（不能只统计成功）。
+- 输入：`match_scores` 最终快照、`team_payments`、比赛配置、平台补贴。
+- 输出：`settlements`、`matches.status = settled`、`match_stream_events`.
+- 规则：
+  - 每场比赛只允许一个有效结算实例。
+  - `platformFeeRate = 0.05`
+  - 两队分配 `[0.7, 0.3]`；三队及以上 `[0.6, 0.3, 0.1]`
+  - 个人奖金按个人得分占比分配
+  - 链上发奖成功后才能标记 `settled`
 
 ---
 
-## 8. 测试计划
+## 6. Error, Idempotency, and Observability Contracts
 
-### 8.1 前端单元测试
+### 6.1 Response and Header Rules
 
-| 测试目标 | 覆盖范围 |
-|---|---|
-| Model: 状态机迁移 | 合法/非法 MatchStatus 迁移 |
-| Model: selectors | sortedMissions, teamSlots, contributionRatio |
-| Service: 计分投影 | urgencyWeight + panicMultiplier 组合 |
-| Controller: payEntry 编排 | 余额不足、未锁定、重复支付等边界 |
+- 所有响应必须带 `requestId`。
+- 所有写接口必须要求 `X-Idempotency-Key`。
+- 所有写接口必须先通过 route-level 钱包签名中间件，校验 `walletAddress + message + signature` 与 `scope:targetId` 绑定关系。
+- 命中相同 `scope + X-Idempotency-Key + requestHash` 时必须返回同一结果；同 key 不同 payload 必须返回 `CONFLICT`。
+- 读取缓存但已过期时，响应必须显式返回 `stale=true`。
 
-### 8.2 集成测试
+### 6.2 Retry Rules
 
-| 测试链路 | 验收信号 |
-|---|---|
-| Lobby → Lock → Pay → Match Start | match.status 从 lobby 到 running |
-| ScoreEvent 写入 → Realtime → 前端弹幕 | < 3s 端到端延迟 |
-| Match End → Settlement → Bill 查询 | bill.status = settled + 金额校验 |
-| 异常演练：RPC 超时 / 重复结算 / 非法状态迁移 | 命中预期错误码并写入对应 audit reason code |
+- `INVALID_INPUT`、`FORBIDDEN`、`SYSTEM_NOT_SELECTABLE` 不可重试。
+- `CHAIN_SYNC_ERROR`、`STREAM_UNAVAILABLE`、外部依赖超时可重试。
+- `CONFLICT` 由客户端先刷新最新状态，再决定是否重试。
 
-### 8.3 合约测试
+### 6.3 Required Structured Log Fields
 
-- `sui move test` 本地单元测试
-- devnet: `sui client call` 验证 create/start/settle 流程
-- devnet: `sui client query-events` 验证 FuelEvent 可查
+- `requestId`
+- `runtime`
+- `matchId`
+- `teamId`
+- `walletAddress`
+- `txDigest`
+- `errorCode`
 
----
+### 6.4 Runtime Health Endpoint
 
-## 9. TODO Mapping
+- `GET /api/runtime/health` 必须返回 worker 心跳与投影新鲜度摘要。
+- 至少包含：`nodeRuntime`, `constellationRuntime`, `matchRuntime`, `chainSyncEngine`, `settlementRuntime`。
 
-| TODO ID | Layer | Feature | Interface | Description | Status |
-|---|---|---|---|---|---|
-| T-001 | Backend | F-001 | node-scanner + missions 表 | 站点扫描与紧急比赛自动生成 | Todo |
-| T-002 | Frontend | F-001 | useMissionController + HeatmapScreen | 任务发现 + 热力图交互 | Todo |
-| T-003 | Backend | F-002 | create-team / join-team / lock-team / pay-entry | 组队全流程后端接口 | Todo |
-| T-004 | Frontend | F-002 | useLobbyController + LobbyScreen | 组队全流程前端交互 | Todo |
-| T-005 | Backend | F-003 | chain-sync Edge Function | FuelEvent 三重过滤归因管道 | Todo |
-| T-006 | Backend | F-004 | match-tick + Realtime broadcast | 比赛状态机驱动 + 实时推送 | Todo |
-| T-007 | Frontend | F-003/F-004 | useMatchController + MatchScreen | 比赛实时反馈（得分板 + 弹幕 + Panic） | Todo |
-| T-008 | Backend + Sui | F-005 | trigger-settlement + 合约 | 结算计算 + 链上发放 | Todo |
-| T-009 | Frontend | F-005 | useSettlementController + SettlementScreen | 结算战报展示 | Todo |
-| T-010 | Sui | All | fuel_frog_panic::match | 自研合约模块开发与 devnet 部署 | Todo |
-| T-011 | Frontend | F-000 | walletService + authStore | 钱包连接流程 | Todo |
-| T-012 | Testing | All | 单元 + 集成 + 合约 | 全链路测试覆盖 | Todo |
+### 6.5 Required Metrics
+
+- `match_create_conflict_total`
+- `match_publish_success_total`
+- `team_payment_verify_latency_ms`
+- `score_delivery_latency_ms`
+- `stream_disconnect_total`
+- `settlement_duration_seconds`

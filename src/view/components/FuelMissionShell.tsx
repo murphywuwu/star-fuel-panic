@@ -1,11 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useWalletConnection, useWallets } from "@mysten/dapp-kit-react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
 import type { ReactNode } from "react";
 import type { MissionPhase } from "@/types/fuelMission";
+import { formatWalletBalance } from "@/utils/walletBalance";
 import { TacticalButton } from "@/view/components/TacticalButton";
+
+const WalletConnectBridge = dynamic(
+  () => import("@/view/components/WalletConnectBridge").then((mod) => mod.WalletConnectBridge),
+  {
+    ssr: false,
+    loading: () => null
+  }
+);
 
 interface FuelMissionShellProps {
   title: string;
@@ -21,7 +33,7 @@ interface FuelMissionShellProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/lobby", label: "HEATMAP", hint: "Browse dangerous nodes and live matches" },
+  { href: "/lobby", label: "MISSION LOBBY", hint: "Discover matches, set position, and route into squad planning" },
   { href: "/planning", label: "SQUAD LOBBY", hint: "Create a team, lock roles, and prepare to enter" },
   { href: "/match", label: "LIVE MATCH", hint: "Submit supply runs, watch the board, beat the timer" },
   { href: "/settlement", label: "SETTLEMENT LEDGER", hint: "Review payouts, MVP, and final rewards" }
@@ -54,16 +66,42 @@ export function FuelMissionShell({
   bannerTone = "warning",
   children
 }: FuelMissionShellProps) {
-  const { state: authState, selectors, actions: authActions } = useAuthController();
+  const { state: authState, ui, selectors, actions: authActions } = useAuthController();
   const [walletNotice, setWalletNotice] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const wallets = useWallets();
+  const walletConnection = useWalletConnection();
+  const router = useRouter();
 
-  const handleConnectWallet = async () => {
-    const connected = await authActions.onConnectWallet();
-    if (!connected.ok) {
-      setWalletNotice(walletErrorMessage(connected.errorCode, connected.message));
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    for (const item of NAV_ITEMS) {
+      router.prefetch(item.href);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!isMounted) {
       return;
     }
-    setWalletNotice("WALLET CONNECTED");
+    if (authState.isConnected) {
+      setWalletNotice("WALLET CONNECTED");
+    }
+  }, [authState.isConnected, isMounted]);
+
+  const hasEveWallet = wallets.some((wallet) => wallet.name.toLowerCase().includes("eve"));
+
+  const handleConnectWallet = async () => {
+    if (!hasEveWallet) {
+      setWalletNotice("EVE WALLET PROVIDER NOT DETECTED");
+      return;
+    }
+
+    await authActions.onConnectWallet();
+    setWalletNotice("SELECT EVE WALLET");
   };
 
   const handleDisconnectWallet = async () => {
@@ -81,13 +119,20 @@ export function FuelMissionShell({
       setWalletNotice(walletErrorMessage(refreshed.errorCode, refreshed.message));
       return;
     }
-    setWalletNotice(`BALANCE REFRESHED // ${refreshed.payload?.luxBalance ?? authState.luxBalance} LUX`);
+    setWalletNotice(`BALANCE REFRESHED // ${formatWalletBalance(refreshed.payload?.luxBalance ?? authState.luxBalance)} LUX`);
   };
 
   return (
     <main className="min-h-screen text-eve-offwhite">
+      {ui.connectOpenSignal > 0 ? (
+        <WalletConnectBridge
+          openSignal={ui.connectOpenSignal}
+          shouldClose={walletConnection.status === "connected" || authState.isConnected}
+        />
+      ) : null}
+
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-eve-red/25 bg-[#0e0e0e]/96 px-4 shadow-[0_0_24px_rgba(255,95,0,0.08)] backdrop-blur-md sm:px-6 lg:px-8">
-        <Link href="/lobby" className="text-2xl font-black italic tracking-[-0.08em] text-eve-red">
+        <Link href="/lobby" prefetch className="text-2xl font-black italic tracking-[-0.08em] text-eve-red">
           FUEL_FROG_PANIC
         </Link>
         <div className="hidden items-center gap-2 lg:flex">
@@ -95,6 +140,7 @@ export function FuelMissionShell({
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className={`border px-3 py-2 text-xs font-black uppercase tracking-[0.22em] transition ${navClass(
                 item.href === activeRoute
               )}`}
@@ -107,6 +153,7 @@ export function FuelMissionShell({
           <span className="hidden text-[10px] uppercase tracking-[0.28em] text-eve-red/80 sm:inline">LINK ACTIVE</span>
           <Link
             href="/match"
+            prefetch
             className="inline-flex items-center border border-eve-red bg-eve-red px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-black transition hover:bg-[#ffb599]"
           >
             PANIC
@@ -128,17 +175,25 @@ export function FuelMissionShell({
           <div className="mt-4 border border-eve-red/15 bg-[#080808]/80 p-3">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red">Wallet Identity</p>
             <div className="mt-3 space-y-1 text-xs text-eve-offwhite/85">
-              <p>ADDRESS: {selectors.walletShort}</p>
-              <p className={authState.luxBalance < 100 ? "text-eve-red" : "text-eve-offwhite/85"}>
-                BALANCE: {authState.luxBalance.toFixed(2)} LUX
+              <p>ADDRESS: {isMounted ? selectors.walletShort : "NOT CONNECTED"}</p>
+              <p className={isMounted && authState.luxBalance < 100 ? "text-eve-red" : "text-eve-offwhite/85"}>
+                BALANCE: {isMounted ? formatWalletBalance(authState.luxBalance) : "0"} LUX
               </p>
-              <p>STATUS: {authState.isConnected ? "CONNECTED" : authState.isConnecting ? "CONNECTING" : "DISCONNECTED"}</p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {!authState.isConnected ? (
-                <TacticalButton onClick={handleConnectWallet} disabled={authState.isConnecting}>
-                  {authState.isConnecting ? "CONNECTING" : "CONNECT"}
-                </TacticalButton>
+              {!isMounted ? (
+                <TacticalButton disabled>CONNECT</TacticalButton>
+              ) : !authState.isConnected ? (
+                <>
+                  <TacticalButton onClick={handleConnectWallet} disabled={authState.isConnecting}>
+                    {authState.isConnecting ? "CONNECTING" : "CONNECT"}
+                  </TacticalButton>
+                  {!hasEveWallet ? (
+                    <p className="basis-full text-[10px] uppercase tracking-[0.14em] text-eve-red">
+                      EVE WALLET PROVIDER NOT DETECTED
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <TacticalButton tone="ghost" onClick={handleRefreshBalance}>
@@ -155,6 +210,11 @@ export function FuelMissionShell({
                 {walletNotice}
               </p>
             ) : null}
+            {isMounted && !authState.isConnected && wallets.length > 0 && walletConnection.status === "disconnected" ? (
+              <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/55">
+                PROVIDERS: {wallets.map((wallet) => wallet.name).join(" / ")}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -164,6 +224,7 @@ export function FuelMissionShell({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
                 className={`flex items-start gap-3 border-l-4 px-4 py-4 text-left transition ${navClass(
                   item.href === activeRoute
                 )}`}

@@ -1,13 +1,15 @@
 import { createStore } from "zustand/vanilla";
-import type { MemberPayout, MvpInfo, SettlementBill } from "@/types/settlement";
+import type { MemberPayout, MvpInfo, SettlementBill, SettlementStatus } from "@/types/settlement";
 
 export interface SettlementState {
+  status: SettlementStatus | null;
   bill: SettlementBill | null;
   loading: boolean;
   error: string | null;
 }
 
 interface SettlementActions {
+  setStatus: (status: SettlementStatus | null) => void;
   setBill: (bill: SettlementBill | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -17,6 +19,7 @@ interface SettlementActions {
 export type SettlementStore = SettlementState & SettlementActions;
 
 const initialState: SettlementState = {
+  status: null,
   bill: null,
   loading: false,
   error: null
@@ -24,6 +27,7 @@ const initialState: SettlementState = {
 
 export const settlementStore = createStore<SettlementStore>()((set) => ({
   ...initialState,
+  setStatus: (status) => set({ status }),
   setBill: (bill) => set({ bill }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
