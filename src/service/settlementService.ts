@@ -1,3 +1,4 @@
+import { settlementStore, type SettlementStore } from "@/model/settlementStore";
 import { matchRuntimeStore } from "@/model/matchRuntimeStore";
 import type { TeamRole } from "@/types/fuelMission";
 import {
@@ -19,6 +20,14 @@ const EDGE_BILL_ENDPOINTS = [
 const PLATFORM_FEE_RATE = 0.05 as const;
 
 class SettlementServiceImpl {
+  subscribe(listener: () => void): () => void {
+    return settlementStore.subscribe(listener);
+  }
+
+  getSnapshot(): SettlementStore {
+    return settlementStore.getState();
+  }
+
   async getSettlementBill(matchId: string): Promise<SettlementBill> {
     const normalized = matchId.trim();
     if (!normalized) {

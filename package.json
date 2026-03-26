@@ -17,6 +17,8 @@
     "test:refund-api": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/matchRuntime.refund.test.ts",
     "test:f007": "node ./scripts/test-f007.mjs",
     "typecheck": "tsc --noEmit",
+    "verify:arch": "pnpm build && pnpm lint:imports",
+    "verify": "pnpm verify:arch",
     "qa:all": "node ./scripts/qa/run-all.mjs",
     "qa:state-machine": "node ./scripts/qa/check-match-state-machine.mjs",
     "qa:settlement": "node ./scripts/qa/check-settlement-rules.mjs",

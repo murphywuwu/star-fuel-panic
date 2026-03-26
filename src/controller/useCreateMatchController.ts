@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { createMatchService } from "@/service/createMatchService";
 
 export function useCreateMatchController() {
@@ -10,13 +10,21 @@ export function useCreateMatchController() {
     createMatchService.getSnapshot
   );
 
-  return {
-    state,
-    actions: {
+  const actions = useMemo(
+    () => ({
       setField: createMatchService.setField.bind(createMatchService),
+      searchSystems: createMatchService.searchSystems.bind(createMatchService),
+      selectSystem: createMatchService.selectSystem.bind(createMatchService),
+      toggleTargetNode: createMatchService.toggleTargetNode.bind(createMatchService),
       createDraft: createMatchService.createDraft.bind(createMatchService),
       publish: createMatchService.publish.bind(createMatchService),
       reset: createMatchService.reset.bind(createMatchService)
-    }
+    }),
+    []
+  );
+
+  return {
+    state,
+    actions
   };
 }

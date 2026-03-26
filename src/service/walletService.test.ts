@@ -4,7 +4,7 @@ import test from "node:test";
 import { setWalletRuntimeBridge, walletService } from "./walletService.ts";
 
 const LUX_COIN_TYPE =
-  "0x2::coin_registry::Currency<0xf0446b93345c1118f21239d7ac58fb82d005219b2016e100f074e4d17162a465::EVE::EVE>";
+  "0xf0446b93345c1118f21239d7ac58fb82d005219b2016e100f074e4d17162a465::EVE::EVE";
 
 interface CapturedTransactionData {
   sender?: string | null;
@@ -41,7 +41,7 @@ test("walletService builds entry payment transactions for custom coin types", as
 
   const snapshot = capturedData as CapturedTransactionData;
   assert.equal(snapshot.sender, "0x0000000000000000000000000000000000000000000000000000000000000abc");
-  assert.match(snapshot.commands?.[0]?.$Intent?.data?.type ?? "", /::coin_registry::Currency<.*::EVE::EVE>$/);
+  assert.equal(snapshot.commands?.[0]?.$Intent?.data?.type, LUX_COIN_TYPE);
 
   setWalletRuntimeBridge(null);
 });

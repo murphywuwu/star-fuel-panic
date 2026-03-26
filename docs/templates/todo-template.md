@@ -31,9 +31,9 @@
 
 ## 2. Task Board
 
-| TODO ID | Feature ID | SPEC Section | Layer | Task | Why (value) | Dependency | Acceptance Signal | Status |
-|---|---|---|---|---|---|---|---|---|
-| T-001 | F-001 | 4.1 | View |  |  |  |  | Todo |
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-001 | F-001 | 4.1 | View | View only |  |  |  |  | Todo |
 
 Status values:
 - `Todo`
@@ -51,8 +51,13 @@ Status values:
 
 - Every `Done` item must have:
   - Linked feature and layer filled.
+  - `Layer Scope` filled and still respected by the final implementation.
   - Acceptance signal evidence (test/log/screenshot/command output).
   - No unresolved blocker from dependencies.
+- Every frontend task must:
+  - Respect `View -> Controller -> Service -> Model`.
+  - Avoid controller -> model imports and view -> service/model imports.
+  - Record the narrowest possible `Layer Scope` before implementation.
 
 ## 5. Change Log
 

@@ -1,53 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { NetworkNode } from "@/types/node";
+import { useTargetNodePanelController } from "@/controller/useTargetNodePanelController";
 import { TacticalPanel } from "./TacticalPanel";
-import { getSolarSystemName } from "@/utils/solarSystemNames";
 
 type TargetNodePanelProps = {
   assemblyId: string | null;
 };
 
 export function TargetNodePanel({ assemblyId }: TargetNodePanelProps) {
-  const [node, setNode] = useState<NetworkNode | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [systemName, setSystemName] = useState<string>("");
-
-  useEffect(() => {
-    if (!assemblyId) {
-      setNode(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    fetch(`/api/nodes/${assemblyId}`)
-      .then((res) => res.json())
-      .then(async (data) => {
-        if (data.node) {
-          setNode(data.node);
-          // Fetch solar system name
-          if (data.node.solarSystem !== 0) {
-            const name = await getSolarSystemName(data.node.solarSystem);
-            setSystemName(name);
-          } else {
-            setSystemName("Unknown System");
-          }
-        } else {
-          setError("Node not found");
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load node:", err);
-        setError("Failed to load node data");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [assemblyId]);
+  const controller = useTargetNodePanelController(assemblyId);
+  const { node, loading, error, view } = controller;
 
   if (!assemblyId) {
     return null;
@@ -69,19 +31,8 @@ export function TargetNodePanel({ assemblyId }: TargetNodePanelProps) {
     );
   }
 
-  const urgencyColor = {
-    critical: "text-red-500",
-    warning: "text-yellow-500",
-    safe: "text-green-500"
-  }[node.urgency];
-
-  const statusColor = node.isOnline ? "text-green-500" : "text-gray-500";
-
   return (
-    <TacticalPanel
-      title="TARGET NODE"
-      className={`border-${node.urgency === "critical" ? "red" : node.urgency === "warning" ? "yellow" : "blue"}-500/30`}
-    >
+    <TacticalPanel title="TARGET NODE" className={view?.borderClassName}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
         <div>
           <div className="text-gray-500 text-xs uppercase mb-1">Node ID</div>
@@ -95,14 +46,14 @@ export function TargetNodePanel({ assemblyId }: TargetNodePanelProps) {
 
         <div>
           <div className="text-gray-500 text-xs uppercase mb-1">Status</div>
-          <div className={`font-semibold ${statusColor}`}>
+          <div className={`font-semibold ${view?.statusColor}`}>
             {node.isOnline ? "ONLINE" : "OFFLINE"}
           </div>
         </div>
 
         <div>
           <div className="text-gray-500 text-xs uppercase mb-1">Urgency</div>
-          <div className={`font-semibold uppercase ${urgencyColor}`}>
+          <div className={`font-semibold uppercase ${view?.urgencyColor}`}>
             {node.urgency}
           </div>
         </div>
@@ -122,24 +73,24 @@ export function TargetNodePanel({ assemblyId }: TargetNodePanelProps) {
           <div className="font-mono text-xs">{node.typeId}</div>
         </div>
 
-        {node.solarSystem !== 0 && (
+        {node.solarSystem !== 0 && view ? (
           <div>
             <div className="text-gray-500 text-xs uppercase mb-1">Solar System</div>
-            <div className="font-semibold">{systemName || `System ${node.solarSystem}`}</div>
+            <div className="font-semibold">{view.systemNameLabel}</div>
           </div>
-        )}
+        ) : null}
 
-        {node.maxEnergyProduction > 0 && (
+        {view?.hasEnergy ? (
           <div>
             <div className="text-gray-500 text-xs uppercase mb-1">Energy</div>
             <div className="font-semibold">
               {node.currentEnergyProduction} / {node.maxEnergyProduction}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {(node.coordX !== 0 || node.coordY !== 0 || node.coordZ !== 0) && (
+      {view?.hasCoordinates ? (
         <div className="mt-4 pt-4 border-t border-gray-700">
           <div className="text-gray-500 text-xs uppercase mb-2">Coordinates</div>
           <div className="grid grid-cols-3 gap-2 text-xs font-mono">
@@ -154,7 +105,7 @@ export function TargetNodePanel({ assemblyId }: TargetNodePanelProps) {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {node.isBurning && (
         <div className="mt-2 text-orange-500 text-xs">

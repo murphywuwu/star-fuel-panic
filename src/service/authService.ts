@@ -92,6 +92,10 @@ class AuthService {
         luxBalance: balance
       });
     } catch (error) {
+      console.error("[wallet] syncFromWalletProvider failed", {
+        walletAddress,
+        error
+      });
       const previousState = this.store.getState();
       const fallbackBalance =
         this.normalizeAddress(previousState.walletAddress) === this.normalizeAddress(walletAddress)
@@ -157,6 +161,10 @@ class AuthService {
       this.store.getState().updateBalance(balance);
       return this.result(true, "balance refreshed", { luxBalance: balance });
     } catch (error) {
+      console.error("[wallet] refreshBalance failed", {
+        walletAddress: state.walletAddress,
+        error
+      });
       return this.resolveWalletError(error, "E_WALLET_NETWORK", "wallet balance refresh failed");
     }
   }

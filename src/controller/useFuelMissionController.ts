@@ -1,13 +1,79 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { selectIsTeamReady, selectMyRole, selectMyTeam, selectTeamSlots } from "@/model/fuelMissionStore";
 import { fuelMissionService } from "@/service/fuelMissionService";
 import { matchService } from "@/service/matchService";
-import type { ControllerResult, MatchStreamCallbacks, TeamRole } from "@/types/fuelMission";
+import type { ControllerResult, MatchStreamCallbacks, TeamRole, TeamState } from "@/types/fuelMission";
+
+interface TeamSlotView {
+  slotId: string;
+  role: TeamRole;
+  filled: boolean;
+  member?: TeamState["players"][number];
+}
+
+const DEFAULT_ROLE_SLOTS: TeamRole[] = ["Collector", "Hauler", "Escort"];
 
 function normalizeResult<T>(result: ControllerResult<T>): ControllerResult<T> {
   return result;
+}
+
+function selectMyTeam(teams: TeamState[], myTeamId: string | null): TeamState | null {
+  if (!myTeamId) {
+    return null;
+  }
+  return teams.find((team) => team.teamId === myTeamId) ?? null;
+}
+
+function selectMyRole(teams: TeamState[], myTeamId: string | null): TeamRole | null {
+  const myTeam = selectMyTeam(teams, myTeamId);
+  if (!myTeam) {
+    return null;
+  }
+
+  const firstAssigned = Object.entries(myTeam.roles).find(([, playerId]) =>
+    myTeam.players.some((player) => player.playerId === playerId)
+  );
+
+  return (firstAssigned?.[0] as TeamRole | undefined) ?? null;
+}
+
+function selectTeamSlots(team: TeamState): TeamSlotView[] {
+  const slots =
+    team.roleSlots && team.roleSlots.length > 0
+      ? team.roleSlots
+      : (Object.keys(team.roles) as TeamRole[]).length > 0
+        ? (Object.keys(team.roles) as TeamRole[])
+        : DEFAULT_ROLE_SLOTS;
+
+  const usedPlayerIds = new Set<string>();
+
+  return slots.map((role, index) => {
+    const mappedPlayerId = team.roles[role];
+    let member = mappedPlayerId ? team.players.find((player) => player.playerId === mappedPlayerId) : undefined;
+
+    if (member && usedPlayerIds.has(member.playerId)) {
+      member = undefined;
+    }
+    if (!member) {
+      member = team.players.find((player) => player.role === role && !usedPlayerIds.has(player.playerId));
+    }
+
+    if (member) {
+      usedPlayerIds.add(member.playerId);
+    }
+
+    return {
+      slotId: `${team.teamId}:${role}:${index}`,
+      role,
+      filled: Boolean(member),
+      member
+    };
+  });
+}
+
+function selectIsTeamReady(team: TeamState): boolean {
+  return selectTeamSlots(team).every((slot) => slot.filled);
 }
 
 export function useFuelMissionController() {

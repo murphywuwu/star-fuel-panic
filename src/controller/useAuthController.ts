@@ -1,10 +1,9 @@
 "use client";
 
 import { useCurrentAccount, useCurrentClient, useDAppKit, useWalletConnection, useWallets, type UiWallet } from "@mysten/dapp-kit-react";
-import { toBase64 } from "@mysten/sui/utils";
+import { normalizeStructTag, toBase64 } from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { selectWalletShort } from "@/model/authStore";
 import { authService } from "@/service/authService";
 import { setWalletRuntimeBridge } from "@/service/walletService";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
@@ -22,6 +21,7 @@ const WALLET_ERROR_LABEL: Partial<Record<FuelMissionErrorCode, string>> = {
 const DEFAULT_COIN_TYPE = process.env.NEXT_PUBLIC_LUX_COIN_TYPE?.trim() || "0x2::sui::SUI";
 const DEFAULT_DECIMALS = Number(process.env.NEXT_PUBLIC_LUX_DECIMALS ?? Number.NaN);
 const CONFIGURED_DECIMALS = Number.isFinite(DEFAULT_DECIMALS) ? Math.floor(DEFAULT_DECIMALS) : null;
+const NORMALIZED_COIN_TYPE = normalizeStructTag(DEFAULT_COIN_TYPE);
 
 function normalizeAddress(address: string | null | undefined) {
   return address?.trim().toLowerCase() ?? null;
@@ -30,6 +30,16 @@ function normalizeAddress(address: string | null | undefined) {
 function pickPreferredWallet(wallets: UiWallet[]) {
   const eveWallet = wallets.find((wallet) => wallet.name.toLowerCase().includes("eve"));
   return eveWallet ?? wallets[0] ?? null;
+}
+
+function selectWalletShort(walletAddress: string | null) {
+  if (!walletAddress) {
+    return "NOT CONNECTED";
+  }
+  if (walletAddress.length <= 12) {
+    return walletAddress;
+  }
+  return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 }
 
 export function walletErrorMessage(errorCode?: FuelMissionErrorCode | string, fallbackMessage?: string) {
@@ -82,11 +92,53 @@ export function useAuthController() {
       return decimalsPromiseRef.current;
     };
 
+    const resolveBalanceFromClient = async (address: string) => {
+      const decimals = await resolveCoinDecimals();
+
+      try {
+        const response = await client.core.getBalance({
+          owner: address,
+          coinType: DEFAULT_COIN_TYPE
+        });
+
+        const primaryBalance = response.balance.balance;
+        if (primaryBalance !== "0") {
+          return balanceToDisplayUnits(primaryBalance, decimals);
+        }
+      } catch (error) {
+        console.error("[wallet] getBalance failed, falling back to listBalances", {
+          address,
+          coinType: DEFAULT_COIN_TYPE,
+          error
+        });
+      }
+
+      const balances = await client.core.listBalances({
+        owner: address,
+        limit: 100
+      });
+
+      const matched = balances.balances.find((entry) => normalizeStructTag(entry.coinType) === NORMALIZED_COIN_TYPE);
+      return balanceToDisplayUnits(matched?.balance ?? "0", decimals);
+    };
+
     setWalletRuntimeBridge({
       connect: async () => {
         const preferredWallet = pickPreferredWallet(wallets);
         if (!preferredWallet) {
           throw new Error("no compatible wallet found");
+        }
+
+        if (walletConnection.status !== "disconnected") {
+          try {
+            await dAppKit.disconnectWallet();
+          } catch {
+            // Best-effort cleanup only. EVE Vault may already be deauthorized.
+          }
+
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem("sui:dapp-kit:wallet-connection-info");
+          }
         }
 
         const connected = await dAppKit.connectWallet({ wallet: preferredWallet });
@@ -123,15 +175,7 @@ export function useAuthController() {
         throw new Error("wallet execution returned no digest");
       },
       getBalance: async (address: string) => {
-        const [response, decimals] = await Promise.all([
-          client.core.getBalance({
-            owner: address,
-            coinType: DEFAULT_COIN_TYPE
-          }),
-          resolveCoinDecimals()
-        ]);
-
-        return balanceToDisplayUnits(response.balance.balance, decimals);
+        return resolveBalanceFromClient(address);
       }
     });
   }, [account?.address, client, dAppKit, walletConnection.status, wallets]);
@@ -175,7 +219,7 @@ export function useAuthController() {
       connectOpenSignal
     },
     selectors: {
-      walletShort: selectWalletShort(state)
+      walletShort: selectWalletShort(state.walletAddress)
     },
     actions: {
       onConnectWallet: async () => {

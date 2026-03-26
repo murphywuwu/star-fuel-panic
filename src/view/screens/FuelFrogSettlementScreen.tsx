@@ -1,41 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
-import { useFuelMissionController } from "@/controller/useFuelMissionController";
+import { useFuelFrogSettlementScreenController } from "@/controller/useFuelFrogSettlementScreenController";
 import { MatchShell } from "@/view/components/MatchShell";
 import { BillTable, EarningsCard, ScoreSummary } from "@/view/components/SettlementModules";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
 export function FuelFrogSettlementScreen() {
-  const { state, actions } = useFuelMissionController();
-  const { state: authState } = useAuthController();
-  const [message, setMessage] = useState("READY // CONNECT WALLET TO CLAIM & FINALIZE");
-
-  const pilotEarnings = useMemo(() => {
-    const topContribution = state.contributions[0];
-    if (!topContribution) {
-      return { pilotName: "Pilot Alpha", payoutAmount: 0 };
-    }
-
-    const payout = state.settlement.memberPayouts.find((item) => item.playerId === topContribution.playerId)?.amount ?? 0;
-    return { pilotName: topContribution.name, payoutAmount: payout };
-  }, [state.contributions, state.settlement.memberPayouts]);
-
-  const handleSettle = () => {
-    if (!authState.isConnected) {
-      setMessage("WALLET NOT CONNECTED // SETTLEMENT ACTION LOCKED");
-      return;
-    }
-    const result = actions.onSettle();
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "E_UNKNOWN"} // ${walletErrorMessage(result.errorCode, result.message)}`);
-      return;
-    }
-    setMessage(`SETTLEMENT READY // ${result.payload?.settlementId ?? "N/A"}`);
-  };
+  const controller = useFuelFrogSettlementScreenController();
+  const { mission, auth, view, actions } = controller;
+  const state = mission.state;
+  const authState = auth.state;
 
   return (
     <MatchShell
@@ -53,18 +29,18 @@ export function FuelFrogSettlementScreen() {
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <BillTable settlement={state.settlement} />
         <EarningsCard
-          pilotName={pilotEarnings.pilotName}
-          payoutAmount={pilotEarnings.payoutAmount}
+          pilotName={view.pilotEarnings.pilotName}
+          payoutAmount={view.pilotEarnings.payoutAmount}
           settlementId={state.settlement.settlementId}
         />
       </section>
 
       <TacticalPanel title="Settlement Actions" eyebrow="Confirm Flow">
         <div className="flex flex-wrap gap-2">
-          <TacticalButton onClick={handleSettle} disabled={!authState.isConnected}>
+          <TacticalButton onClick={actions.handleSettle} disabled={!authState.isConnected}>
             Finalize Bill
           </TacticalButton>
-          <TacticalButton tone="ghost" onClick={() => setMessage("AUDIT LOG AVAILABLE IN EVENT FEED")}>
+          <TacticalButton tone="ghost" onClick={actions.showAuditLog}>
             View Audit Log
           </TacticalButton>
           <Link
@@ -75,7 +51,7 @@ export function FuelFrogSettlementScreen() {
           </Link>
         </div>
         <p className="mt-3 border border-eve-yellow/35 bg-eve-black/70 px-3 py-2 font-mono text-xs uppercase tracking-[0.12em] text-eve-offwhite">
-          {message}
+          {view.message}
         </p>
       </TacticalPanel>
     </MatchShell>

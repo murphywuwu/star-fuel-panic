@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSettlementBillPanelController } from "@/controller/useSettlementBillPanelController";
 import type { ControllerResult, PlayerContribution, SettlementBill } from "@/types/fuelMission";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
@@ -10,34 +10,13 @@ interface SettlementBillPanelProps {
   onSettle: () => ControllerResult<SettlementBill>;
 }
 
-function money(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} LUX`;
-}
-
 export function SettlementBillPanel({ settlementBill, memberContributions, onSettle }: SettlementBillPanelProps) {
-  const [message, setMessage] = useState("SETTLEMENT PIPELINE IDLE");
-
-  const contributionNameMap = useMemo(
-    () => new Map(memberContributions.map((item) => [item.playerId, item.name])),
-    [memberContributions]
-  );
-
-  const handleSettle = () => {
-    const result = onSettle();
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "E_UNKNOWN"} // ${result.message}`);
-      return;
-    }
-    setMessage(`SETTLEMENT CONFIRMED // ${result.payload?.settlementId ?? "N/A"}`);
-  };
-
-  const rows = [
-    { label: "Player Buy-in Pool", value: settlementBill.playerBuyinPool },
-    { label: "Gross Pool", value: settlementBill.grossPool },
-    { label: "Platform Fee", value: settlementBill.platformFee },
-    { label: "Host Fee", value: settlementBill.hostFee },
-    { label: "Payout Pool", value: settlementBill.payoutPool }
-  ];
+  const controller = useSettlementBillPanelController({
+    settlementBill,
+    memberContributions,
+    onSettle
+  });
+  const { view, actions } = controller;
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -51,10 +30,10 @@ export function SettlementBillPanel({ settlementBill, memberContributions, onSet
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {view.rows.map((row) => (
                 <tr key={row.label}>
                   <td className="border-b border-eve-yellow/20 px-3 py-2 text-eve-offwhite/85">{row.label}</td>
-                  <td className="border-b border-eve-yellow/20 px-3 py-2 font-mono text-eve-offwhite">{money(row.value)}</td>
+                  <td className="border-b border-eve-yellow/20 px-3 py-2 font-mono text-eve-offwhite">{view.money(row.value)}</td>
                 </tr>
               ))}
             </tbody>
@@ -62,17 +41,17 @@ export function SettlementBillPanel({ settlementBill, memberContributions, onSet
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <TacticalButton onClick={handleSettle}>Trigger Settlement</TacticalButton>
-          <TacticalButton tone="ghost" onClick={() => setMessage(`AUDIT LOG READY // ${settlementBill.settlementId ?? "NO SETTLEMENT ID"}`)}>
+          <TacticalButton onClick={actions.handleSettle}>Trigger Settlement</TacticalButton>
+          <TacticalButton tone="ghost" onClick={actions.showAuditLog}>
             View Audit Log
           </TacticalButton>
-          <TacticalButton tone="danger" onClick={() => setMessage("ISSUE FLAGGED // REVIEW REQUEST SUBMITTED")}>
+          <TacticalButton tone="danger" onClick={actions.reportIssue}>
             Report Issue
           </TacticalButton>
         </div>
 
         <p className="mt-4 border border-eve-yellow/40 bg-eve-black/70 px-3 py-2 font-mono text-xs uppercase tracking-[0.12em]">
-          {message}
+          {view.message}
         </p>
       </TacticalPanel>
 
@@ -80,12 +59,12 @@ export function SettlementBillPanel({ settlementBill, memberContributions, onSet
         <p className="text-xs text-eve-offwhite/85">Settlement ID: {settlementBill.settlementId ?? "PENDING"}</p>
         <ul className="mt-3 space-y-2 text-xs text-eve-offwhite/90">
           {settlementBill.memberPayouts.length === 0 ? <li>SYNCING LEDGER...</li> : null}
-          {settlementBill.memberPayouts.map((member) => (
+          {view.memberRows.map((member) => (
             <li key={member.playerId} className="border border-eve-yellow/30 bg-eve-black/70 px-3 py-2">
               <p className="font-mono uppercase tracking-[0.12em] text-eve-yellow">
-                {contributionNameMap.get(member.playerId) ?? member.playerId}
+                {member.displayName}
               </p>
-              <p className="mt-1">Payout: {money(member.amount)}</p>
+              <p className="mt-1">Payout: {member.displayAmount}</p>
             </li>
           ))}
         </ul>

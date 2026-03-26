@@ -1,7 +1,7 @@
 # Fuel Frog Panic — Architecture Baseline
 
 Version: v6.0
-Last Updated: 2026-03-26
+Last Updated: 2026-03-27
 Source: `docs/PRD.md` v2.6
 
 ---
@@ -120,8 +120,8 @@ BFF / Runtime Layer
 | Route | 责任 |
 |---|---|
 | `/` | 钱包接入、玩家身份建立、进入 Lobby 的前置引导。 |
-| `/lobby` | 比赛发现主入口；比赛列表、筛选、比赛详情预览、位置设置。 |
-| `/planning` | 创建比赛、创建/加入战队、锁队、支付报名费。 |
+| `/lobby` | 比赛发现主入口；比赛列表、筛选、比赛详情预览、位置设置，以及创建比赛快捷入口（modal）。 |
+| `/planning` | 创建/加入战队、锁队、支付报名费；保留创建比赛的 fallback / deep-link 入口。 |
 | `/match` | 比赛进行中主视图；浏览器模式与游戏内浮窗共用同一领域状态。 |
 | `/settlement` | 结算等待页与战报页。 |
 | `/nodes-map` | 仅作为精准模式选点的内部视图或兼容入口，不再作为独立任务发现入口。 |
@@ -155,8 +155,23 @@ BFF / Runtime Layer
 - Controller 只做参数整形、错误态映射、页面编排，不直接请求数据库、不直接操作 store。
 - Service 负责调用 BFF、订阅实时流、写入 Zustand actions。
 - Model 只能承载状态、actions、selectors，不能发请求、不能依赖 DOM。
+- View 不得保有业务流程级 `useState/useEffect/useMemo`：表单草稿、modal 开关、search debounce、URL sync、异步 bootstrap、消息提示、数据拉取生命周期都必须进入 controller。
+- View 允许保留的唯一局部状态是 hover/focus/animation 这类纯呈现微状态，且不能触发 service/model side effect。
 - 精准模式的节点地图只是一种 View 组件，不构成新的领域边界；它仍属于 Match Creation 域。
 - 浏览器比赛页和游戏内浮窗必须共享同一份 `matchRuntimeStore` 读模型，避免两套计分语义。
+
+### 4.5 Screen Orchestration Controllers
+
+| View | Orchestration Controller | Ownership |
+|---|---|---|
+| `LobbyDiscoveryScreen` | `useLobbyDiscoveryScreenController` | 管理 create-match modal、location picker、search/browse 展开态和推荐加载编排。 |
+| `CreateMatchScreen` | `useCreateMatchScreenController` | 管理 system search debounce、publish feedback、target node plotting 和关闭重置流程。 |
+| `TeamLobbyScreen` | `useTeamLobbyScreenController` | 管理创建战队 modal、审批/拒绝输入、支付提示和页面级 mutation message。 |
+| `FuelFrogMatchScreen` | `useFuelFrogMatchScreenController` | 管理 stream boot、排行榜派生、目标节点视图模型和 event feed 裁剪。 |
+| `FuelFrogSettlementScreen` | `useFuelFrogSettlementScreenController` | 管理 settlement CTA、MVP/收益 hero 派生和结算 message。 |
+| `FuelFrogLobbyScreen` | `useFuelFrogLobbyScreenController` | 管理 legacy squad lobby 表单、队伍选择和支付/锁队 blocker 文案。 |
+| `NodeMap3D` | `useNodeMapViewController` | 管理 URL query 同步、overview bootstrap、breadcrumb 和 scene projection。 |
+| `WalletConnectBridge` / `TargetNodePanel` / `SettlementBillPanel` | `useWalletConnectBridgeController` / `useTargetNodePanelController` / `useSettlementBillPanelController` | 管理 modal 生命周期、节点详情拉取、结算面板 message，不再由 View 自行编排。 |
 
 ---
 

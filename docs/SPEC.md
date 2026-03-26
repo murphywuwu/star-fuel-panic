@@ -1,7 +1,7 @@
 # SPEC: Fuel Frog Panic — Interface Contracts
 
 Version: v6.0
-Last Updated: 2026-03-26
+Last Updated: 2026-03-27
 Source PRD: `docs/PRD.md` v2.6
 Source Architecture: `docs/architecture.md` v6.0
 
@@ -493,8 +493,12 @@ type MatchStreamEvent =
 
 ### 3.1 Match Creation
 
+Create Match can render either as a dedicated planning surface or as a modal launched from Lobby. The controller/store/service contract is shared between both surfaces.
+
 View 事件：
 
+- `onOpenCreateMatch()`
+- `onCloseCreateMatch()`
 - `onModeChange(mode)`
 - `onOpenSystemPicker()`
 - `onSystemSelect(systemId)`
@@ -570,6 +574,7 @@ View 事件：
 
 - `onFilterChange(filters)`
 - `onOpenMatch(matchId)`
+- `onOpenCreateMatch()`
 - `onOpenLocationPicker()`
 - `onLocationSelect(systemId)`
 - `onRequestRecommendations(matchId)`
@@ -782,6 +787,31 @@ Selectors:
 - `selectWinningTeam`
 - `selectMvp`
 - `selectTotalPlayerPayout`
+
+### 3.6 Screen / Component Orchestration Contract
+
+- View 层只能消费 domain controller 或 screen/component orchestration controller 的输出。
+- Orchestration controller 可以组合多个 domain controller，并拥有以下职责：
+  - modal / form / picker / search query 等页面级局部状态
+  - debounce、async bootstrap、URL sync、message banner、publish/settle feedback
+  - 给 View 的派生展示模型，例如 node plot、ranked teams、payout hero、breadcrumb
+- View 层禁止直接承担以下职责：
+  - 直接 `fetch` / stream subscribe / query-string 编排
+  - 业务流程级 `useState/useEffect/useMemo`
+  - mutation 成功/失败 message 状态机
+- 当前实现要求以下 orchestration controllers 持续存在并作为 View 唯一入口：
+  - `useLobbyDiscoveryScreenController`
+  - `useCreateMatchScreenController`
+  - `useTeamLobbyScreenController`
+  - `useFuelFrogMatchScreenController`
+  - `useFuelFrogSettlementScreenController`
+  - `useFuelFrogLobbyScreenController`
+  - `useHeatmapScreenController`
+  - `useNodeMapViewController`
+  - `useWalletConnectBridgeController`
+  - `useTargetNodePanelController`
+  - `useSettlementBillPanelController`
+- 例外：hover/focus/animation 这类纯呈现微状态可继续留在 View，但不能访问 service/model，也不能发起副作用。
 
 ---
 

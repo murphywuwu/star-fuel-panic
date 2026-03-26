@@ -191,6 +191,12 @@ For every task (code or documentation), the agent must:
   - Controller can access Service only.
   - Service can access Model only.
 - Enforce Zustand-only implementation for Model layer.
+- Any implementation that violates `View -> Controller -> Service -> Model` is incomplete even if the feature appears to work.
+- Do not rely on controller -> model exception lists; if a change seems to require one, refactor the code instead.
+- Before editing frontend code, explicitly identify the layer scope of the change in the active TODO item or implementation note.
+- Before final delivery for any frontend change, run architecture verification:
+  - `pnpm build`
+  - `node ./scripts/check-layer-imports.mjs`
 
 4. Sui contract testing constraints:
 - Treat `docs/sui-devnet-testing-standard.md` as mandatory for all contract-related tasks.
@@ -268,6 +274,14 @@ When user confirms an idea and asks for implementation, follow this workflow ord
   - PM Agent owns PRD creation/updates.
   - Architecture Agent owns architecture/SPEC creation/updates.
   - Todo Agent owns TODO creation/updates.
+- TODO task policy for frontend work:
+  - Every frontend implementation task must declare `Layer Scope`.
+  - Preferred values:
+    - `View only`
+    - `View + Controller`
+    - `Controller + Service`
+    - `Service + Model`
+  - If the planned layer scope would cross more than one boundary, split the task before coding.
 - Test plan must reflect current test coverage and defect status.
 - No implementation starts before `docs/SPEC.md` and `docs/TODO.md` exist for the requested change.
 - No coding starts before reviewing `docs/PRD.md`, `docs/SPEC.md`, and `docs/architecture.md`.

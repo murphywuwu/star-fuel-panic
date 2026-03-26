@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useLobbyController } from "@/controller/useLobbyController";
-import { useLocationController } from "@/controller/useLocationController";
+import { useLobbyDiscoveryScreenController } from "@/controller/useLobbyDiscoveryScreenController";
 import { FuelMissionShell } from "@/view/components/FuelMissionShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
-import type { ConstellationSummary, RegionSummary, SearchHit, SolarSystemSummary } from "@/types/solarSystem";
+import { CreateMatchScreen } from "@/view/screens/CreateMatchScreen";
+import type { SolarSystemSummary } from "@/types/solarSystem";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -34,110 +33,9 @@ function formatEntryFee(entryFee: number) {
   return entryFee > 0 ? `${entryFee} LUX / Pilot` : "Free Entry";
 }
 
-function sortConstellations(constellations: ConstellationSummary[]) {
-  return [...constellations].sort(
-    (left, right) => right.sortScore - left.sortScore || left.constellationId - right.constellationId
-  );
-}
-
 export function LobbyDiscoveryScreen() {
-  const location = useLocationController();
-  const lobby = useLobbyController({
-    currentSystemId: location.location?.systemId ?? null,
-    currentConstellationId: location.location?.constellationId ?? null
-  });
-  const selectedMatch = lobby.selectedMatch;
-
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [expandedRegionId, setExpandedRegionId] = useState<number | null>(null);
-  const [expandedConstellationId, setExpandedConstellationId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
-    const selectedMatchId = selectedMatch?.match.id;
-    if (!selectedMatchId || selectedMatch.match.mode !== "free" || !location.location) {
-      return;
-    }
-
-    if (lobby.recommendations.length > 0 || lobby.loadingRecommendationsFor === selectedMatchId) {
-      return;
-    }
-
-    void lobby.actions.loadRecommendations(selectedMatchId);
-  }, [
-    lobby.actions,
-    lobby.loadingRecommendationsFor,
-    lobby.recommendations.length,
-    location.location,
-    selectedMatch
-  ]);
-
-  useEffect(() => {
-    if (!pickerOpen) {
-      return;
-    }
-
-    if (
-      location.loadingBootstrap ||
-      (location.regions.length > 0 && location.recommendedSystems.length > 0)
-    ) {
-      return;
-    }
-
-    void location.loadPickerBootstrap();
-  }, [
-    location.loadingBootstrap,
-    location.regions.length,
-    location.recommendedSystems.length,
-    location.loadPickerBootstrap,
-    pickerOpen
-  ]);
-
-  const regionSummaries = useMemo(
-    () => [...location.regions].sort((left, right) => right.sortScore - left.sortScore || left.regionId - right.regionId),
-    [location.regions]
-  );
-
-  const handleSystemSelect = async (system: SolarSystemSummary) => {
-    location.setLocation(system);
-    setPickerOpen(false);
-  };
-
-  const handleSearchSelect = async (hit: SearchHit) => {
-    if (hit.type === "system") {
-      await location.selectSystemById(hit.id);
-      setPickerOpen(false);
-      return;
-    }
-
-    if (typeof hit.regionId === "number") {
-      setExpandedRegionId(hit.regionId);
-      await location.loadRegionConstellations(hit.regionId);
-    }
-    setExpandedConstellationId(hit.id);
-    await location.loadConstellationSystems(hit.id);
-  };
-
-  const toggleRegion = async (region: RegionSummary) => {
-    if (expandedRegionId === region.regionId) {
-      setExpandedRegionId(null);
-      setExpandedConstellationId(null);
-      return;
-    }
-
-    setExpandedRegionId(region.regionId);
-    await location.loadRegionConstellations(region.regionId);
-  };
-
-  const toggleConstellation = async (constellationId: number) => {
-    if (expandedConstellationId === constellationId) {
-      setExpandedConstellationId(null);
-      return;
-    }
-
-    setExpandedConstellationId(constellationId);
-    await location.loadConstellationSystems(constellationId);
-  };
+  const controller = useLobbyDiscoveryScreenController();
+  const { location, lobby, selectedMatch, ui, actions } = controller;
 
   return (
     <FuelMissionShell
@@ -170,11 +68,14 @@ export function LobbyDiscoveryScreen() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <TacticalButton onClick={() => setPickerOpen(true)}>
+                <TacticalButton onClick={actions.openCreateMatch}>
+                  CREATE MATCH
+                </TacticalButton>
+                <TacticalButton onClick={actions.openPicker}>
                   {location.location ? "CHANGE LOCATION" : "SET LOCATION"}
                 </TacticalButton>
                 {location.location ? (
-                  <TacticalButton tone="ghost" onClick={() => location.clearLocation()}>
+                  <TacticalButton tone="ghost" onClick={() => actions.clearLocation()}>
                     CLEAR
                   </TacticalButton>
                 ) : null}
@@ -371,7 +272,7 @@ export function LobbyDiscoveryScreen() {
         </div>
       </section>
 
-      {pickerOpen ? (
+      {ui.pickerOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-4">
           <div className="max-h-[85vh] w-full max-w-5xl overflow-auto border border-eve-red/25 bg-[#0f0f0f] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -379,7 +280,7 @@ export function LobbyDiscoveryScreen() {
                 <p className="text-[10px] font-black uppercase tracking-[0.32em] text-eve-red/90">Set Position</p>
                 <h3 className="mt-2 text-2xl font-black uppercase tracking-[0.04em] text-eve-offwhite">Region / Constellation / System</h3>
               </div>
-              <TacticalButton tone="danger" onClick={() => setPickerOpen(false)}>
+              <TacticalButton tone="danger" onClick={actions.closePicker}>
                 CLOSE
               </TacticalButton>
             </div>
@@ -387,12 +288,8 @@ export function LobbyDiscoveryScreen() {
             <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
               <TacticalPanel title="Search" eyebrow="Direct Lookup">
                 <input
-                  value={searchQuery}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setSearchQuery(nextValue);
-                    void location.search(nextValue);
-                  }}
+                  value={ui.searchQuery}
+                  onChange={(event) => void actions.handleSearchChange(event.target.value)}
                   placeholder="Search constellations or systems..."
                   className="w-full border border-eve-red/25 bg-[#080808] px-3 py-3 text-sm text-eve-offwhite outline-none"
                 />
@@ -406,7 +303,7 @@ export function LobbyDiscoveryScreen() {
                       key={`${hit.type}-${hit.id}`}
                       type="button"
                       className="w-full border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-left text-xs uppercase tracking-[0.16em] text-eve-offwhite/80"
-                      onClick={() => void handleSearchSelect(hit)}
+                      onClick={() => void actions.handleSearchSelect(hit)}
                     >
                       <span className="text-eve-red/90">{hit.type}</span>
                       <span className="ml-2">{hit.label}</span>
@@ -421,7 +318,7 @@ export function LobbyDiscoveryScreen() {
                       <button
                         key={recommendation.system.systemId}
                         type="button"
-                        onClick={() => void handleSystemSelect(recommendation.system)}
+                        onClick={() => void actions.handleSystemSelect(recommendation.system)}
                         className="w-full border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-left text-xs uppercase tracking-[0.16em] text-eve-offwhite/80"
                       >
                         <div className="flex items-center justify-between gap-3">
@@ -437,15 +334,15 @@ export function LobbyDiscoveryScreen() {
 
               <TacticalPanel title="Constellations" eyebrow="Browse">
                 <div className="space-y-4">
-                  {regionSummaries.map((region) => {
-                    const expandedRegion = expandedRegionId === region.regionId;
-                    const constellations = sortConstellations(location.constellationsByRegion[region.regionId] ?? []);
+                  {ui.regionSummaries.map((region) => {
+                    const expandedRegion = ui.expandedRegionId === region.regionId;
+                    const constellations = ui.sortConstellations(location.constellationsByRegion[region.regionId] ?? []);
 
                     return (
                       <div key={region.regionId} className="border border-eve-red/15 bg-[#080808]/65 p-3">
                         <button
                           type="button"
-                          onClick={() => void toggleRegion(region)}
+                          onClick={() => void actions.toggleRegion(region)}
                           className="flex w-full items-center justify-between gap-3 text-left"
                         >
                           <div>
@@ -467,13 +364,13 @@ export function LobbyDiscoveryScreen() {
                             ) : null}
                             {constellations.map((constellation) => {
                               const systems = location.systemsByConstellation[constellation.constellationId] ?? [];
-                              const expanded = expandedConstellationId === constellation.constellationId;
+                              const expanded = ui.expandedConstellationId === constellation.constellationId;
 
                               return (
                                 <div key={constellation.constellationId} className="border border-eve-red/15 bg-[#111111]/80">
                                   <button
                                     type="button"
-                                    onClick={() => void toggleConstellation(constellation.constellationId)}
+                                    onClick={() => void actions.toggleConstellation(constellation.constellationId)}
                                     className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-xs uppercase tracking-[0.16em] text-eve-offwhite/82"
                                   >
                                     <span>{constellation.constellationName}</span>
@@ -492,7 +389,7 @@ export function LobbyDiscoveryScreen() {
                                           <button
                                             key={system.systemId}
                                             type="button"
-                                            onClick={() => void handleSystemSelect(system)}
+                                            onClick={() => void actions.handleSystemSelect(system)}
                                             className="flex w-full items-center justify-between gap-3 border border-eve-red/10 bg-[#080808]/70 px-3 py-2 text-left text-[11px] uppercase tracking-[0.14em] text-eve-offwhite/80"
                                           >
                                             <span>{system.systemName}</span>
@@ -514,6 +411,37 @@ export function LobbyDiscoveryScreen() {
                   })}
                 </div>
               </TacticalPanel>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {ui.createMatchOpen ? (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/72 px-4">
+          <div className="max-h-[88vh] w-full max-w-6xl overflow-auto border border-eve-red/25 bg-[#0f0f0f] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.7)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-eve-red/90">
+                  Create Fuel Match
+                </p>
+                <h3 className="mt-2 text-2xl font-black uppercase tracking-[0.04em] text-eve-offwhite">
+                  Sponsor A New Fuel Operation
+                </h3>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-eve-offwhite/70">
+                  Build the match directly from the lobby, define the scoring scope, set the player economics,
+                  and publish the contract without leaving this page.
+                </p>
+              </div>
+              <TacticalButton tone="danger" onClick={actions.closeCreateMatch}>
+                CLOSE
+              </TacticalButton>
+            </div>
+
+            <div className="mt-6">
+              <CreateMatchScreen
+                onClose={actions.closeCreateMatch}
+                onPublished={(matchId) => void actions.handleMatchPublished(matchId)}
+              />
             </div>
           </div>
         </div>

@@ -1,182 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
-import { useTeamLobbyController } from "@/controller/useTeamLobbyController";
+import { useTeamLobbyScreenController } from "@/controller/useTeamLobbyScreenController";
 import { FuelMissionShell } from "@/view/components/FuelMissionShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
-import type { PlayerRole, TeamApplication, TeamDetail } from "@/types/team";
+import type { PlayerRole } from "@/types/team";
 
 const ROLE_ORDER: PlayerRole[] = ["collector", "hauler", "escort"];
 
-function roleLabel(role: PlayerRole) {
-  if (role === "collector") return "Collector";
-  if (role === "hauler") return "Hauler";
-  return "Escort";
+interface TeamLobbyScreenProps {
+  preferredMatchId?: string | null;
 }
 
-function teamStatusLabel(team: TeamDetail) {
-  if (team.status === "paid") return "PAID";
-  if (team.status === "locked") return "LOCKED";
-  return "FORMING";
-}
-
-function isCaptain(team: TeamDetail, walletAddress: string | null) {
-  if (!walletAddress) {
-    return false;
-  }
-  return team.captainAddress.trim().toLowerCase() === walletAddress.trim().toLowerCase();
-}
-
-function pendingApplications(team: TeamDetail) {
-  return team.applications.filter((application) => application.status === "pending");
-}
-
-function findMyPendingApplication(team: TeamDetail, walletAddress: string | null) {
-  if (!walletAddress) {
-    return null;
-  }
-
-  const normalized = walletAddress.trim().toLowerCase();
-  return (
-    team.applications.find(
-      (application) =>
-        application.status === "pending" &&
-        application.applicantAddress.trim().toLowerCase() === normalized
-    ) ?? null
-  );
-}
-
-function roleSlotTotal(counts: { collector: number; hauler: number; escort: number }) {
-  return counts.collector + counts.hauler + counts.escort;
-}
-
-export function TeamLobbyScreen() {
-  const searchParams = useSearchParams();
-  const preferredMatchId = searchParams.get("matchId");
-  const { state, selectors, actions } = useTeamLobbyController();
-  const { state: authState, actions: authActions } = useAuthController();
-  const currentWalletAddress = authState.walletAddress;
-
-  const [teamName, setTeamName] = useState("Alpha Squad");
-  const [maxMembers, setMaxMembers] = useState(3);
-  const [collectorSlots, setCollectorSlots] = useState(1);
-  const [haulerSlots, setHaulerSlots] = useState(1);
-  const [escortSlots, setEscortSlots] = useState(1);
-  const [joinRoleByTeam, setJoinRoleByTeam] = useState<Record<string, PlayerRole>>({});
-  const [rejectReasonByApplication, setRejectReasonByApplication] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState("TEAM LOBBY ONLINE // LOAD A MATCH AND FORM A SQUAD");
-
-  useEffect(() => {
-    void actions.load(preferredMatchId).then((result) => {
-      if (!result.ok) {
-        setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      }
-    });
-  }, [actions, preferredMatchId]);
-
-  const slotCounts = {
-    collector: collectorSlots,
-    hauler: haulerSlots,
-    escort: escortSlots
-  };
-  const slotTotal = roleSlotTotal(slotCounts);
-  const canCreate = authState.isConnected && slotTotal === maxMembers && teamName.trim().length > 0;
-
-  const handleCreateTeam = async () => {
-    const result = await actions.createTeam({
-      matchId: state.matchId ?? "",
-      name: teamName.trim(),
-      maxMembers,
-      roleSlots: slotCounts,
-      walletAddress: authState.walletAddress ?? ""
-    });
-
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`TEAM CREATED // ${teamName.trim()}`);
-  };
-
-  const handleJoinTeam = async (teamId: string) => {
-    const result = await actions.joinTeam(teamId, {
-      role: joinRoleByTeam[teamId] ?? "hauler",
-      walletAddress: authState.walletAddress ?? ""
-    });
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`APPLICATION SENT // ${result.payload?.applicationId ?? "PENDING"}`);
-  };
-
-  const handleApprove = async (teamId: string, applicationId: string) => {
-    const result = await actions.approveJoinApplication(teamId, applicationId, authState.walletAddress ?? "");
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`APPLICATION APPROVED // ${applicationId}`);
-  };
-
-  const handleReject = async (teamId: string, applicationId: string) => {
-    const result = await actions.rejectJoinApplication(teamId, applicationId, {
-      walletAddress: authState.walletAddress ?? "",
-      reason: rejectReasonByApplication[applicationId]?.trim() || undefined
-    });
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`APPLICATION REJECTED // ${applicationId}`);
-  };
-
-  const handleLeave = async (teamId: string) => {
-    const result = await actions.leaveTeam(teamId, authState.walletAddress ?? "");
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`LEFT TEAM // ${teamId}`);
-  };
-
-  const handleLock = async (teamId: string) => {
-    const result = await actions.lockTeam(teamId, authState.walletAddress ?? "");
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`TEAM LOCKED // ${teamId}`);
-  };
-
-  const handlePay = async (team: TeamDetail) => {
-    const amount = selectors.paymentAmount(team.id);
-    const payment = await authActions.onExecuteEntryPayment(amount);
-    if (!payment.ok || !payment.payload?.txDigest) {
-      setMessage(`${payment.errorCode ?? "UNKNOWN"} // ${walletErrorMessage(payment.errorCode, payment.message)}`);
-      return;
-    }
-
-    const result = await actions.payTeam(team.id, {
-      walletAddress: authState.walletAddress ?? "",
-      txDigest: payment.payload.txDigest
-    });
-    if (!result.ok) {
-      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
-      return;
-    }
-
-    setMessage(`TEAM PAID // ${team.name} // ${payment.payload.txDigest}`);
-  };
+export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProps) {
+  const controller = useTeamLobbyScreenController(preferredMatchId);
+  const { state, authState, ui, helpers, actions } = controller;
 
   return (
     <FuelMissionShell
@@ -210,73 +48,28 @@ export function TeamLobbyScreen() {
           </TacticalPanel>
 
           <TacticalPanel title="Create Team" eyebrow="Captain">
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Team Name</span>
-                <input
-                  value={teamName}
-                  onChange={(event) => setTeamName(event.target.value)}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
-                />
-              </label>
-
-              <label className="space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Max Members</span>
-                <input
-                  type="number"
-                  min={3}
-                  max={8}
-                  value={maxMembers}
-                  onChange={(event) => setMaxMembers(Math.max(3, Math.min(8, Number(event.target.value) || 3)))}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
-                />
-              </label>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <label className="space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Collector</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={8}
-                  value={collectorSlots}
-                  onChange={(event) => setCollectorSlots(Math.max(0, Math.min(8, Number(event.target.value) || 0)))}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Hauler</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={8}
-                  value={haulerSlots}
-                  onChange={(event) => setHaulerSlots(Math.max(0, Math.min(8, Number(event.target.value) || 0)))}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Escort</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={8}
-                  value={escortSlots}
-                  onChange={(event) => setEscortSlots(Math.max(0, Math.min(8, Number(event.target.value) || 0)))}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
-                />
-              </label>
-            </div>
-
-            <div className="mt-3 border border-eve-red/20 bg-black/20 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75">
-              SLOT TOTAL: {slotTotal} / {maxMembers}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <TacticalButton onClick={handleCreateTeam} disabled={!canCreate || state.isMutating}>
-                Create Team
-              </TacticalButton>
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-eve-offwhite/72">
+                Open a dedicated creation modal instead of editing squad configuration directly in the lobby stream.
+              </p>
+              <div className="grid gap-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-3">
+                <p>MATCH READY: {state.matchId ? "YES" : "NO"}</p>
+                <p>WALLET READY: {authState.isConnected ? "YES" : "NO"}</p>
+                <p>OPEN SLOTS: {Math.max(0, (state.match?.maxTeams ?? 0) - state.teams.length)}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <TacticalButton
+                  onClick={actions.openCreateTeamModal}
+                  disabled={!ui.canOpenCreateModal || state.isMutating}
+                >
+                  Open Create Team
+                </TacticalButton>
+              </div>
+              {!ui.canOpenCreateModal ? (
+                <p className="border border-eve-red/20 bg-black/20 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/72">
+                  CONNECT A WALLET AND LOAD A MATCH BEFORE CREATING A SQUAD.
+                </p>
+              ) : null}
             </div>
           </TacticalPanel>
         </div>
@@ -291,15 +84,10 @@ export function TeamLobbyScreen() {
               ) : null}
 
               {state.teams.map((team) => {
-                const captain = isCaptain(team, currentWalletAddress);
-                const myPending = findMyPendingApplication(team, currentWalletAddress);
-                const canApply =
-                  authState.isConnected &&
-                  !captain &&
-                  !selectors.currentPlayerTeam(currentWalletAddress) &&
-                  !myPending &&
-                  team.status === "forming";
-                const applications = pendingApplications(team);
+                const teamUi = helpers.getTeamUiState(team);
+                const captain = teamUi.captain;
+                const myPending = teamUi.myPending;
+                const applications = teamUi.applications;
 
                 return (
                   <article key={team.id} className="border border-eve-yellow/25 bg-eve-black/70 px-4 py-4">
@@ -311,7 +99,7 @@ export function TeamLobbyScreen() {
                         </p>
                       </div>
                       <span className="font-mono text-xs uppercase tracking-[0.14em] text-eve-yellow">
-                        {teamStatusLabel(team)}
+                        {helpers.teamStatusLabel(team)}
                       </span>
                     </div>
 
@@ -324,7 +112,7 @@ export function TeamLobbyScreen() {
                     <div className="mt-3 grid gap-2 border border-eve-red/10 bg-black/20 px-3 py-3 text-xs text-eve-offwhite/78">
                       {ROLE_ORDER.map((role) => (
                         <p key={`${team.id}-${role}`}>
-                          {roleLabel(role)}: {team.members.filter((member) => member.role === role).length}/{team.roleSlots[role]}
+                          {helpers.roleLabel(role)}: {team.members.filter((member) => member.role === role).length}/{team.roleSlots[role]}
                         </p>
                       ))}
                     </div>
@@ -332,7 +120,7 @@ export function TeamLobbyScreen() {
                     <div className="mt-3 grid gap-2 border border-eve-yellow/15 bg-black/20 px-3 py-3 text-xs text-eve-offwhite/78">
                       {team.members.map((member) => (
                         <p key={member.id}>
-                          {roleLabel(member.role)} // {member.walletAddress} // {member.slotStatus}
+                          {helpers.roleLabel(member.role)} // {member.walletAddress} // {member.slotStatus}
                         </p>
                       ))}
                     </div>
@@ -340,34 +128,29 @@ export function TeamLobbyScreen() {
                     {applications.length > 0 ? (
                       <div className="mt-3 space-y-2 border border-eve-red/20 bg-eve-red/5 px-3 py-3">
                         <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-eve-red">Pending Applications</p>
-                        {applications.map((application: TeamApplication) => (
+                        {applications.map((application) => (
                           <div key={application.applicationId} className="border border-eve-red/20 bg-black/20 px-3 py-3">
                             <p className="text-xs uppercase tracking-[0.12em] text-eve-offwhite/78">
-                              {application.applicantAddress} // {roleLabel(application.role)}
+                              {application.applicantAddress} // {helpers.roleLabel(application.role)}
                             </p>
                             {captain ? (
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <input
-                                  value={rejectReasonByApplication[application.applicationId] ?? ""}
-                                  onChange={(event) =>
-                                    setRejectReasonByApplication((current) => ({
-                                      ...current,
-                                      [application.applicationId]: event.target.value
-                                    }))
-                                  }
+                                  value={helpers.getRejectReason(application.applicationId)}
+                                  onChange={(event) => actions.setRejectReason(application.applicationId, event.target.value)}
                                   placeholder="Reject reason (optional)"
                                   className="min-w-[14rem] flex-1 border border-eve-yellow/40 bg-eve-black/80 px-3 py-2 text-xs text-eve-offwhite outline-none focus:border-eve-yellow"
                                 />
                                 <TacticalButton
                                   tone="ghost"
-                                  onClick={() => void handleApprove(team.id, application.applicationId)}
+                                  onClick={() => void actions.handleApprove(team.id, application.applicationId)}
                                   disabled={state.isMutating}
                                 >
                                   Approve
                                 </TacticalButton>
                                 <TacticalButton
                                   tone="danger"
-                                  onClick={() => void handleReject(team.id, application.applicationId)}
+                                  onClick={() => void actions.handleReject(team.id, application.applicationId)}
                                   disabled={state.isMutating}
                                 >
                                   Reject
@@ -381,48 +164,43 @@ export function TeamLobbyScreen() {
 
                     {myPending ? (
                       <p className="mt-3 border border-eve-yellow/35 bg-eve-yellow/10 px-3 py-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/82">
-                        APPLICATION PENDING // {roleLabel(myPending.role)}
+                        APPLICATION PENDING // {helpers.roleLabel(myPending.role)}
                       </p>
                     ) : null}
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {canApply ? (
+                      {teamUi.canApply ? (
                         <>
                           <select
-                            value={joinRoleByTeam[team.id] ?? "hauler"}
-                            onChange={(event) =>
-                              setJoinRoleByTeam((current) => ({
-                                ...current,
-                                [team.id]: event.target.value as PlayerRole
-                              }))
-                            }
+                            value={teamUi.selectedJoinRole}
+                            onChange={(event) => actions.setJoinRole(team.id, event.target.value as PlayerRole)}
                             className="border border-eve-yellow/50 bg-eve-black/80 px-2 py-2 text-xs text-eve-offwhite outline-none focus:border-eve-yellow"
                           >
                             {ROLE_ORDER.map((role) => (
                               <option key={`${team.id}-${role}`} value={role}>
-                                {roleLabel(role)}
+                                {helpers.roleLabel(role)}
                               </option>
                             ))}
                           </select>
-                          <TacticalButton onClick={() => void handleJoinTeam(team.id)} disabled={state.isMutating}>
+                          <TacticalButton onClick={() => void actions.handleJoinTeam(team.id)} disabled={state.isMutating}>
                             Apply Join
                           </TacticalButton>
                         </>
                       ) : null}
 
-                      {selectors.currentPlayerTeam(currentWalletAddress)?.id === team.id && team.status === "forming" ? (
-                        <TacticalButton tone="ghost" onClick={() => void handleLeave(team.id)} disabled={state.isMutating}>
+                      {teamUi.isCurrentPlayerTeam && team.status === "forming" ? (
+                        <TacticalButton tone="ghost" onClick={() => void actions.handleLeave(team.id)} disabled={state.isMutating}>
                           Leave
                         </TacticalButton>
                       ) : null}
 
                       {captain ? (
                         <>
-                          <TacticalButton tone="ghost" onClick={() => void handleLock(team.id)} disabled={state.isMutating}>
+                          <TacticalButton tone="ghost" onClick={() => void actions.handleLock(team.id)} disabled={state.isMutating}>
                             Lock Team
                           </TacticalButton>
                           <TacticalButton
-                            onClick={() => void handlePay(team)}
+                            onClick={() => void actions.handlePay(team)}
                             disabled={state.isMutating || team.status !== "locked"}
                           >
                             Captain Pay
@@ -443,8 +221,107 @@ export function TeamLobbyScreen() {
           ? "LOADING TEAM LOBBY..."
           : state.isMutating
             ? "TEAM LOBBY MUTATION IN FLIGHT..."
-            : message}
+            : ui.message}
       </p>
+
+      {ui.isCreateTeamModalOpen ? (
+        <div
+          className="fixed inset-0 z-[72] flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm"
+          onClick={actions.closeCreateTeamModal}
+        >
+          <div
+            className="w-full max-w-2xl border border-eve-yellow/35 bg-[linear-gradient(180deg,rgba(26,26,26,0.98)_0%,rgba(8,8,8,0.98)_100%)] p-5 shadow-[0_0_0_1px_rgba(229,179,43,0.12),0_24px_80px_rgba(0,0,0,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.32em] text-eve-red/90">Captain</p>
+                <h2 className="mt-1 text-sm font-black uppercase tracking-[0.18em] text-eve-offwhite">Create Team</h2>
+                <p className="mt-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/70">
+                  Configure squad size and role slots, then submit a fresh team into the current match lobby.
+                </p>
+              </div>
+              <TacticalButton tone="ghost" onClick={actions.closeCreateTeamModal}>
+                Close
+              </TacticalButton>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Team Name</span>
+                <input
+                  value={ui.teamName}
+                  onChange={(event) => actions.setTeamName(event.target.value)}
+                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Max Members</span>
+                <input
+                  type="number"
+                  min={3}
+                  max={8}
+                  value={ui.maxMembers}
+                  onChange={(event) => actions.setMaxMembers(Number(event.target.value))}
+                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="space-y-1">
+                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Collector</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={ui.collectorSlots}
+                  onChange={(event) => actions.setCollectorSlots(Number(event.target.value))}
+                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Hauler</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={ui.haulerSlots}
+                  onChange={(event) => actions.setHaulerSlots(Number(event.target.value))}
+                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-eve-offwhite/80">Escort</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={8}
+                  value={ui.escortSlots}
+                  onChange={(event) => actions.setEscortSlots(Number(event.target.value))}
+                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-2 border border-eve-red/20 bg-black/20 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-3">
+              <p>SLOT TOTAL: {ui.slotTotal} / {ui.maxMembers}</p>
+              <p>MATCH: {state.matchId ?? "UNAVAILABLE"}</p>
+              <p>CAPTAIN: {authState.walletAddress ?? "NOT CONNECTED"}</p>
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <TacticalButton tone="ghost" onClick={actions.closeCreateTeamModal}>
+                Cancel
+              </TacticalButton>
+              <TacticalButton onClick={() => void actions.handleCreateTeam()} disabled={!ui.canCreate || state.isMutating}>
+                Create Team
+              </TacticalButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </FuelMissionShell>
   );
 }

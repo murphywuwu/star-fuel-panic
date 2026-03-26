@@ -9,16 +9,6 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const srcRoot = path.join(repoRoot, "src");
 
-const allowedControllerModelImports = new Set([
-  "src/controller/useAuthController.ts|@/model/authStore",
-  "src/controller/useFuelMissionController.ts|@/model/fuelMissionStore",
-  "src/controller/useMatchController.ts|@/model/fuelMissionStore",
-  "src/controller/useMatchController.ts|@/model/scoreStore",
-  "src/controller/useSettlementController.ts|@/model/fuelMissionStore",
-  "src/controller/useSettlementController.ts|@/model/authStore",
-  "src/controller/useSettlementController.ts|@/model/settlementStore"
-]);
-
 function walk(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files = [];
@@ -76,7 +66,6 @@ for (const file of walk(srcRoot)) {
 
   for (const specifier of parseImports(content)) {
     const targetLayer = layerOfImport(specifier);
-    const allowKey = `${rel}|${specifier}`;
 
     if (
       sourceLayer === "view" &&
@@ -92,9 +81,7 @@ for (const file of walk(srcRoot)) {
     }
 
     if (sourceLayer === "controller" && (targetLayer === "view" || targetLayer === "model")) {
-      if (!allowedControllerModelImports.has(allowKey)) {
-        violations.push(`${rel}: controller -> ${targetLayer} is forbidden (${specifier})`);
-      }
+      violations.push(`${rel}: controller -> ${targetLayer} is forbidden (${specifier})`);
       continue;
     }
 

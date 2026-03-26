@@ -1,5 +1,7 @@
 import { createMatchStore, type CreateMatchState } from "@/model/createMatchStore";
 import type { ControllerResult } from "@/types/common";
+import type { NetworkNode } from "@/types/node";
+import type { SearchHit, SolarSystemDetail } from "@/types/solarSystem";
 
 function normalizeWallet(walletAddress: string) {
   return walletAddress.trim().toLowerCase();
@@ -40,11 +42,91 @@ class CreateMatchService {
 
   getSnapshot = () => this.store.getState();
 
-  setField<K extends keyof Omit<CreateMatchState, "loading" | "error" | "draftId">>(
+  setField<K extends "mode" | "solarSystemId" | "targetNodeIds" | "sponsorshipFee" | "maxTeams" | "entryFee" | "durationHours">(
     key: K,
     value: CreateMatchState[K]
   ) {
     this.store.getState().setField(key, value);
+  }
+
+  async searchSystems(query: string): Promise<ControllerResult<SearchHit[]>> {
+    const snapshot = this.store.getState();
+    const trimmed = query.trim();
+
+    if (trimmed.length < 2) {
+      snapshot.setSearchHits([]);
+      return ok("SEARCH_RESET", []);
+    }
+
+    snapshot.setSearching(true);
+    snapshot.setError(null);
+
+    try {
+      const payload = await searchSolarSystems(trimmed);
+      const hits = payload.hits.filter((hit) => hit.type === "system");
+      snapshot.setSearchHits(hits);
+      return ok("SYSTEM_SEARCH_LOADED", hits);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "system search failed";
+      snapshot.setError(message);
+      snapshot.setSearchHits([]);
+      return fail(message, "NETWORK_ERROR");
+    } finally {
+      snapshot.setSearching(false);
+    }
+  }
+
+  async selectSystem(systemId: number): Promise<ControllerResult<SolarSystemDetail>> {
+    const snapshot = this.store.getState();
+    snapshot.setLoadingSystem(true);
+    snapshot.setError(null);
+
+    try {
+      const [systemPayload, nodePayload] = await Promise.all([
+        fetchSolarSystemDetail(systemId),
+        fetchSystemNodes(systemId)
+      ]);
+
+      snapshot.setField("solarSystemId", systemPayload.system.systemId);
+      snapshot.setField("targetNodeIds", []);
+      snapshot.setSelectedSystem(systemPayload.system);
+      snapshot.setSystemNodes(nodePayload.nodes);
+      snapshot.setSearchHits([]);
+      return ok("SYSTEM_SELECTED", systemPayload.system);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "system selection failed";
+      snapshot.setError(message);
+      snapshot.setSelectedSystem(null);
+      snapshot.setSystemNodes([]);
+      return fail(message, "NETWORK_ERROR");
+    } finally {
+      snapshot.setLoadingSystem(false);
+    }
+  }
+
+  toggleTargetNode(objectId: string): ControllerResult<string[]> {
+    const snapshot = this.store.getState();
+    if (snapshot.mode !== "precision") {
+      snapshot.setField("targetNodeIds", []);
+      return ok("TARGETS_CLEARED", []);
+    }
+
+    const exists = snapshot.targetNodeIds.includes(objectId);
+    if (exists) {
+      const next = snapshot.targetNodeIds.filter((candidate) => candidate !== objectId);
+      snapshot.setField("targetNodeIds", next);
+      return ok("TARGET_REMOVED", next);
+    }
+
+    if (snapshot.targetNodeIds.length >= 5) {
+      const message = "Precision mode supports up to 5 target nodes.";
+      snapshot.setError(message);
+      return fail(message, "INVALID_INPUT");
+    }
+
+    const next = [...snapshot.targetNodeIds, objectId];
+    snapshot.setField("targetNodeIds", next);
+    return ok("TARGET_ADDED", next);
   }
 
   async createDraft(walletAddress: string): Promise<ControllerResult<string>> {
@@ -140,6 +222,39 @@ async function createMatchDraftRequest(payload: {
     })
   });
   return response.json();
+}
+
+async function searchSolarSystems(query: string): Promise<{ hits: SearchHit[] }> {
+  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+    cache: "no-store"
+  });
+  const payload = await response.json();
+  if (!response.ok || !Array.isArray(payload?.hits)) {
+    throw new Error(payload?.error?.message ?? "system search failed");
+  }
+  return payload as { hits: SearchHit[] };
+}
+
+async function fetchSolarSystemDetail(systemId: number): Promise<{ system: SolarSystemDetail }> {
+  const response = await fetch(`/api/solar-systems/${systemId}`, {
+    cache: "no-store"
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload?.system) {
+    throw new Error(payload?.error?.message ?? "solar system detail failed");
+  }
+  return payload as { system: SolarSystemDetail };
+}
+
+async function fetchSystemNodes(systemId: number): Promise<{ nodes: NetworkNode[] }> {
+  const response = await fetch(`/api/network-nodes?solarSystem=${systemId}&isOnline=true&limit=50`, {
+    cache: "no-store"
+  });
+  const payload = await response.json();
+  if (!response.ok || !Array.isArray(payload?.nodes)) {
+    throw new Error(payload?.error?.message ?? "system node query failed");
+  }
+  return payload as { nodes: NetworkNode[] };
 }
 
 async function publishMatchRequest(payload: { matchId: string; walletAddress: string; idempotencyKey: string }) {

@@ -2,13 +2,9 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useWalletConnection, useWallets } from "@mysten/dapp-kit-react";
-import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
+import { useFuelMissionShellController } from "@/controller/useFuelMissionShellController";
 import type { ReactNode } from "react";
 import type { MissionPhase } from "@/types/fuelMission";
-import { formatWalletBalance } from "@/utils/walletBalance";
 import { TacticalButton } from "@/view/components/TacticalButton";
 
 const WalletConnectBridge = dynamic(
@@ -66,68 +62,14 @@ export function FuelMissionShell({
   bannerTone = "warning",
   children
 }: FuelMissionShellProps) {
-  const { state: authState, ui, selectors, actions: authActions } = useAuthController();
-  const [walletNotice, setWalletNotice] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-  const wallets = useWallets();
-  const walletConnection = useWalletConnection();
-  const router = useRouter();
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    for (const item of NAV_ITEMS) {
-      router.prefetch(item.href);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-    if (authState.isConnected) {
-      setWalletNotice("WALLET CONNECTED");
-    }
-  }, [authState.isConnected, isMounted]);
-
-  const hasEveWallet = wallets.some((wallet) => wallet.name.toLowerCase().includes("eve"));
-
-  const handleConnectWallet = async () => {
-    if (!hasEveWallet) {
-      setWalletNotice("EVE WALLET PROVIDER NOT DETECTED");
-      return;
-    }
-
-    await authActions.onConnectWallet();
-    setWalletNotice("SELECT EVE WALLET");
-  };
-
-  const handleDisconnectWallet = async () => {
-    const disconnected = await authActions.onDisconnectWallet();
-    if (!disconnected.ok) {
-      setWalletNotice(walletErrorMessage(disconnected.errorCode, disconnected.message));
-      return;
-    }
-    setWalletNotice("WALLET DISCONNECTED");
-  };
-
-  const handleRefreshBalance = async () => {
-    const refreshed = await authActions.onRefreshBalance();
-    if (!refreshed.ok) {
-      setWalletNotice(walletErrorMessage(refreshed.errorCode, refreshed.message));
-      return;
-    }
-    setWalletNotice(`BALANCE REFRESHED // ${formatWalletBalance(refreshed.payload?.luxBalance ?? authState.luxBalance)} LUX`);
-  };
+  const shell = useFuelMissionShellController();
 
   return (
     <main className="min-h-screen text-eve-offwhite">
-      {ui.connectOpenSignal > 0 ? (
+      {shell.walletBridge.shouldRender ? (
         <WalletConnectBridge
-          openSignal={ui.connectOpenSignal}
-          shouldClose={walletConnection.status === "connected" || authState.isConnected}
+          openSignal={shell.walletBridge.openSignal}
+          shouldClose={shell.walletBridge.shouldClose}
         />
       ) : null}
 
@@ -175,20 +117,20 @@ export function FuelMissionShell({
           <div className="mt-4 border border-eve-red/15 bg-[#080808]/80 p-3">
             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red">Wallet Identity</p>
             <div className="mt-3 space-y-1 text-xs text-eve-offwhite/85">
-              <p>ADDRESS: {isMounted ? selectors.walletShort : "NOT CONNECTED"}</p>
-              <p className={isMounted && authState.luxBalance < 100 ? "text-eve-red" : "text-eve-offwhite/85"}>
-                BALANCE: {isMounted ? formatWalletBalance(authState.luxBalance) : "0"} LUX
+              <p>ADDRESS: {shell.wallet.shortAddress}</p>
+              <p className={shell.wallet.isBalanceLow ? "text-eve-red" : "text-eve-offwhite/85"}>
+                BALANCE: {shell.wallet.balanceLabel}
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {!isMounted ? (
+              {!shell.viewState.isMounted ? (
                 <TacticalButton disabled>CONNECT</TacticalButton>
-              ) : !authState.isConnected ? (
+              ) : !shell.authState.isConnected ? (
                 <>
-                  <TacticalButton onClick={handleConnectWallet} disabled={authState.isConnecting}>
-                    {authState.isConnecting ? "CONNECTING" : "CONNECT"}
+                  <TacticalButton onClick={shell.actions.connectWallet} disabled={shell.authState.isConnecting}>
+                    {shell.authState.isConnecting ? "CONNECTING" : "CONNECT"}
                   </TacticalButton>
-                  {!hasEveWallet ? (
+                  {!shell.wallet.hasEveWallet ? (
                     <p className="basis-full text-[10px] uppercase tracking-[0.14em] text-eve-red">
                       EVE WALLET PROVIDER NOT DETECTED
                     </p>
@@ -196,23 +138,23 @@ export function FuelMissionShell({
                 </>
               ) : (
                 <>
-                  <TacticalButton tone="ghost" onClick={handleRefreshBalance}>
+                  <TacticalButton tone="ghost" onClick={shell.actions.refreshBalance}>
                     REFRESH
                   </TacticalButton>
-                  <TacticalButton tone="danger" onClick={handleDisconnectWallet}>
+                  <TacticalButton tone="danger" onClick={shell.actions.disconnectWallet}>
                     EXIT
                   </TacticalButton>
                 </>
               )}
             </div>
-            {walletNotice ? (
+            {shell.wallet.notice ? (
               <p className="mt-3 border border-eve-red/25 bg-[#080808] px-2 py-2 text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/90">
-                {walletNotice}
+                {shell.wallet.notice}
               </p>
             ) : null}
-            {isMounted && !authState.isConnected && wallets.length > 0 && walletConnection.status === "disconnected" ? (
+            {shell.wallet.showProviderList ? (
               <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-eve-offwhite/55">
-                PROVIDERS: {wallets.map((wallet) => wallet.name).join(" / ")}
+                PROVIDERS: {shell.wallet.providerNames}
               </p>
             ) : null}
           </div>

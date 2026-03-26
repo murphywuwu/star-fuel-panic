@@ -1,6 +1,17 @@
 import { createStore } from "zustand/vanilla";
+import type { NetworkNode } from "@/types/node";
+import type { SearchHit, SolarSystemDetail } from "@/types/solarSystem";
 
 type Mode = "free" | "precision";
+
+type EditableCreateMatchField =
+  | "mode"
+  | "solarSystemId"
+  | "targetNodeIds"
+  | "sponsorshipFee"
+  | "maxTeams"
+  | "entryFee"
+  | "durationHours";
 
 export type CreateMatchState = {
   mode: Mode;
@@ -10,16 +21,26 @@ export type CreateMatchState = {
   maxTeams: number;
   entryFee: number;
   durationHours: number;
+  searchHits: SearchHit[];
+  selectedSystem: SolarSystemDetail | null;
+  systemNodes: NetworkNode[];
+  searching: boolean;
+  loadingSystem: boolean;
   loading: boolean;
   error: string | null;
   draftId: string | null;
 };
 
 type CreateMatchActions = {
-  setField: <K extends keyof Omit<CreateMatchState, "loading" | "error" | "draftId">>(
+  setField: <K extends EditableCreateMatchField>(
     key: K,
     value: CreateMatchState[K]
   ) => void;
+  setSearchHits: (searchHits: SearchHit[]) => void;
+  setSelectedSystem: (selectedSystem: SolarSystemDetail | null) => void;
+  setSystemNodes: (systemNodes: NetworkNode[]) => void;
+  setSearching: (searching: boolean) => void;
+  setLoadingSystem: (loadingSystem: boolean) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setDraftId: (id: string | null) => void;
@@ -34,6 +55,11 @@ const initialState: CreateMatchState = {
   maxTeams: 8,
   entryFee: 50,
   durationHours: 2,
+  searchHits: [],
+  selectedSystem: null,
+  systemNodes: [],
+  searching: false,
+  loadingSystem: false,
   loading: false,
   error: null,
   draftId: null
@@ -41,7 +67,17 @@ const initialState: CreateMatchState = {
 
 export const createMatchStore = createStore<CreateMatchState & CreateMatchActions>()((set) => ({
   ...initialState,
-  setField: (key, value) => set({ [key]: value } as Partial<CreateMatchState>),
+  setField: (key, value) =>
+    set({
+      [key]: value,
+      draftId: null,
+      error: null
+    } as Partial<CreateMatchState>),
+  setSearchHits: (searchHits) => set({ searchHits }),
+  setSelectedSystem: (selectedSystem) => set({ selectedSystem }),
+  setSystemNodes: (systemNodes) => set({ systemNodes }),
+  setSearching: (searching) => set({ searching }),
+  setLoadingSystem: (loadingSystem) => set({ loadingSystem }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setDraftId: (draftId) => set({ draftId }),

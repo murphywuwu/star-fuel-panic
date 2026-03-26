@@ -1,7 +1,7 @@
 # TODO: Fuel Frog Panic Execution Backlog
 
 Version: v2.6.1
-Last Updated: 2026-03-26
+Last Updated: 2026-03-27
 Source Docs: `docs/PRD.md` v2.6, `docs/architecture.md` v6.0, `docs/SPEC.md` v6.0
 Maintainer: Todo Agent
 
@@ -50,6 +50,9 @@ Maintainer: Todo Agent
 | [x] | T-0004 | F-000 | 6.2 | QA | 持续回归 `EXIT -> refresh -> CONNECT`、余额显示、连接失败态 | 钱包链路是所有主流程的单点风险 | T-0001 | 回归用例覆盖连接成功、拒签、余额异常、刷新重连 |
 | [x] | T-0005 | F-000 | 3.1 | View / Controller | 将 EVE Vault 连接弹窗改为受控开关，并在 provider 已连接时立即关闭，不再依赖用户手动再点一次 | 当前 connect modal 在登录成功后仍残留，破坏首个主入口体验 | T-0001, T-0002 | 登录成功后 `walletConnection.status=connected` 或 `authStore.isConnected=true` 时弹窗自动消失 |
 | [x] | T-0006 | F-000 | 3.1 | Controller / Service / View | 修复钱包 LUX coin 配置在读取与支付两条链路中的一致性：优先使用链上 coin metadata decimals，避免小额非零余额被格式化成 `0`，并让入场费支付支持真实 LUX coin type | 当前 balance 口径受默认 decimals 和 UI 格式化双重影响；若切到真实 LUX coin type，旧支付实现又只支持 `SUI` | T-0002, T-0004 | 钱包余额在 `decimals=0` 时保持 `500000`，在 `decimals=9` 且原始值为 `500000` 时显示非零值而非 `0`；入场费支付不再因非 `SUI` coin type 被直接拒绝 |
+| [x] | T-0007 | F-000 | 3.1 | Config / Service | 将 `NEXT_PUBLIC_LUX_COIN_TYPE` 从 `coin_registry::Currency<...>` 更正为实际 coin type `0xf044...::EVE::EVE`，使 `StateService/GetBalance` 与支付构币都命中真实 LUX 对象 | `GetBalance` 需要的是 coin 的实际 Move type；传注册表包装类型会命中 `Coin<Currency<...>>`，返回 0 | T-0006 | 使用 `GetBalance` 查询真实钱包时，不再因错误的 `coinType` 字符串稳定返回 `0` |
+| [x] | T-0008 | F-000 | 3.1 | View / Controller | 修复 `disconnect -> reconnect` 第二次连接卡在 `Awaiting connection...`：每次重新打开钱包弹窗都创建全新 modal 实例，并在发起新连接前先清理潜在残留 session | 当前 EVE Vault 在断开后第二次连接会卡死在等待态，说明 modal 或 provider 残留了上一轮连接状态 | T-0002, T-0005 | 执行 `CONNECT -> EXIT -> CONNECT` 时，第二次连接不会卡在 `Awaiting connection...` |
+| [x] | T-0009 | F-000 | 3.1 | Controller / Service | 为 LUX 余额读取增加 `listBalances` 回退和可观测错误输出，避免 `GetBalance` 异常或零值误判时前端继续显示 `0 LUX` | 当前前端在单币余额查询异常时会静默写入 `0`，用户只能看到错误结果，看不到失败原因 | T-0006, T-0007 | 当 `getBalance` 返回 0 或抛错时，前端会尝试从 `listBalances` 精确匹配目标 coin type；查询失败会输出明确错误，不再静默吞掉 |
 
 ### F-001 Match Creation & Publish
 
@@ -85,6 +88,7 @@ Maintainer: Todo Agent
 | [x] | T-0303 | F-003 | 3.3, 4.3 | Model / Controller / Type | 按 architecture v6.0 收口 `teamLobbyStore` 与 `useTeamLobbyController`，避免继续复用过宽的 `lobbyStore` | 当前前端域边界仍有旧状态混用风险 | T-0204, T-0301 | `/planning` 已切回 Team Lobby，`teamLobbyStore -> teamLobbyService -> useTeamLobbyController` 成为独立 team 域链路，且新 controller 不再直接读 model |
 | [x] | T-0304 | F-003 | 2.1, 2.4, 4.3 | Runtime / API | 对齐错误码和校验：`TEAM_FULL / TEAM_LOCKED / ROLE_SLOT_FULL / PAYMENT_MISMATCH` 等 | 与 SPEC v6.0 保持一致，便于前端直出用户提示 | T-0300 | 典型失败场景返回规范错误码与 retryable 语义 |
 | [x] | T-0306 | F-003 | 2.2, 2.4, 3.3, 4.3 | Runtime / API / View / Controller | 将入队流程改为“申请制”：`POST /join` 返回 `pending`，队长通过 `approve/reject` 审批，前端展示待审批与审批动作 | PRD 已明确加入战队需队长同意/拒绝，当前链路仍是直加入 | T-0303, T-0304 | `teamRuntime`、审批端点与 `TeamLobbyScreen` 已接通 pending / approve / reject / lock / pay 全链路 |
+| [x] | T-0307 | F-003 | 3.3 | View | 将 `/planning` 页的创建战队表单从页面直出改为按钮触发 modal，保留现有 `createTeam` controller/service 链路不变 | 当前 Team Lobby 首屏被大表单占据，弱化了战队列表和审批主视图 | T-0303, T-0306 | `/planning` 首屏只显示创建入口按钮；点击后弹出创建战队 modal，提交成功后自动关闭并刷新消息 |
 | [x] | T-0305 | F-003 | 3.3, 4.3 | QA | 在 `draft -> publish -> apply -> approve/reject -> lock -> pay` 新链路下重跑 Team Lobby 回归 | 入队申请审批上线后，旧回归结论不再充分 | T-0104, T-0303, T-0306 | `node --import ./scripts/register-test-loader.mjs --experimental-strip-types --test src/app/api/__tests__/f007-match-flow.test.ts` 通过，覆盖 apply / approve / reject / lock / pay 主链路 |
 
 ### F-004 Match Runtime / Scoring / Overlay
@@ -139,6 +143,13 @@ Maintainer: Todo Agent
 | [x] | T-0710 | F-007 | Architecture 3, 4.4 | View / Controller / Runtime | 优化首页首屏性能，避免 `/lobby` 初始化时同步拉取重型位置数据，并减少 discovery 接口对 8MB 投影文件的重复解析 | 当前页面首屏会预取位置选择器数据，且 runtime 每次请求都同步读取大投影文件，导致页面“出不来”且明显卡顿 | T-0700 | 首屏不再在 picker 关闭时请求 `constellations/recommendations`，`pnpm build` 通过，discovery 接口首字节时间明显下降 |
 | [x] | T-0711 | F-007 | 4.1, 6.1 | View / Controller / Runtime / API | 继续优化位置选择器性能，将 `constellations` 浏览链改为 `region -> constellations -> systems` 分段加载，避免初始返回 500KB 星座列表 | 当前 picker 首次打开仍会下载 2214 条星座摘要，数据量和渲染量都偏大 | T-0710 | picker 初始只请求 region 摘要，展开 region 后再加载 constellations，`/api/constellations` 首包体积显著下降 |
 | [x] | T-0712 | F-007 | 3.2, 4.1 | View / Runtime | 将应用页面中的中文文案统一切换为英文，确保大厅、列表标签、按钮和动态比赛文案都使用英文 | 当前 `/lobby` 及其 discovery runtime 仍混有中文显示文本，不符合项目 UI 语言要求 | T-0711 | 页面中不再出现中文可见文案，`pnpm build` 通过 |
+| [x] | T-0713 | F-007 | Architecture 4.4 | Controller / View | 将 `FuelMissionShell` 中的钱包编排、路由预取和交互状态从 View 收回到 Controller，恢复 `View -> Controller -> Service -> Model` | 当前 shell 组件直接使用钱包/路由 hook 和本地编排状态，超出 view 纯渲染职责 | T-0700 | `FuelMissionShell` 只消费 shell controller 输出，`pnpm lint:imports` 与 `pnpm build` 通过 |
+| [x] | T-0714 | F-007 | Architecture 4.1, 4.4 | View / Page | 恢复从 `/lobby` 进入“创建加油比赛”主链路，补齐 CTA 和 `/planning` 下的创建比赛视图分发 | 当前 `CreateMatchScreen` 已存在但未挂到任何路由，也没有从 lobby 暴露入口，导致创建比赛链路断开 | T-0700 | `/lobby` 有 `CREATE MATCH` 按钮，点击后进入 `/planning` 的创建比赛视图，`pnpm build` 通过 |
+| [x] | T-0715 | F-007 | 3.1, 3.2, Architecture 4.4 | Controller / View | 将创建比赛改为 lobby 内 modal，并重做创建表单的主题、字段语义与精准模式节点选择体验 | 当前 CTA 虽已恢复，但仍是跳页链路，且旧表单样式和字段语义都不符合 Lobby 主界面质量标准 | T-0714 | `CREATE MATCH` 在 lobby 内打开 modal，按钮尺寸与 `CHANGE LOCATION` 一致，表单字段具备玩家可理解文案和分区说明，精准模式可直接点选目标节点 |
+| [x] | T-0717 | F-007 | 3.1, 3.2 | View | 继续优化创建比赛弹窗的信息架构和节点展示：移除编号标题、将 Match Readout 合并进 Publish Summary，并把系统节点改成闪烁点阵图交互 | 当前弹窗虽然已可用，但分区命名仍偏表单化，节点展示仍是列表，不符合更直观的战术操作预期 | T-0715 | 创建比赛弹窗无编号标题，Publish Summary 包含玩家可理解的读数摘要，系统节点以闪烁点阵图展示并支持 Precision 模式点选 |
+| [x] | T-0719 | F-007 | 3.1, 3.2 | View / Controller | 优化创建比赛弹窗的 Economics 与 Publish Summary：`maxTeams` / `durationHours` 改为可直接输入数字，缩短说明文案，并强化 `Pool Projection` 的视觉层级 | 当前 Economics 仍混用下拉选择与过长说明，`Pool Projection` 视觉重点不足，不利于用户快速决策 | T-0715, T-0717 | Match Economics 全部支持直接数字输入，说明文案更短；Publish Summary 的 Pool Projection 具备明显的数值主次和更醒目的奖池展示 |
+| [x] | T-0718 | F-007 | Architecture 2, 4.4 | Governance / Refactor | 移除 `check-layer-imports` 中的 controller->model 白名单，清理现存越层 controller import，并新增 `pnpm verify:arch` 作为统一架构门禁 | 仅靠文档和手动提醒无法稳定执行架构规范，必须把规则变成无例外硬约束 | T-0700, T-0713 | `src/controller` 不再 import `@/model/*`；`pnpm lint:imports` 和 `pnpm verify:arch` 可作为稳定门禁执行 |
+| [x] | T-0716 | F-007 | Architecture 4.4 | Controller / View | 回扫活跃 `src/view` screen/component，将页面编排状态、数据拉取、副作用与 URL/Modal/Form 逻辑迁入 controller，收敛 View 为纯渲染层 | 当前 `LobbyDiscoveryScreen`、`CreateMatchScreen`、`TeamLobbyScreen`、`NodeMap3D`、`TargetNodePanel`、`SettlementBillPanel`、`WalletConnectBridge` 等仍保留 view 侧逻辑，和新的分层要求不一致 | T-0713, T-0715 | 活跃 view 不再直接持有业务编排副作用或数据获取逻辑；`pnpm lint:imports`、`pnpm typecheck`、`pnpm build` 通过 |
 
 ## 3. Ordered Execution Plan (Critical Path)
 
@@ -167,8 +178,10 @@ Maintainer: Todo Agent
 
 - 每个标记为 `[x]` 的任务必须满足：
   - 已标注 `Feature ID / SPEC Section / Layer / Acceptance Signal`。
+  - 如为前端任务，已声明并遵守 `Layer Scope`。
   - 不再依赖未关闭的前置阻塞项。
   - 如涉及公开接口，`docs/SPEC.md` 与实现口径一致。
+  - 如为前端任务，至少通过 `node ./scripts/check-layer-imports.mjs`；推荐通过 `pnpm verify:arch`。
 - 每个标记为 `[ ]` 的任务在完成时必须：
   - 同步更新本文件状态。
   - 如变更业务逻辑或接口，联动更新 `docs/PRD.md` 或 `docs/SPEC.md`。
@@ -194,4 +207,15 @@ Maintainer: Todo Agent
 - 2026-03-27: 完成 `T-0710`，将 `/lobby` 的位置选择器 bootstrap 改为按需加载，稳定 `useLobbyController` / `useTeamLobbyController` 的 action 引用并为 lobby/team load 加入去重，同时为 `runtimeProjectionStore` 和 `solarSystemRuntime` 增加缓存优先读取策略；本地验证显示 `/lobby`、`/api/matches`、`/api/network-nodes`、`/api/solar-systems/recommendations` 首字节时间均明显下降。
 - 2026-03-27: 完成 `T-0711`，将位置选择器改为 region-first 浏览：`/api/constellations?view=regions` 先返回 region 摘要，展开 region 后再请求对应 constellations，同时 search hit 补充 `regionId` 以直接展开层级；本地验证显示 picker 初始 constellations 首包从约 510KB 降到约 35KB。
 - 2026-03-27: 完成 `T-0712`，将 `/lobby` 页面及 `matchDiscoveryRuntime` 的中文可见文案统一切换为英文，并回扫当前页面路由与 discovery 输出，确认不再存在中文显示文本。
+- 2026-03-27: 完成 `T-0713`，新增 `useFuelMissionShellController` 承接 `FuelMissionShell` 的钱包状态编排、路由预取和交互 notice；`FuelMissionShell` 已收敛为纯渲染组件，只消费 controller 输出，`pnpm lint:imports` 与 `pnpm build` 均通过。
+- 2026-03-27: 完成 `T-0714`，补齐 `/lobby -> /planning?view=create-match` 的创建比赛入口，恢复 `CreateMatchScreen` 的路由可达性，并将 `/planning` 改为按 query 分发“创建比赛 / Team Lobby”视图。
+- 2026-03-27: 完成 `T-0715`，将 `CREATE MATCH` 改为 lobby 内 modal，按钮尺寸与 `CHANGE LOCATION` 对齐；创建表单已重做为战术面板风格，并补齐模式说明、系统搜索/选择、经济参数释义与精准模式节点点选交互，同时同步更新 `docs/architecture.md` 与 `docs/SPEC.md` 的入口/事件契约。
+- 2026-03-27: 完成 `T-0717`，将创建比赛弹窗的编号标题移除，把原 `Match Readout` 信息收进 `Publish Summary`，并把系统节点展示改成可闪烁的战术点阵图；Precision 模式下已支持直接点选节点，不再依赖列表式目标选择。
+- 2026-03-27: 完成 `T-0719`，将创建比赛弹窗中的 `Team Cap` 与 `Match Duration` 改为可直接输入数字，压缩 `Match Economics` 说明文案，并重绘 `Pool Projection` 为更亮眼的奖池读数卡片。
+- 2026-03-27: 完成 `T-0718`，清除 `scripts/check-layer-imports.mjs` 的 controller->model 白名单，收回现存 controller 越层 import，并新增 `pnpm verify:arch` 作为统一架构门禁；同时更新 `AGENTS.md` 与 TODO 模板，要求前端任务声明 `Layer Scope`。
+- 2026-03-27: 完成 `T-0716`，新增 screen/component orchestration controllers，把 `LobbyDiscoveryScreen`、`CreateMatchScreen`、`TeamLobbyScreen`、`FuelFrogMatchScreen`、`FuelFrogSettlementScreen`、`FuelFrogLobbyScreen`、`HeatmapScreen`、`NodeMap3D`、`WalletConnectBridge`、`TargetNodePanel`、`SettlementBillPanel` 的页面编排、副作用和数据拉取从 View 收回 Controller；本地验证 `node ./scripts/check-layer-imports.mjs`、`pnpm typecheck`、`pnpm build` 全部通过。
+- 2026-03-27: 完成 `T-0307`，将 `TeamLobbyScreen` 的创建战队表单改为按钮触发 modal，`/planning` 首屏回到 Team Board / Match Snapshot 主视图，现有 `useTeamLobbyController.createTeam` 链路保持不变。
 - 2026-03-27: 完成 `T-0005 / T-0006`，将钱包连接弹窗改为受控 `open` 模式并在 provider 进入 `connected` 时立即关闭；同时把余额换算抽到共享工具，优先读取链上 coin metadata decimals，并将 `NEXT_PUBLIC_LUX_COIN_TYPE` 切到真实 LUX coin type 后的读取与支付链路一并打通。
+- 2026-03-27: 完成 `T-0007`，确认 `StateService/GetBalance` 需要的 `coinType` 是实际 coin 的 Move type，而不是 `coin_registry::Currency<...>` 包装类型；已将前端配置和回归测试统一更正为 `0xf044...::EVE::EVE`。
+- 2026-03-27: 完成 `T-0008`，为每次连接尝试重建新的 `ConnectModal` 实例，并在发起连接前预清理 dApp Kit 的残留连接状态，避免 `EXIT` 后第二次连接卡在 `Awaiting connection...`。
+- 2026-03-27: 完成 `T-0009`，将钱包余额读取改为 `getBalance` 优先、`listBalances` 精确回退的双路径策略，并在查询失败时输出明确日志，避免用户只看到 `0 LUX` 而看不到真实错误。
