@@ -1,5 +1,11 @@
 import { getMatchDetail, type MatchDetail } from "./matchRuntime.ts";
 import {
+  getPersistedSettlement,
+  savePersistedSettlement,
+  type PersistedSettlement
+} from "./runtimeProjectionStore.ts";
+import type { MatchStatus, MatchStreamEvent } from "../types/match.ts";
+import {
   getTeamPayoutRatios,
   type MemberPayout,
   type MvpInfo,
@@ -25,6 +31,10 @@ function toMoneyString(value: number) {
 
 function calculatePlatformFee(grossPool: number) {
   return Math.floor(grossPool * PLATFORM_FEE_RATE);
+}
+
+function getSettlementUpdatedAt(detail: MatchDetail) {
+  return detail.match.endedAt ?? detail.match.startedAt ?? detail.match.publishedAt ?? detail.match.createdAt;
 }
 
 function getPaidParticipantCount(detail: MatchDetail) {
@@ -55,8 +65,25 @@ function resolveFundingBreakdown(detail: MatchDetail) {
 }
 
 function getPayoutTraceDigest(detail: MatchDetail) {
-  // Mock runtime still reuses the first paid team tx as payout trace until devnet settlement tx is wired in.
+  const persisted = getPersistedSettlement(detail.match.id);
+  if (persisted?.payoutTxDigest) {
+    return persisted.payoutTxDigest;
+  }
+
+  // Legacy fallback while settlement fact is not fully wired for every path.
   return detail.teams.find((team) => Boolean(team.payTxDigest))?.payTxDigest ?? null;
+}
+
+function toPersistedSettlementState(
+  status: MatchDetail["match"]["status"]
+): PersistedSettlement["status"] | null {
+  if (status === "settling") {
+    return "running";
+  }
+  if (status === "settled") {
+    return "succeeded";
+  }
+  return null;
 }
 
 function allocateByRatio(total: number, ratios: number[], length: number): number[] {
@@ -199,9 +226,121 @@ export function buildSettlementBill(detail: MatchDetail): SettlementBill {
   };
 }
 
+function buildPersistedSettlement(detail: MatchDetail): PersistedSettlement | null {
+  const status = toPersistedSettlementState(detail.match.status);
+  if (!status) {
+    return null;
+  }
+
+  const payoutTxDigest = status === "succeeded" ? getPayoutTraceDigest(detail) : null;
+  const bill = {
+    ...buildSettlementBill(detail),
+    payoutTxDigest
+  };
+
+  return {
+    matchId: detail.match.id,
+    bill,
+    payoutTxDigest,
+    updatedAt: getSettlementUpdatedAt(detail),
+    status
+  };
+}
+
+function settlementChanged(current: PersistedSettlement | null, next: PersistedSettlement) {
+  if (!current) {
+    return true;
+  }
+
+  return (
+    current.status !== next.status ||
+    current.updatedAt !== next.updatedAt ||
+    current.payoutTxDigest !== next.payoutTxDigest ||
+    JSON.stringify(current.bill) !== JSON.stringify(next.bill)
+  );
+}
+
+function materializeSettlementFactFromDetail(detail: MatchDetail): PersistedSettlement | null {
+  const next = buildPersistedSettlement(detail);
+  if (!next) {
+    return getPersistedSettlement(detail.match.id);
+  }
+
+  const current = getPersistedSettlement(detail.match.id);
+  if (settlementChanged(current, next)) {
+    savePersistedSettlement(next);
+  }
+
+  return next;
+}
+
+export function syncSettlementProjectionForTransition(
+  detail: MatchDetail,
+  previousStatus: MatchStatus | null
+): {
+  settlement: PersistedSettlement | null;
+  streamEvents: MatchStreamEvent[];
+} {
+  const settlement = materializeSettlementFactFromDetail(detail);
+  if (previousStatus === detail.match.status || !settlement) {
+    return {
+      settlement,
+      streamEvents: []
+    };
+  }
+
+  if (detail.match.status === "settling" && settlement.status === "running") {
+    return {
+      settlement,
+      streamEvents: [
+        {
+          type: "settlement_start",
+          matchId: detail.match.id,
+          progress: 75
+        }
+      ]
+    };
+  }
+
+  if (detail.match.status === "settled" && settlement.status === "succeeded") {
+    return {
+      settlement,
+      streamEvents: [
+        {
+          type: "settlement_complete",
+          matchId: detail.match.id,
+          result: settlement.bill
+        }
+      ]
+    };
+  }
+
+  return {
+    settlement,
+    streamEvents: []
+  };
+}
+
+export function materializeSettlementFact(matchId: string): PersistedSettlement | null {
+  const detail = getMatchDetail(matchId);
+  if (!detail) {
+    return null;
+  }
+
+  return materializeSettlementFactFromDetail(detail);
+}
+
 export function resolveSettlementBill(detail: MatchDetail | null): SettlementResolution {
   if (!detail) {
     return { ok: false, reason: "not_found" };
+  }
+
+  const persisted = materializeSettlementFactFromDetail(detail) ?? getPersistedSettlement(detail.match.id);
+  if (persisted?.status === "succeeded") {
+    return {
+      ok: true,
+      bill: persisted.bill
+    };
   }
 
   if (detail.match.status !== "settled") {
@@ -219,12 +358,23 @@ export function getSettlementBill(matchId: string): SettlementResolution {
 }
 
 export function getSettlementStatus(matchId: string): SettlementStatus | null {
+  const persisted = materializeSettlementFact(matchId) ?? getPersistedSettlement(matchId);
+  if (persisted) {
+    return {
+      matchId,
+      status: persisted.status,
+      progress: persisted.status === "succeeded" ? 100 : persisted.status === "running" ? 75 : 0,
+      payoutTxDigest: persisted.payoutTxDigest,
+      updatedAt: persisted.updatedAt
+    };
+  }
+
   const detail = getMatchDetail(matchId);
   if (!detail) {
     return null;
   }
 
-  const updatedAt = detail.match.endedAt ?? detail.match.startedAt ?? detail.match.publishedAt ?? detail.match.createdAt;
+  const updatedAt = getSettlementUpdatedAt(detail);
   if (detail.match.status === "settled") {
     return {
       matchId,

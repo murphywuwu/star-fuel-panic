@@ -1,7 +1,7 @@
 # 🐸 Fuel Frog Panic — Product Requirements Document
 
-**版本**：v2.6
-**最后更新**：2026-03-26  
+**版本**：v2.6.1
+**最后更新**：2026-03-28  
 **产品性质**：EVE Frontier 链上竞技任务平台（Hackathon Demo）  
 **核心链**：Sui  
 **核心合约模块**：`world::fuel`（`FuelEvent(DEPOSITED)`）
@@ -196,7 +196,7 @@ flowchart TD
 | 分层 | 字段 | 在游戏中的意义 |
 |---|---|---|
 | **链上原生字段** | `objectId`, `typeId`, `ownerCapId`, `fuelQuantity`, `fuelMaxCapacity`, `fuelTypeId`, `fuelBurnRate`, `isBurning`, `maxEnergyProduction`, `currentEnergyProduction`, `isOnline`, `connectedAssemblyIds` | 描述这个站点在链上的真实运行状态：归属、油量、燃烧状态、供能能力、在线状态和挂载设施关系。 |
-| **链上事件映射字段** | `coordX`, `coordY`, `coordZ`, `solarSystem` | 来自 `LocationRevealedEvent` 的公开坐标，决定节点在星图中的位置与所属星系。 |
+| **链上事件映射字段** | `coordX`, `coordY`, `coordZ`, `solarSystem` | 优先来自 `LocationRevealedEvent` 的公开坐标；若 `NetworkNode` 自身未公开位置，平台可回退使用其 `connectedAssemblyIds` 对应设施的公开位置，决定节点在星图中的位置与所属星系。 |
 | **平台计算字段** | `fillRatio`, `urgency` | `fillRatio = fuelQuantity / fuelMaxCapacity`；`urgency` 由填充率阈值映射，用于比赛筛选与权重展示。 |
 | **平台业务字段** | `activeMatchId` | 节点当前是否被平台比赛系统占用；用于大厅联动和状态展示，不属于链上原生字段。 |
 | **索引同步字段** | `lastUpdatedOnChain`, `updatedAt` | 标记索引结果的时效性，帮助前端与运营判断数据新鲜度。 |
@@ -446,7 +446,7 @@ walletService.disconnectWallet(): Promise<void>
 | 参数 | 说明 | 可选值 |
 |---|---|---|
 | `solar_system_id` | **必须指定**目标星系 | 任意有效星系 ID |
-| `sponsorship_fee` | **必须支付**赞助费 | ≥ 500 LUX（无上限） |
+| `sponsorship_fee` | **必须支付**赞助费 | ≥ 50 LUX（无上限） |
 | `max_teams` | 参赛队伍数上限 | 2 ~ 16 支 |
 | `entry_fee` | 入场费 / 人 | 0 ~ 1000 LUX |
 | `duration_hours` | 比赛时长 | 1 ~ 72 小时 |
@@ -472,7 +472,7 @@ walletService.disconnectWallet(): Promise<void>
 |---|---|---|
 | `solar_system_id` | **必须指定**目标星系 | 任意有效星系 ID |
 | `target_nodes` | **必须指定**目标节点 | 1 ~ 5 个节点 ID |
-| `sponsorship_fee` | **必须支付**赞助费 | ≥ 500 LUX（无上限） |
+| `sponsorship_fee` | **必须支付**赞助费 | ≥ 50 LUX（无上限） |
 | `max_teams` | 参赛队伍数上限 | 2 ~ 16 支 |
 | `entry_fee` | 入场费 / 人 | 0 ~ 1000 LUX |
 | `duration_hours` | 比赛时长 | 1 ~ 72 小时 |
@@ -526,6 +526,21 @@ walletService.disconnectWallet(): Promise<void>
 
 **核心原则**：搜索优先 + 智能推荐 + 星座浏览辅助
 
+**搜索结果展示策略**：
+
+- 保留所有匹配到的星系，不因 `no_nodes / offline_only / not_public` 而直接隐藏。
+- 搜索框聚焦且为空时，不展示空白；应优先展示一组 `Ready Systems` 候选，默认来自有可用 `NetworkNode` 的 `selectable` 星系。
+- 用户输入关键词后，结果按两组展示：
+  - `Ready Systems`：可直接选择
+  - `Unavailable Systems`：保留展示但禁用选择
+- 用户输入关键词后，先按文本命中，再按可选性与节点情况排序。
+- 文本命中同时支持：
+  - 当前 world API 返回的系统名
+  - canonical / legacy 系统名（如 `Jita`）
+  - `systemId`
+- 不可选星系仍需保留，但必须下沉展示并标注原因，避免用户误以为搜索结果缺失。
+- `Unavailable Systems` 必须明确标注原因：`No Nodes` / `Offline Only` / `Not Public`。
+
 **交互入口优先级**：
 
 | 优先级 | 入口 | 说明 |
@@ -550,6 +565,16 @@ walletService.disconnectWallet(): Promise<void>
 | 状态 | 有紧急节点 / 有警告节点 / 仅安全节点 / 显示不可选 |
 | 首字母 | A-E / F-J / K-O / P-T / U-Z |
 
+**系统搜索排序策略**：
+
+| 排序优先级 | 逻辑 |
+|---|---|
+| 1 | `selectable` 星系优先（至少有 1 个 `isOnline && isPublic` 节点） |
+| 2 | `nodeCount` 更多的星系优先 |
+| 3 | 有 `critical / warning` 节点的星系优先 |
+| 4 | `offline_only / not_public / no_nodes` 下沉显示 |
+| 5 | 字母排序兜底 |
+
 ---
 
 ##### 赞助费机制（创建比赛必须）
@@ -558,7 +583,7 @@ walletService.disconnectWallet(): Promise<void>
 
 | 参数 | 说明 |
 |---|---|
-| **最低赞助费** | **500 LUX**（确保比赛有足够奖池吸引力） |
+| **最低赞助费** | **50 LUX**（测试阶段降低门槛，方便快速验证流程） |
 | **最高赞助费** | **无上限**（大额赞助吸引更多参赛者） |
 | **用途** | 赞助费 100% 进入奖池，不收取手续费 |
 | **退款规则** | 比赛未满足开赛条件且取消时，可全额退还 |
@@ -572,8 +597,8 @@ walletService.disconnectWallet(): Promise<void>
 
 | 场景 | 赞助费 | 入场费 | 奖池构成 | 适用情况 |
 |---|---|---|---|---|
-| 基础竞技 | 500 LUX | 0 | 500 LUX（纯赞助） | 入门级比赛 |
-| 标准付费赛 | 500 LUX | 100 LUX/人 | 赞助费 + 入场费总和 | 常规竞技 |
+| 基础竞技 | 50 LUX | 0 | 50 LUX（纯赞助） | 入门级比赛 / 测试 |
+| 标准付费赛 | 50 LUX | 100 LUX/人 | 赞助费 + 入场费总和 | 常规竞技 |
 | 高奖金邀请赛 | 1000+ LUX | 200 LUX/人 | 高额赞助 + 入场费 | 高水平对决 |
 | 站主紧急救援 | 2000+ LUX | 0 | 纯赞助 | 站点危急、急需救援 |
 
@@ -584,7 +609,7 @@ walletService.disconnectWallet(): Promise<void>
 | 入场费设置 | 奖池来源 | 说明 |
 |---|---|---|
 | 入场费 > 0 | 赞助费 + 所有队伍入场费总和 | 赞助费保底 + 参赛者贡献 |
-| 入场费 = 0 | 纯赞助费（≥500 LUX） | 免费参赛模式，赞助费预先锁定到合约 |
+| 入场费 = 0 | 纯赞助费（≥50 LUX） | 免费参赛模式，赞助费预先锁定到合约 |
 
 ---
 
@@ -649,6 +674,11 @@ GET /api/search?
 GET /api/solar-systems/recommendations?
   limit=10
 
+// Create Match 搜索框 focus 空态候选
+// 默认展示 Ready Systems，不要求用户先输入关键词
+GET /api/solar-systems/recommendations?
+  limit=8
+
 // ========== 星系与节点 ==========
 
 // 获取星系详情（含节点列表）
@@ -665,7 +695,7 @@ Body: {
   mode: "free" | "precision",
   solarSystemId: string,
   targetNodes?: string[],      // 精准模式必填
-  sponsorshipFee: number,      // 必填，≥500 LUX
+  sponsorshipFee: number,      // 必填，≥50 LUX
   maxTeams: number,
   entryFee: number,
   durationHours: number
@@ -674,6 +704,48 @@ Body: {
 // 发布比赛（创建者确认）
 POST /api/matches/{matchId}/publish
 ```
+
+测试阶段说明：
+
+- 创建比赛时要求主办方先完成一笔真实 sponsorship payment。
+- 当前阶段允许使用 `EVE test token` 代替正式 `LUX` 完成这笔支付。
+- 这笔 sponsorship payment 通过 `fuel_frog_panic` escrow 合约锁入链上对象，而不是转给普通地址。
+- 战队报名费 `pay-team` 也必须进入同一个 `MatchEscrow` 链上托管对象，不允许再转给普通地址收款钱包。
+- 只有当链上交易 digest 被后端验证通过，且交易中包含 `MatchPublished` 事件后，比赛才允许从 `draft` 进入 `lobby`。
+
+**Sui Testnet 上 `NetworkNode` 数据获取原理**：
+
+平台并不是“按星系直接从链上查一张节点表”，而是通过 **事件发现 + 对象回填 + 本地投影** 三段式流程拿到 `NetworkNode` 数据：
+
+1. **发现节点对象**
+   - 服务端先对 `EVE Frontier Package` 查询 `MoveEventType(world::network_node::NetworkNodeCreatedEvent)`。
+   - 这个事件提供 `network_node_id`，用于发现当前链上有哪些 `NetworkNode` 对象需要追踪。
+
+2. **获取公开位置**
+   - 服务端再查询 `MoveEventType(world::location::LocationRevealedEvent)`。
+   - 该事件提供 `assembly_id + solarsystem + x + y + z`，用于建立“对象 ID -> 星系 / 坐标”的映射。
+   - 若 `NetworkNode` 自身没有公开位置，平台可回退使用其 `connectedAssemblyIds` 对应设施的公开位置，回填 `solarSystem` 与坐标。
+
+3. **批量回填对象状态**
+   - 拿到 `network_node_id` 后，服务端使用 Sui RPC `multiGetObjects` 批量读取对象内容。
+   - 读取字段包括：
+     - 燃料数据：`fuel.quantity`、`fuel.max_capacity`、`is_burning`
+     - 状态数据：`status`、`type_id`
+     - 元数据：`name`、`description`、`url`
+     - 连接关系：`connected_assembly_ids`
+
+4. **生成平台读模型**
+   - 服务端将“事件里的位置数据”与“对象里的实时状态数据”合并，生成本地 `node-index` 快照与 `network_nodes` 读模型。
+   - 星系搜索还会额外读取 `data/solar-systems.json` 中的 canonical / legacy 系统名，作为别名索引，解决 live world API 名称编码化后旧名无法命中的问题。
+   - 对外再通过：
+     - `GET /api/search` 提供星系搜索结果
+     - `GET /api/solar-systems/{systemId}` 提供星系详情
+     - `GET /api/network-nodes?solarSystem={systemId}` 提供按星系过滤后的节点列表
+
+5. **Create Match 为什么会出现 `0 nodes`**
+   - 创建比赛时，前端实际读取的是按 `solarSystem` 过滤后的 `network_nodes` 读模型。
+   - 因此，只要某个 `NetworkNode` 还没有被成功映射到具体 `solarSystem`，它就不会出现在该星系的 create-match 节点列表里。
+   - 所以 `0 nodes` 既可能意味着该星系本来就没有公开节点，也可能意味着链上公开位置事件覆盖不足。
 
 ---
 
@@ -685,15 +757,13 @@ POST /api/matches/{matchId}/publish
         ↓
 ② 选择「自由模式」
         ↓
-③ 选择目标星系（搜索或浏览）
+③ 设置赞助费、队伍数、入场费、比赛时长
         ↓
-④ 设置赞助费（≥500 LUX，无上限）
+④ 选择目标星系（focus 时先显示 `Ready Systems`；搜索结果中不可选星系下沉并显示原因）
         ↓
-⑤ 设置参数：队伍数、入场费、比赛时长
+⑤ 确认创建 → 钱包签名（支付赞助费并锁定）
         ↓
-⑥ 确认创建 → 钱包签名（支付赞助费并锁定）
-        ↓
-⑦ 比赛发布成功 → 等待其他玩家加入
+⑥ 比赛发布成功 → 等待其他玩家加入
 ```
 
 **精准模式创建流程**：
@@ -702,17 +772,15 @@ POST /api/matches/{matchId}/publish
         ↓
 ② 选择「精准模式」
         ↓
-③ 选择目标星系 → 加载星系节点地图
+③ 设置赞助费、队伍数、入场费、比赛时长
         ↓
-④ 在地图上点选目标节点（1-5 个）
+④ 选择目标星系 → 加载星系节点地图
         ↓
-⑤ 设置赞助费（≥500 LUX，无上限）
+⑤ 在地图上点选目标节点（1-5 个）
         ↓
-⑥ 设置参数：队伍数、入场费、比赛时长
+⑥ 确认创建 → 钱包签名（支付赞助费并锁定）
         ↓
-⑦ 确认创建 → 钱包签名（支付赞助费并锁定）
-        ↓
-⑧ 比赛发布成功 → 等待其他玩家加入
+⑦ 比赛发布成功 → 等待其他玩家加入
 ```
 
 ---
@@ -802,16 +870,16 @@ POST /api/matches/{matchId}/publish
 │  ───────────────────────────────────────────────────────────────│
 │  比赛参数:                                                      │
 │                                                                 │
-│  赞助费:        [500 LUX    ]  (最低 500 LUX)                    │
+│  赞助费:        [50 LUX     ]  (最低 50 LUX)                     │
 │  参赛队伍上限:  [4 支 ▼]                                        │
 │  入场费:        [100 LUX ▼]    □ 免费参赛                       │
 │  比赛时长:      [2 小时 ▼]                                      │
 │                                                                 │
 │  ───────────────────────────────────────────────────────────────│
 │  奖池预览:                                                      │
-│  • 赞助费: 500 LUX                                              │
+│  • 赞助费: 50 LUX                                               │
 │  • 入场费收入: 4队 × 3人 × 100 LUX = 1,200 LUX（预估）          │
-│  • 预计总奖池: 1,700 LUX                                        │
+│  • 预计总奖池: 1,250 LUX                                        │
 │                                                                 │
 │                                        [取消]  [创建比赛]       │
 └─────────────────────────────────────────────────────────────────┘
@@ -848,10 +916,10 @@ POST /api/matches/{matchId}/publish
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ───────────────────────────────────────────────────────────────│
-│  赞助费: [500 LUX  ] (最低500)                                  │
+│  赞助费: [50 LUX   ] (最低50)                                   │
 │  参赛队伍: [4 支 ▼]    入场费: [100 LUX ▼]    时长: [2 小时 ▼]  │
 │                                                                 │
-│  预计奖池: 赞助费 500 + 入场费 1,200 = 1,700 LUX                 │
+│  预计奖池: 赞助费 50 + 入场费 1,200 = 1,250 LUX                  │
 │                                        [取消]  [创建比赛]       │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -870,14 +938,23 @@ POST /api/matches/{matchId}/publish
 
 #### 4.2.1 功能说明
 
-玩家在选定比赛后，需要创建或加入战队才能参赛。
+玩家可以先在 `/planning` 创建独立战队，不需要先绑定比赛。  
+`/planning` 页面现在承担三件事：
+
+- 显示当前已有多少个战队
+- 展示全部已创建战队及其成员/空槽状态
+- 支持创建新战队或直接加入已有战队
+
+后续当玩家决定参加某场比赛时，再进入具体报名链路处理战队绑定、入队审批、锁队和付费。
 
 **核心能力**：
+- 查看当前战队总数
+- 浏览全部独立战队列表
 - 创建新战队（成为队长）
-- 申请加入已有战队（待队长审批）
-- 队长处理入队申请（同意/拒绝）
-- 选择角色（采集/运输/护航）
-- 队长锁定队伍阵容
+- 直接加入已有独立战队
+- 设置队伍人数上限与角色槽位
+- 记录队长钱包与创建时间，供后续报名阶段复用
+- 提供独立 `/team` 战队档案页，查看当前编制与历史参赛记录
 
 **角色说明**：
 
@@ -902,47 +979,45 @@ POST /api/matches/{matchId}/publish
 
 | 组件 | 说明 |
 |---|---|
-| teamRuntime | 战队创建与管理 |
-| lobbyStore | 大厅状态管理（Zustand） |
-| lobbyService | 大厅业务逻辑 |
+| planningTeamRuntime | 独立战队注册与总数统计 |
+| planningTeamStore | `/planning` 页面状态管理（Zustand） |
+| planningTeamService | `/planning` 页面业务逻辑 |
+| teamRuntime | 后续比赛报名阶段的战队绑定、审批、锁队与支付 |
 
 **API 接口**：
 
 ```typescript
-// 创建战队
-POST /api/teams
+// 获取独立战队注册表
+GET /api/planning-teams
+Response: {
+  items: PlanningTeam[],
+  totalTeams: number
+}
+
+// 创建独立战队
+POST /api/planning-teams
 Body: {
-  matchId: string,
   name: string,
   maxMembers: number,
   roleSlots: { collector: number, hauler: number, escort: number }
 }
+Response: {
+  team: PlanningTeam,
+  totalTeams: number
+}
 
-// 加入战队
-POST /api/teams/{teamId}/join
+// 加入独立战队
+POST /api/planning-teams/{teamId}/join
 Body: {
   role: "collector" | "hauler" | "escort"
 }
 Response: {
-  applicationId: string,
-  status: "pending" | "approved" | "rejected"
+  team: PlanningTeam,
+  totalTeams: number
 }
-
-// 队长同意入队申请
-POST /api/teams/{teamId}/applications/{applicationId}/approve
-
-// 队长拒绝入队申请
-POST /api/teams/{teamId}/applications/{applicationId}/reject
-Body: {
-  reason?: string
-}
-
-// 离开战队
-POST /api/teams/{teamId}/leave
-
-// 队长锁定战队
-POST /api/teams/{teamId}/lock
 ```
+
+后续比赛报名阶段仍沿用 `POST /api/teams`、`/join`、`/approve`、`/reject`、`/lock`、`/pay` 这一组 match-specific 接口，但这些不再是 `/planning` 首屏职责。
 
 ---
 
@@ -950,58 +1025,75 @@ POST /api/teams/{teamId}/lock
 
 **创建战队流程**：
 ```
-① 进入比赛的组队大厅
+① 进入 `/planning`
         ↓
-② 点击 [创建战队]
+② 查看当前战队总数
         ↓
-③ 设置战队名称、人数上限、角色槽位
+③ 点击 [创建战队]
         ↓
-④ 战队创建成功 → 等待队员加入
+④ 设置战队名称、人数上限、角色槽位
         ↓
-⑤ 队员全部就位后，点击 [锁定战队]
+⑤ 战队创建成功 → 总数即时 +1
         ↓
-⑥ 战队锁定 → 准备参加比赛
+⑥ 后续在比赛报名阶段再把战队绑定到具体比赛
 ```
 
-**加入战队流程**：
+**加入独立战队流程**：
 ```
-① 进入比赛的组队大厅
+① 进入 `/planning`
         ↓
-② 浏览战队列表，查看空位和角色需求
+② 浏览全部已创建战队
         ↓
-③ 选择战队 → 选择角色
+③ 查看各队成员数、空槽和角色需求
         ↓
-④ 点击 [申请加入] → 状态变为 [待队长审批]
+④ 选择角色并点击 [加入战队]
         ↓
-⑤ 队长审批：
-   - 同意：加入成功，角色槽位占用
-   - 拒绝：返回大厅，可重新申请其他战队
+⑤ 加入成功，当前钱包写入该独立战队成员列表
         ↓
-⑥ 审批通过后等待队长锁定战队
+⑥ 后续在比赛报名阶段再把这支战队绑定到具体比赛
+```
+
+`/planning` 首屏不再展示比赛快照、match-specific 审批、锁队和支付操作，但需要直接显示独立战队列表与加入入口。
+
+**查看战队档案流程**：
+```
+① 连接钱包并进入平台任意主界面
+        ↓
+② 点击顶部导航 [SQUAD DOSSIER]
+        ↓
+③ 系统读取当前钱包所属战队、角色、队长身份和成员编制
+        ↓
+④ 查看该战队参加过的加油比赛列表（时间倒序）
+        ↓
+⑤ 从记录中快速跳回当前组队大厅或比赛主界面
 ```
 
 ---
 
 #### 4.2.4 UI 设计
 
-**组队大厅界面**：
+**独立战队创建页**：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  组队大厅 - Jita 星系探索赛                             [返回]   │
+│  TEAM REGISTRY / OPEN FORMATION                        [返回]   │
 │  ───────────────────────────────────────────────────────────────│
-│  奖池: 1,200 LUX │ 入场费: 100/人 │ 已报名: 2/4 队              │
+│  当前战队总数: 12                                              │
 │  ───────────────────────────────────────────────────────────────│
 │                                                                 │
-│  ┌─ 战队列表 ───────────────────────────────────────────────┐   │
+│  ┌─ TEAM BOARD ──────────────────────────────────────────────┐   │
+│  │  Alpha Squad    [2/3]  Captain: 0x1a2b...                │   │
+│  │  Slots: Collector 1/1 │ Hauler 0/1 │ Escort 1/1          │   │
+│  │                                      [选择角色] [加入]    │   │
+│  │  ───────────────────────────────────────────────────────  │   │
+│  │  Nova Wing      [3/3]  FULL                              │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─ CREATE TEAM ───────────────────────────────────────────┐   │
 │  │                                                          │   │
-│  │  🔷 Alpha Squad    [3/4 人] [招募中]                     │   │
-│  │     队长: 0x1a2b...  │  缺: 1 运输                       │   │
-│  │                                        [申请加入]        │   │
-│  │  ─────────────────────────────────────────────────────  │   │
-│  │  🔷 Beta Team      [4/4 人] [已锁定]                     │   │
-│  │     队长: 0x3c4d...  │  阵容完整                         │   │
-│  │  ─────────────────────────────────────────────────────  │   │
+│  │  Team Name: [__________________________]                │   │
+│  │  Max Members: [ 3 ]                                     │   │
+│  │  Slots: Collector / Hauler / Escort                     │   │
 │  │                                                          │   │
 │  │                               [创建新战队]               │   │
 │  └──────────────────────────────────────────────────────────┘   │
@@ -1009,32 +1101,44 @@ POST /api/teams/{teamId}/lock
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**战队详情界面**：
+**我的战队档案页**：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Alpha Squad                                            [返回]   │
+│  SQUAD DOSSIER // ACTIVE PILOT PROFILE                  [返回]   │
 │  ───────────────────────────────────────────────────────────────│
-│  队长: 0x1a2b...cd3e                                            │
+│  钱包: 0x1a2b...cd3e                                             │
+│  当前战队: Alpha Squad │ 我的角色: Hauler │ 状态: Paid          │
 │  ───────────────────────────────────────────────────────────────│
 │                                                                 │
-│  角色槽位:                                                       │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ ⛏️ 采集 │ 0x1a2b... (队长)        │ ✅ 已就位            │   │
-│  │ 🚚 运输 │ 0x5e6f...               │ ✅ 已就位            │   │
-│  │ 🚚 运输 │ [空位]                   │ [申请加入]          │   │
-│  │ 🛡️ 护航 │ 0x7g8h...               │ ✅ 已就位            │   │
+│  ┌─ 当前编制 ────────────────────────────────────────────────┐   │
+│  │ 队长: 0x1a2b...cd3e                                      │   │
+│  │ 成员: 3/3 │ 角色槽位: Collector1 / Hauler1 / Escort1    │   │
+│  │ Collector │ 0x1a2b... │ LOCKED                           │   │
+│  │ Hauler    │ 0x5e6f... │ LOCKED                           │   │
+│  │ Escort    │ 0x7g8h... │ LOCKED                           │   │
+│  │                                      [打开组队大厅]       │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
-│  入队申请（仅队长可见）:                                          │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ 0x9abc... 申请角色: 运输                  [同意] [拒绝]   │   │
+│  ┌─ DEPLOYMENT LOG ─────────────────────────────────────────┐   │
+│  │ 2026-03-28 │ Jita Precision Supply Run                   │   │
+│  │ Alpha Squad │ Precision │ Rank #1 │ Personal Score 96    │   │
+│  │ Reward 188 LUX │ Status Settled          [打开比赛]       │   │
+│  │ ──────────────────────────────────────────────────────── │   │
+│  │ 2026-03-27 │ Forge System Exploration Match              │   │
+│  │ Alpha Squad │ Free Mode │ Lobby │ Current Role Hauler    │   │
+│  │ Gross Pool 450 LUX                      [打开组队大厅]    │   │
 │  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ───────────────────────────────────────────────────────────────│
-│  [离开战队]                              [锁定战队] (仅队长)    │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**页面要求**：
+
+- 默认以当前连接钱包作为查询主键，不要求用户手动输入地址。
+- 顶部优先展示"当前战队编制"；若当前没有 active squad，则显示最近一次参赛战队摘要和空态提示。
+- 参赛记录必须按时间倒序展示，并至少包含：比赛名、模式、战队名、比赛状态、个人角色、个人得分、战队排名、个人奖励。
+- 若战队所在比赛仍处于 `lobby / prestart / running / panic / settling`，页面必须提供回到组队大厅或比赛页的快捷入口。
+- 若用户尚未加入任何战队，页面仍需显示 0 值统计和明确 CTA，引导前往 Lobby / Team Lobby。
 
 ---
 
@@ -1169,7 +1273,7 @@ GET /api/network-nodes/recommendations?
 │  │ 🎯 自由模式 │ Forge 星域探索赛                           │  │
 │  │ ─────────────────────────────────────────────────────────│  │
 │  │ 星系: Forge │ 目标: 星系内任意节点                       │  │
-│  │ 奖池: 500 LUX │ 入场费: 免费 │ 3/8 队                   │  │
+│  │ 奖池: 50 LUX │ 入场费: 免费 │ 3/8 队                    │  │
 │  │ 距离: 1 跳                                               │  │
 │  │                                             [查看详情]    │  │
 │  └──────────────────────────────────────────────────────────┘  │
@@ -1429,6 +1533,184 @@ $$
 └──────────────────────────────────────────┘
 ```
 
+##### Hackathon Demo Replay Mode（仅路演展示，不替代真实比赛）
+
+当黑客松路演现场无法通过真实 EVE 操作稳定演示“多队实时竞争”时，`/match` 页面允许切换为 `Demo Replay Mode`，以脚本化 telemetry 回放方式展示比赛观感。该模式仅替代展示层的数据来源，不改变计分规则、链上归因、奖池计算和结算逻辑。
+
+**设计目标**：
+- 让评委在 10 秒内看懂“多支队伍正在实时竞争”
+- 保留真实产品的核心叙事：倒计时、得分板、目标节点状态、事件流、Panic Mode
+- 明确这是展示回放而非真实 live 数据，避免误导
+
+**非目标**：
+- 不伪装成真实链上实时计分
+- 不新增独立的比赛规则或结算规则
+- 不把 mascot 扩散为全页装饰元素
+
+**展示标识**：
+- 顶部状态区允许增加小尺寸标签：`SIMULATION MODE` 或 `DEMO TELEMETRY`
+- 标签必须弱于主标题，不得盖过倒计时和 Panic 横幅
+
+##### 舞台演示版屏幕定义
+
+**Screen intent**：
+- 在浏览器和投屏环境下，用 60 秒循环回放稳定展示“多队追分 + 节点告急 + Panic 反超”的比赛戏剧性
+
+**Layout zones**：
+- Top：品牌、比赛编号、`SIMULATION MODE` 标签、倒计时、Panic 横幅
+- Left：4 支战队得分板，固定显示 mascot、队伍代号、当前得分、进度条、最近动作摘要
+- Right Top：3 个目标节点状态，展示 fill ratio、风险等级、倍率提示
+- Right Bottom：事件流，滚动显示每次加油、倍率触发、反超与 Panic 提示
+
+**Key modules**：
+- `Demo Status Header`
+- `Mascot Scoreboard`
+- `Target Node Telemetry`
+- `Scripted Event Feed`
+- `Panic Mode Banner`
+
+**Primary CTA and secondary actions**：
+- 主操作：无强业务 CTA，默认自动播放
+- 次级操作：允许提供 `Replay`、`Pause`、`Jump to Panic` 作为演示控制，不出现在正式比赛模式中
+
+**Empty/loading/error states**：
+- Empty：不允许出现空榜；进入页面即从脚本首帧渲染 4 支队伍的初始分数
+- Loading：首次进入时最多展示 1 秒 `BOOTING DEMO TELEMETRY...`
+- Error：脚本资源异常时回退到静态首帧，并展示 `DEMO FEED DEGRADED // STATIC SNAPSHOT`
+
+**Responsive notes**：
+- Desktop / 投屏：保持双栏，左侧得分板优先级最高
+- Tablet：保留双栏，但事件流高度收缩
+- Mobile：改为纵向堆叠，顺序为顶栏 -> 得分板 -> 节点状态 -> 事件流；每队仅保留 mascot、队名、分数和进度条
+
+**Accessibility notes**：
+- mascot 仅作为识别辅助，不承载唯一信息；队伍名、颜色、字母代号必须同时存在
+- Panic 和节点告急不能只靠颜色表达，必须同时显示文本标签如 `PANIC`、`CRITICAL`
+
+##### Mascot 战队徽章规范
+
+**总原则**：
+- mascot 只出现在左侧战队得分板，不出现在目标节点区
+- mascot 定义为“战队徽章头像”，不是可爱贴纸
+- 全部 mascot 基于同一个 Fuel Frog 轮廓变体，通过头盔、护目镜、天线、编号区分队伍
+- 使用硬边、低饱和、工业徽记风；禁止圆角卡通、Q 版表情、软萌高光
+- 推荐尺寸：`40x40` 或 `48x48`
+- 推荐色数：单色或双色；必须兼容 `#080808 / #1A1A1A / #E5B32B / #CC3300 / #E0E0E0`
+
+| 队伍 | 代号 | 主色 | mascot 设定 | 叙事定位 |
+|---|---|---|---|---|
+| IRON FROGS | A | `#E5B32B` + 黑 | 重装头盔、正面护目镜、装甲编号 `A-01` | 稳定领跑、最后险胜 |
+| VOID HOPPERS | B | `#E0E0E0` + 枪灰 | 细长 visor、轻型侧翼、编号 `B-07` | 中段持续追分 |
+| EMBER TOADS | C | `#CC3300` + 黑 | 危险天线、裂纹面罩、编号 `C-13` | Panic 阶段爆发 |
+| RELAY CREW | D | 枪灰 + 淡黄 | 通信背包、外置耳机、编号 `D-02` | 前期活跃、后劲不足 |
+
+**得分条行内结构**：
+
+```
+[mascot] [A / IRON FROGS]                [2,380 pts]
+         [██████████░░]  LAST: FINAL PUSH +280
+```
+
+每一行必须同时具备：
+- mascot
+- 字母代号（A/B/C/D）
+- 战队名
+- 当前分数
+- 进度条
+- 最近动作摘要（例如 `CRITICAL REFILL +320`）
+
+##### 60 秒脚本化回放（推荐默认场景）
+
+该脚本以“开局接近 -> 中段追分 -> 节点告急 -> Panic 爆发 -> 最后反超”为固定节奏，循环播放。
+
+| 时间片 | 画面节奏 | 队伍分数变化 | 节点变化 | 事件流示例 |
+|---|---|---|---|---|
+| `00-10s` | 四队接近，建立“实时比赛”认知 | A `1180 -> 1320`；B `1120 -> 1240`；C `980 -> 1090`；D `940 -> 1010` | `Gate-Alpha` 38% -> 42% | `IRON FROGS // MIRA injected Gate-Alpha +140 pts` |
+| `10-25s` | B 连续追分，逼近 A | A `1320 -> 1540`；B `1240 -> 1520`；C `1090 -> 1260`；D `1010 -> 1130` | `SSU-Beta` 72% -> 84% | `VOID HOPPERS // SETH stabilized SSU-Beta +180 pts` |
+| `25-40s` | `Turret-Gamma` 跌入危险，C 吃倍率冲榜 | A `1540 -> 1760`；B `1520 -> 1710`；C `1260 -> 1810`；D `1130 -> 1280` | `Turret-Gamma` 18% -> 12% -> 24% | `EMBER TOADS // KIRO triggered critical refill +320 pts` |
+| `40-50s` | 进入 Panic，边框发红，增长加快 | A `1760 -> 2100`；B `1710 -> 1980`；C `1810 -> 2140`；D `1280 -> 1490` | 顶部横幅切 `PANIC MODE` | `PANIC MODE ACTIVE // ALL SCORE x1.5` |
+| `50-60s` | A 最后一波冲刺反超 C，形成高潮 | A `2100 -> 2380`；B `1980 -> 2210`；C `2140 -> 2310`；D `1490 -> 1660` | `Gate-Alpha` 冲到安全区 | `IRON FROGS // FINAL PUSH +280 pts` |
+
+**脚本控制原则**：
+- 所有分数跃迁都必须有对应事件流文案
+- 节点进度变化必须和高分事件存在因果关系
+- 不允许所有队伍以同速、匀速上涨
+- Panic 前后要有明显节奏差，确保评委一眼看出高潮段
+
+##### Demo 文案库（建议直接用于事件流）
+
+- `IRON FROGS // MIRA injected Gate-Alpha +140 pts`
+- `VOID HOPPERS // SETH stabilized SSU-Beta +180 pts`
+- `EMBER TOADS // KIRO triggered critical refill +320 pts`
+- `RELAY CREW // ORIN secured relay route +110 pts`
+- `PANIC MODE ACTIVE // ALL SCORE x1.5`
+- `IRON FROGS // FINAL PUSH +280 pts`
+
+##### 前端假实时播放方案（Presentation-only）
+
+前端实现必须遵守 `View -> Controller -> Service -> Model`，禁止在 View 中直接写计时器和随机数。展示模式的数据源切换属于前端展示编排，不属于业务规则变更。
+
+**分层归属**：
+- View：只渲染当前帧，展示 mascot、得分条、节点状态、事件流和 Panic 横幅
+- Controller：决定是 `live` 还是 `demo-replay`，控制播放、暂停、重播、跳转到 Panic
+- Service：提供脚本场景、时间推进、插值结果和事件触发
+- Model：持有当前播放模式、当前秒数、当前帧快照、播放状态
+
+**推荐数据结构**：
+
+```ts
+type DemoReplayScenario = {
+  id: string;
+  label: string;
+  loopSec: 60;
+  teams: Array<{
+    teamId: string;
+    teamCode: "A" | "B" | "C" | "D";
+    teamName: string;
+    mascotKey: string;
+    accentToken: string;
+    startScore: number;
+  }>;
+  segments: Array<{
+    startSec: number;
+    endSec: number;
+    scoreTargets: Record<string, number>;
+    nodeTargets: Array<{
+      nodeId: string;
+      fillRatio: number;
+      urgencyLabel: "SAFE" | "WARN" | "CRITICAL";
+    }>;
+    feedBursts: Array<{
+      atSec: number;
+      teamId: string | null;
+      message: string;
+      scoreDelta?: number;
+      kind: "score" | "system" | "panic";
+    }>;
+    banner?: "panic_mode";
+  }>;
+};
+```
+
+**播放规则**：
+1. 页面进入 `demo-replay` 时，先渲染首帧，再启动 60 秒循环时钟。
+2. 分数条和节点 fill ratio 在 segment 内做线性插值，确保平滑，但事件流只在 `feedBursts.atSec` 触发，保持“离散事件 + 连续数值”的真实感。
+3. `40s` 必须触发 `panic_mode`，同步切换顶栏红色脉冲、事件流系统消息和倍率文案。
+4. `60s` 结束后停留 1 秒展示最终榜单，再重置到首帧循环。
+5. 若存在控制按钮，`Replay` 回到 `0s`，`Pause` 只冻结时钟不改帧，`Jump to Panic` 直接跳到 `40s`。
+
+**实现边界**：
+- `demo-replay` 与真实 `live` 模式共享同一 UI 组件，不复制页面
+- `demo-replay` 的输出结构尽量对齐 `/status` + `/scoreboard` + `/stream` 的消费口径，减少未来切换成本
+- `demo-replay` 不写入后端、不写入链上、不进入真实结算路径
+
+**验收标准**：
+- 评委在 10 秒内可理解“多队实时竞争”的核心价值
+- mascot 提升队伍辨识度，但不遮挡分数与倒计时
+- Panic 阶段具有明确的颜色、节奏和分数增长差异
+- 演示循环 3 次以上不出现节奏断裂或视觉空窗
+- 演示模式与真实比赛模式仅切换数据源，不切换页面骨架
+
 ---
 
 ### 4.5 自动分账
@@ -1448,7 +1730,7 @@ $$
 
 | 来源 | 说明 |
 |---|---|
-| **赞助费** | 创建者支付的赞助费（≥500 LUX） |
+| **赞助费** | 创建者支付的赞助费（≥50 LUX） |
 | **入场费收入** | 所有参赛玩家的入场费总和 |
 | **平台补贴** | 平台注入的额外奖励（可选） |
 
@@ -1467,11 +1749,11 @@ $$
 
 | 奖池构成 | 金额 |
 |---|---|
-| 赞助费 | 500 LUX |
+| 赞助费 | 50 LUX |
 | 入场费（4队 × 3人 × 100 LUX） | 1,200 LUX |
-| **总奖池** | **1,700 LUX** |
-| 平台服务费（5%） | -85 LUX |
-| **实际分配奖池** | **1,615 LUX** |
+| **总奖池** | **1,250 LUX** |
+| 平台服务费（5%） | -62 LUX |
+| **实际分配奖池** | **1,188 LUX** |
 
 **设计理由**：
 - **5% 是行业合理水平**：电竞平台抽成通常在 2.5%-10% 之间，5% 平衡了平台收益与玩家体验
@@ -1528,6 +1810,7 @@ Body: { matchId: string }
 - 以**人头**计费，由比赛发布者设定（0-1000 LUX/人）
 - **队长**是唯一的链上付款人，一次性按当前队伍人数总付
 - 队员**无需触发任何钱包签名**，零摩擦入场
+- 报名费资金必须直接进入比赛发布时创建的 `MatchEscrow`，与 sponsorship 使用同一托管模型；后端只接受带有 `TeamEntryLocked` 事件且金额精确匹配的支付交易
 
 **白名单注册**：
 - 队长付款成功后，系统将全队地址一次性注册至本局「白名单」
@@ -1643,9 +1926,9 @@ interface SettlementBill {
 │  ───────────────────────────────────────────────────────────────│
 │  📊 奖池分配                                                    │
 │                                                                 │
-│  总奖池：1,700 LUX（赞助费 500 + 入场费 1,200）                  │
-│  平台服务费（5%）：-85 LUX                                       │
-│  实际奖池：1,615 LUX                                             │
+│  总奖池：1,250 LUX（赞助费 50 + 入场费 1,200）                   │
+│  平台服务费（5%）：-62 LUX                                       │
+│  实际奖池：1,188 LUX                                             │
 │  ├─ 🥇 Alpha Squad 获得：1,130.5 LUX（70%）                     │
 │  └─ 🥈 Beta Team 获得：484.5 LUX（30%）                         │
 │                                                                 │
@@ -1670,6 +1953,72 @@ interface SettlementBill {
 | ⚡ 救援英雄 | 本局给红色站点（< 20%）送油最多 |
 | 🛡️ 无懈可击 | 护航玩家全程保护运输船未被击毁 |
 | 🚀 最后一秒 | 最后 30 秒完成送油并改变排名 |
+
+##### Hackathon Settlement Demo Mode（仅路演展示，不替代真实结算）
+
+当黑客松路演现场无法稳定等待真实链上结算完成，或无法在有限时间内演示“等待结算 -> 出账单 -> 展示 MVP 与分账”的完整体验时，`/settlement` 页面允许切换为 `Settlement Demo Mode`，以脚本化结算流程展示最终体验。该模式仅替代展示层数据与进度，不改变平台抽成、队伍分账、个人贡献分账和真实 payout trace 规则。
+
+**设计目标**：
+- 让评委在 10 秒内理解“这场比赛如何分钱”
+- 同时展示两种关键状态：`Settling` 等待态与 `Report` 战报态
+- 用更舞台化的方式突出 `总奖池 / 平台抽成 / 实发奖池 / 冠军 / MVP / 我的收益`
+
+**非目标**：
+- 不伪装成真实链上 payout 已确认
+- 不改写真实结算账单规则
+- 不让 demo 结果写入链上或后端
+
+**展示标识**：
+- 顶部状态区允许增加 `SIMULATION MODE` 或 `DEMO REPORT`
+- 如果处于脚本化等待态，必须明确显示 `SIMULATED SETTLING`
+
+##### 路演结算屏幕定义
+
+**Screen intent**：
+- 在浏览器和投屏环境下，用一个短暂的“结算中”状态 + 一个高完成度的“最终战报”状态，清楚演示平台如何出账与分配收益
+
+**Layout zones**：
+- Top：结算状态、`SIMULATION MODE` 标签、房间编号、结算进度或报告状态
+- Hero：冠军队伍、总奖池、实发奖池、MVP、我的收益
+- Left：奖池拆分与队伍排名分配
+- Right：个人分账排行、荣誉标签、链上记录占位信息
+- Bottom：`Replay Demo / Jump to Report / Continue` 控制
+
+**Key modules**：
+- `Settlement Status Rail`
+- `Payout Hero Board`
+- `Pool Breakdown`
+- `Team Distribution Grid`
+- `Personal Payout Board`
+- `Honor Tags`
+
+**Primary CTA and secondary actions**：
+- 主操作：默认自动播放 demo 结算流程
+- 次级操作：`Replay`, `Pause`, `Jump to Report`, `Continue to Lobby`
+
+**Empty/loading/error states**：
+- Empty：不允许空账单；demo 模式进入后必须立即显示脚本首帧
+- Loading：允许短暂显示 `SIMULATED SETTLING...`
+- Error：脚本异常时回退到完整静态战报，显示 `DEMO REPORT DEGRADED // STATIC SNAPSHOT`
+
+##### 推荐脚本节奏（Settlement Demo）
+
+- `00-04s`：显示 `SIMULATED SETTLING`，进度条从 `18% -> 72%`
+- `04-07s`：状态切到 `PAYOUT READY`，显示 `Settlement ID / Payout Trace` 占位
+- `07s+`：进入最终 `Report` 画面，聚焦冠军、MVP、奖池拆分和我的收益
+
+**默认展示读数**：
+- 总奖池：`1,250 LUX`
+- 平台服务费：`62 LUX`
+- 实发奖池：`1,188 LUX`
+- 冠军：`IRON FROGS`
+- MVP：`MIRA // HAULER // 2,100 pts`
+- 我的收益：可固定展示为 `352 LUX`
+
+**实现边界**：
+- `settlement-demo` 与真实 `live` 结算页共享同一页面骨架
+- `settlement-demo` 不写入后端、不触发真实 claim、不进入真实 payout
+- `settlement-demo` 的账单字段应尽量对齐 `GET /api/matches/{matchId}/result` 和 `GET /api/matches/{matchId}/settlement` 的消费口径
 
 ---
 
@@ -1732,7 +2081,8 @@ interface SettlementBill {
 |---|---|---|
 | **星系热力图** | Supabase Realtime 订阅 `network_nodes` 变更，Canvas/SVG 渲染节点 | 双图层叠加（油量底图 + 比赛脉冲），5 秒轮询刷新 |
 | **任务大厅** | REST API 拉取比赛列表，按奖池×紧急度排序 | 卡片组件实时更新倒计时；**每张卡片必须展示最少/最多战队数、当前报名战队数与开赛门槛摘要**（与 4.1.3 一致） |
-| **组队 Lobby** | Supabase Realtime 实时同步槽位状态 | 双队对称布局，角色槽位三态（等待/确认/锁定） |
+| **独立战队页** | REST API 拉取战队总数与创建结果，首屏不绑定比赛 | 强调总数读数 + 创建入口，两块信息即读即用 |
+| **比赛报名 Team Lobby** | Supabase Realtime 实时同步槽位状态 | 作为后续 match-specific 流程存在，不再承担 `/planning` 首屏职责 |
 | **游戏内浮窗** | EVE Frontier 原生 WebView 接入，Supabase Realtime 实时推送 | Optimistic UI 预更新进度条，< 500ms 弹幕延迟 |
 | **结算战报** | 比赛结束后一次性拉取完整数据 | 链上数据可跳转 Sui Explorer 验证 |
 
@@ -1918,6 +2268,121 @@ EVE Frontier 链上（Sui）
 ---
 
 ## 9. PM Discussion Log
+
+### 2026-03-28（`/planning` 改为独立战队创建页）
+
+- 用户问题：`/planning` 创建战队实际上不需要绑定比赛，这个页面只需要显示当前有多少个战队，并支持创建战队。
+- PM 答复：接受。`/planning` 改为独立战队注册页，默认只显示总战队数和创建入口；比赛绑定、入队审批、锁队和支付从该页首屏移除，保留到后续比赛报名阶段处理。
+- 决策类型：组队入口定位调整。
+- 影响章节：`4.2 创建战队`、`5.3 前端模块`
+
+---
+
+### 2026-03-28（Settlement 页面路演演示模式）
+
+- 用户问题：希望和 `match` 页面一样，为 `settlement` 页面也提供一个只用于黑客松演示的版本。
+- PM 答复：
+  1. 接受该方案，并定义为 `Settlement Demo Mode`，明确它是脚本化结算展示，而不是真实链上 payout 已确认。
+  2. 该模式必须同时覆盖 `Settling` 等待态与 `Report` 战报态，避免评委只看到一张静态账单。
+  3. 页面骨架与真实结算页共用，只切换数据源，不复制第二套 settlement 页面。
+  4. 重点展示读数固定为：`总奖池 / 平台抽成 / 实发奖池 / 冠军 / MVP / 我的收益`。
+- 决策类型：路演展示模式设计（Settlement）。
+- 影响章节：
+  - `4.5.4 UI 设计`
+  - `9. PM Discussion Log`
+
+---
+
+### 2026-03-28（Match 页面路演演示模式 + mascot 战队徽章）
+
+- 用户问题：黑客松现场暂时无法通过真实游戏操作稳定演示各队实时竞技，希望在 `match` 页面加入假的演示效果，并在每个队伍进度条前放一个 mascot 图片。
+- PM 答复：
+  1. 接受该方案，但应定义为 `Hackathon Demo Replay Mode`，明确它是脚本化 telemetry 回放，而不是伪装成真实 live 数据。
+  2. mascot 只放在左侧战队得分板，作为“战队徽章头像”，不扩散到目标节点进度条，避免语义混淆。
+  3. 默认采用 60 秒循环脚本：开局接近、中段追分、节点告急、Panic 爆发、最后反超。
+  4. 前端实现必须与真实比赛模式共用同一页面骨架，只切换数据源，不新增第二套 match 页面。
+- 决策类型：路演展示模式设计 + 战队识别系统设计。
+- 影响章节：
+  - `4.4.4 UI 设计`
+  - `9. PM Discussion Log`
+
+---
+
+### 2026-03-28（Create Match 星系搜索支持旧系统名别名）
+
+- 用户问题：创建比赛弹窗里按星系名搜索未返回任何值，之前可返回；需要分析并修复。
+- PM 答复：
+  1. 根因不是搜索链路失效，而是 live world API 当前系统名已切到编码名，导致用户按旧 EVE 名称（如 `Jita` / `Amarr`）搜索时无法命中。
+  2. 接受兼容方案：搜索同时支持当前链上系统名、canonical/legacy 系统名和 `systemId`。
+  3. 搜索结果文案应在别名与当前名不一致时同时展示两者，例如 `Jita // EHK-KH7 (30000142)`。
+- 决策类型：搜索可用性修复 + 名称兼容策略。
+- 影响章节：
+  - `4.1.1 星系选择交互设计`
+  - `4.1.2 技术支持`
+  - `9. PM Discussion Log`
+
+---
+
+### 2026-03-28（Sui Testnet 节点数据获取说明补充）
+
+- 用户问题：希望明确说明平台是如何从 Sui 测试链上拿到 `NetworkNode` 数据的，并将原理写入 PRD 的技术说明部分。
+- PM 答复：
+  1. 在 `4.1.2 技术支持` 中补充 `NetworkNode` 数据获取原理。
+  2. 明确链路为“事件发现（`NetworkNodeCreatedEvent`） -> 位置事件（`LocationRevealedEvent`） -> `multiGetObjects` 对象回填 -> 本地读模型投影”。
+  3. 明确 create-match 出现 `0 nodes` 的技术原因：系统过滤依赖 `solarSystem` 映射，若位置事件覆盖不足，节点不会进入该系统列表。
+- 决策类型：技术文档澄清（不变更产品规则）。
+- 影响章节：
+  - `4.1.2 技术支持`
+  - `9. PM Discussion Log`
+
+---
+
+### 2026-03-27（创建比赛星系搜索排序策略）
+
+- 用户问题：创建比赛时，希望保留无节点星系，但将包含 network nodes 的星系优先展示，避免用户在大量 `0 nodes` 结果里低效筛选。
+- PM 答复：
+  1. 接受该方案，作为 create-match 星系搜索的默认展示策略。
+  2. 所有匹配星系都保留，但 `selectable` 星系前置。
+  3. `no_nodes / offline_only / not_public` 星系不隐藏，只下沉展示并标注原因。
+  4. 搜索框 focus 且空输入时，应优先展示 `Ready Systems` 候选；有输入时，结果分为 `Ready Systems` 与 `Unavailable Systems` 两组。
+  5. `Unavailable Systems` 只展示、不允许选择，并显示具体原因标签。
+- 决策类型：创建比赛搜索排序策略 + 交互优化。
+- 影响章节：
+  - `4.1.1 星系选择交互设计`
+  - `4.1.3 用户操作漏斗`
+  - `9. PM Discussion Log`
+
+---
+
+### 2026-03-27（赞助费测试门槛调整）
+
+- 用户问题：为了便于当前阶段测试，希望将创建比赛的最低赞助费从 500 LUX 下调到 50 LUX。
+- PM 答复：接受该调整，作为测试阶段规则生效；所有创建、发布、UI 和合约校验口径统一改为 `sponsorshipFee >= 50 LUX`。
+- 决策类型：商业规则调整（测试阶段门槛下调）。
+- 影响章节：
+  - `4.1 创建 & 发布比赛`（创建参数、赞助费机制、UI 示例）
+  - `4.5 自动分账`（示例奖池与平台抽成计算）
+  - `12. PM Discussion Log`
+
+### 2026-03-28（创建比赛赞助费必须真实支付并进入 escrow）
+
+- 用户问题：当前创建比赛虽然要求 sponsorship fee，但实际发布时并没有发起真钱包支付，导致用户可以不付费创建比赛；由于当前只有一个钱包地址可测，是否可以直接改成 escrow 合约收款，而不是要求转给另一个普通地址。
+- PM 答复：接受。测试阶段 `sponsorshipFee` 允许使用 EVE test token 支付，但发布比赛必须通过 escrow 合约入口把赞助费锁入链上对象；后端需验证 `publishTxDigest` 对应交易包含 `MatchPublished` 事件，且付款钱包扣款币种与金额匹配 sponsorship 规则后，才允许 `draft -> lobby`。
+- 决策类型：支付闭环完善（创建比赛 escrow 发布前置条件收紧）。
+- 影响章节：
+  - `4.1 创建 & 发布比赛`（发布前置条件）
+  - `4.5 自动分账`（奖池来源说明）
+  - `12. PM Discussion Log`
+
+### 2026-03-28（pay-team 改为统一链上 escrow 托管）
+
+- 用户问题：把 `pay-team` 从地址收款改成链上 escrow 合约收款，彻底统一资金托管模型。
+- PM 答复：接受。战队报名费不再允许打到普通地址，必须通过比赛发布时创建的同一个 `MatchEscrow` 合约对象锁定；后端需验证 `payTxDigest` 对应交易包含 `TeamEntryLocked` 事件，且 `room / escrow / team_ref / member_count / quoted_amount_lux / locked_amount` 与当前战队报价完全匹配后，才允许写入 paid 与 whitelist 事实。
+- 决策类型：支付托管模型统一（team pay 迁移到链上 escrow）。
+- 影响章节：
+  - `4.3 发现 & 参加比赛`（入场费支付闭环）
+  - `4.5 自动分账`（奖池入账来源说明）
+  - `12. PM Discussion Log`
 
 ### 2026-03-26（入队申请审批机制补充）
 

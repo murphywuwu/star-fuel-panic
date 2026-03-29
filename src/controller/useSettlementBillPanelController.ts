@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ControllerResult, PlayerContribution, SettlementBill } from "@/types/fuelMission";
+import { formatPaymentTokenAmount } from "@/utils/paymentToken";
 
 interface SettlementBillPanelControllerInput {
   settlementBill: SettlementBill;
@@ -10,7 +11,7 @@ interface SettlementBillPanelControllerInput {
 }
 
 function money(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} LUX`;
+  return formatPaymentTokenAmount(value, { maximumFractionDigits: 2 });
 }
 
 export function useSettlementBillPanelController({

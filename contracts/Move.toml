@@ -10,4 +10,5 @@ Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-fram
 fuel_frog_panic = "0x0"
 
 [environments]
-devnet = "3d6c67b7"
+devnet = "e9eed8f1"
+testnet = "3d6c67b7"

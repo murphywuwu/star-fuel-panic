@@ -1,4 +1,5 @@
 import type { UrgencyLevel } from "../types/mission.ts";
+import type { SettlementBill } from "../types/settlement.ts";
 import type { Team, TeamMember } from "../types/team.ts";
 
 export type MatchStatus = "draft" | "lobby" | "prestart" | "running" | "panic" | "settling" | "settled";
@@ -12,6 +13,7 @@ export type ScoringMode = "weighted" | "volume";
 export type Match = {
   id: string;
   onChainId: string | null;
+  escrowId?: string | null;
   status: MatchStatus;
   creationMode: MatchCreationMode;
   solarSystemId?: number;
@@ -97,6 +99,11 @@ export type MatchStreamEvent =
       type: "settlement_start";
       matchId: string;
       progress: number;
+    }
+  | {
+      type: "settlement_complete";
+      matchId: string;
+      result: SettlementBill;
     }
   | {
       type: "heartbeat";

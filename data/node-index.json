@@ -1,8 +1,8 @@
 {
-  "version": 2,
-  "lastSyncAt": "2026-03-26T18:12:11.324Z",
+  "version": 3,
+  "lastSyncAt": "2026-03-27T15:32:55.039Z",
   "discoveryCursor": {
-    "txDigest": "CEPx8sYvtqeXKzUx3Hm5Hzrvn9C6LieiqAPByjdvUYgG",
+    "txDigest": "Hrs8WwrHfSE6NDLUwH9pi4am1YGAr5QqD28Wi7vjvEi9",
     "eventSeq": "3"
   },
   "locationCursor": {
@@ -35,8 +35,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0x48e4f9eb58fa7288d60c098f45772e1fa45ef38531bd2f16aa8fed28fd8aa599",
@@ -66,8 +66,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0xce8db35dbf8c86319814ade280b5c54d6d8e9778b5cfe7b32ec160f5fb699dc3",
@@ -99,8 +99,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0x5ad1a98cd2896e4e51a9aaca8a347f3fdfab57bb7a88d6e1f8088a1a111d88b2",
@@ -129,8 +129,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0x4944b17e165cb6391a3f06df93cfd18c7bb87ffeac027e86df6ec690aecd8a84",
@@ -159,8 +159,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0xa25bc3c22003088f76703a5928b78c028c4f32ef39f2b1103c6e0ba316f9ec14",
@@ -189,8 +189,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.095Z",
+      "updatedAt": "2026-03-27T15:33:01.095Z"
     },
     {
       "id": "0x41e2d1fdb980001757ce6a9f769855ca3d121391190019768ede8e4688874dec",
@@ -221,8 +221,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xfef4b89b2a22e799c9d4372f8e991301935304bdb4efdb35f6bbdc95de279187",
@@ -249,8 +249,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x85590ae5478e7c03eca822c3043b5f63e10efb0c533f529b820b3e7942f63aa9",
@@ -264,12 +264,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1039,
+      "fuelQuantity": 985,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0104,
+      "fillRatio": 0.0098,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -288,8 +288,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xbce555aedb0c1322232c4243ce62cfc6210293cb69be6b4fe212ab9b4ba49fd7",
@@ -299,16 +299,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x1e69832d1977a6963ea93b4cf2feeb7e432cde4ae463ff2989f35de3c78765f2",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 2617,
+      "coordX": -29488084009241320000,
+      "coordY": 2539139038072543700,
+      "coordZ": 10915708908330308000,
+      "solarSystem": 30022944,
+      "fuelQuantity": 2593,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0262,
+      "fillRatio": 0.0259,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -335,8 +335,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xd16dc8357b67fb2325432904a59645205eea6c7111602b512c7631b5a4e81a0b",
@@ -367,8 +367,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x68ab999ed4407ac3b120355a8acc6c64f6c1ed9b06727e1348504d83e5d5fd78",
@@ -395,8 +395,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.378Z",
-      "updatedAt": "2026-03-26T18:12:13.378Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x15b30a839fd3b0e0ce28e4736af23a97421dffdbb88985a4fe4927a63c5e6a6e",
@@ -426,8 +426,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x6904f9ad603417b4608b62c049f14c3b9f558a92d60f331e303cbbb793fb83fb",
@@ -454,8 +454,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x7747f8cf9f9b4585b82f83b816e9986b628221d08ce365c4c1b66fe173ea5c0d",
@@ -488,8 +488,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xe7c5a5f2b3dab3d396c438a28854cc50e13f285ca8f0a60dd861928e64d5f44f",
@@ -503,12 +503,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 3141,
+      "fuelQuantity": 3114,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78515,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0314,
+      "fillRatio": 0.0311,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -520,8 +520,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x0fe4c18a3825baccf91055d2d8d097e545322a6cd725b47c09e26b7edbd1b3e0",
@@ -550,8 +550,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x0b79e51f2c444483a7f131d617e6d52f7a029dd33b646a4367600b685b9d96a7",
@@ -582,8 +582,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xa16eef72fe37e428a82fb72923279552ff5b22de56724422dbcff7b0d3bc2ead",
@@ -610,8 +610,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xc32b6af0fa04978cec159ae8797c2b9329fa1a90850afd8515814709c84163e0",
@@ -638,8 +638,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x057f0e69ed46b1ece9676954a6f6d6641cfb847064dfa9af5fafc78fdab29f11",
@@ -668,8 +668,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x4751bd092f9774312e2aadd82e4ede4981bf47e286c3bb096e74651f60d56c86",
@@ -696,8 +696,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x129247daf0e6ff8be11106c574e4b6a0b166ac7d4e766e5f21183d7bc85643a2",
@@ -711,12 +711,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 601,
+      "fuelQuantity": 547,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.006,
+      "fillRatio": 0.0055,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -726,8 +726,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x0edaea9af12a7ae54ae31a47faf78e131b845941bbe1c26274cd4c25cbcd5a9c",
@@ -741,12 +741,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2930,
+      "fuelQuantity": 2906,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0293,
+      "fillRatio": 0.0291,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -757,8 +757,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xb696d32fd7ea6cc517c699dd8bb354b576564936d9f9a46b8a25c35fa6d59203",
@@ -787,8 +787,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xfd197fe8cee2866d264b4508de73b5e8a75cf5574c27bcd0cdcaf80756e06569",
@@ -802,12 +802,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 643,
+      "fuelQuantity": 619,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0064,
+      "fillRatio": 0.0062,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -819,8 +819,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x48c1e6ced9e94937b25512a597541ad4dd4e63deb9378b445abe13b607447b2d",
@@ -834,12 +834,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 643,
+      "fuelQuantity": 619,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0064,
+      "fillRatio": 0.0062,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -850,8 +850,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x69ecbdf13c1d3a182c57e632bf62bcce85a7218dbaf577d9b3f3b061fcd2b7f4",
@@ -865,12 +865,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1205,
+      "fuelQuantity": 1151,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.012,
+      "fillRatio": 0.0115,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -881,8 +881,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x30d8db5e0aec63dfba6846bac8a6130f341e4e789822304e7a1f6fd6919f6853",
@@ -918,8 +918,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x56221d26480ff613aeaeac66184cc68f4dcb51e335089365964db3402bed353c",
@@ -952,8 +952,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x23cc71b3e335b82d719ba474af329e3b82d05540308da93b3bfeb16bcf6d425e",
@@ -980,8 +980,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x2273612e7787f950e02b94ac445c9fe66053369cf00b11dc67eff96095f2a477",
@@ -995,12 +995,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2484,
+      "fuelQuantity": 2269,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0248,
+      "fillRatio": 0.0227,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1013,8 +1013,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xb78e5d07c8efb5c7f99b0dbbf040aed0d7cf4ad09af8bb515561fe2e9d0354f1",
@@ -1028,12 +1028,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1734,
+      "fuelQuantity": 1680,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0173,
+      "fillRatio": 0.0168,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1052,8 +1052,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xd7060f4c765c3daf40d931c64e45691ef0b8440bcaebc5aa9c82198e67fa1274",
@@ -1080,8 +1080,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x6a2e5aad41c4e596aa5ec2ad6e3aa42192b8f8024ef23659adc70f7c3b00c512",
@@ -1095,12 +1095,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2661,
+      "fuelQuantity": 2637,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0266,
+      "fillRatio": 0.0264,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1114,8 +1114,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x5ab6eaa78fc5de0e08003a8ab2f8504895ba8dde73c8b6150a33ffa051c0e586",
@@ -1129,12 +1129,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2831,
+      "fuelQuantity": 2807,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0283,
+      "fillRatio": 0.0281,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1144,8 +1144,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x481838ab0902e72bec03a9bb16c2c53d53e9137be269865e8c959ef68ed0e3f8",
@@ -1180,8 +1180,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x5dd4a8ee06c2f5db74d60c9f716650a6148b3b77da1fb748a021842fa588d9d4",
@@ -1195,12 +1195,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1844,
+      "fuelQuantity": 1790,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0184,
+      "fillRatio": 0.0179,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1216,8 +1216,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x8bad0caba44cb8400c50e95c15fbfc370ec48b1ce35daf8e1365376382940c4c",
@@ -1231,12 +1231,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 861,
+      "fuelQuantity": 646,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0086,
+      "fillRatio": 0.0065,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1253,8 +1253,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x0e42d9255ef0543d8fb695116690c6580a6da6761d25f1161685dbe241cdd745",
@@ -1268,12 +1268,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 865,
+      "fuelQuantity": 650,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0086,
+      "fillRatio": 0.0065,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1290,8 +1290,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xa33ebcf674ee15b2c7c3254a1a5424684cbcd067c84a7fbe97458d3ad2e0d737",
@@ -1305,12 +1305,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 867,
+      "fuelQuantity": 652,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0087,
+      "fillRatio": 0.0065,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1327,8 +1327,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xccf2cb9b60ccdf063dde102ef69f441026f84fc368e00462964aa39f4048e806",
@@ -1342,12 +1342,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 869,
+      "fuelQuantity": 654,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0087,
+      "fillRatio": 0.0065,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1364,8 +1364,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x0ec225750297ded91623f487fc316aacee776b40f06817de0be8fb3c815e6311",
@@ -1379,12 +1379,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 871,
+      "fuelQuantity": 656,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0087,
+      "fillRatio": 0.0066,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1401,8 +1401,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x13a1c30f11df0b93344b7806fee2c3f706e9fdf5201782d4f329c91435803c5c",
@@ -1416,12 +1416,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 873,
+      "fuelQuantity": 658,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0087,
+      "fillRatio": 0.0066,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1438,8 +1438,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xe28d806df83210e7f0c45feecfdb9e60d584f87c6920693af8cad6e8967b4921",
@@ -1453,12 +1453,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 407,
+      "fuelQuantity": 353,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0041,
+      "fillRatio": 0.0035,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1476,8 +1476,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xf5371ac71870e84f9f52652fd8d6981f68d1f948bc09b5049366a04690219dd6",
@@ -1491,12 +1491,12 @@
       "coordY": 833922063787752300,
       "coordZ": -468689682664393800,
       "solarSystem": 30013135,
-      "fuelQuantity": 737,
+      "fuelQuantity": 713,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0074,
+      "fillRatio": 0.0071,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1507,8 +1507,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x1fd0eb61e7af3416cd3a12f583fc3e1c9b87b9129d8709a7123613b1724612d8",
@@ -1518,16 +1518,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x3b0ffac7a4e0243954c5996bc92a087c9f03fcccc6293b31a49f4c0528c20924",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 737,
+      "coordX": -13603815000384610000,
+      "coordY": 1701341044523694800,
+      "coordZ": -992651443339102000,
+      "solarSystem": 30013131,
+      "fuelQuantity": 713,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0074,
+      "fillRatio": 0.0071,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1538,8 +1538,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.379Z",
-      "updatedAt": "2026-03-26T18:12:13.379Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0x12a4322311db48995d39e340a64cac78d479a077112b866b92ae079838c07686",
@@ -1549,16 +1549,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x7e84a9ea8e44d0a7c7de3c75e8194608871382de33e2cc6ed4e05cf57e2001cc",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 2911,
+      "coordX": -13219368642328031000,
+      "coordY": 1480024762838029600,
+      "coordZ": -290773504736565700,
+      "solarSystem": 30013130,
+      "fuelQuantity": 2858,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0291,
+      "fillRatio": 0.0286,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1569,8 +1569,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.380Z",
-      "updatedAt": "2026-03-26T18:12:13.380Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xed4e60f586a073b1927660bf91a7973490ef37a9e140f285bbb7311d9c3c8adb",
@@ -1584,12 +1584,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1612,
+      "fuelQuantity": 1397,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0161,
+      "fillRatio": 0.014,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1603,8 +1603,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.380Z",
-      "updatedAt": "2026-03-26T18:12:13.380Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xfea6e61d88a2c5671ea9ceef19e0d3e4b633c791a830555c78f866ffdf9524bd",
@@ -1631,8 +1631,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.380Z",
-      "updatedAt": "2026-03-26T18:12:13.380Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:01.096Z",
+      "updatedAt": "2026-03-27T15:33:01.096Z"
     },
     {
       "id": "0xfc7e725d74631e18db56cf681245bedd4a167b375f4e89a4a1b39dd61d305a28",
@@ -1646,12 +1646,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 722,
+      "fuelQuantity": 695,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78515,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0072,
+      "fillRatio": 0.0069,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1659,8 +1659,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x4e02177552b54c669aa1b83139d506c78cab58e1f0d430cf5e797af5d8c10550",
@@ -1687,8 +1687,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x053e575e733b0adc63fd92eecbffe64477dcf03ca236d3aa40a2a70fcee74516",
@@ -1723,8 +1723,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0xf116a5fc5dd7039b23f5c65f5af8c1999d38d6a3af85587268857e54f775cd28",
@@ -1753,8 +1753,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x5fcbda283ed1a2e5c2913004fab64cc69bd2290b74cca97c0b3f2896189c2447",
@@ -1768,12 +1768,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1239,
+      "fuelQuantity": 1215,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0124,
+      "fillRatio": 0.0121,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1783,8 +1783,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x71ea02d7a072b0696165945c8e61c0f43a4a81a8e07232d39b64f7563d89bc8f",
@@ -1811,8 +1811,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x2c2961241948777514d36f74891423cee4fc86b4e8755153a15482e4ab299784",
@@ -1839,8 +1839,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0xeb513218d589d2d8cd49041d461622c8412d629e3887874999175dbac28a36a7",
@@ -1854,12 +1854,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 3276,
+      "fuelQuantity": 3252,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0328,
+      "fillRatio": 0.0325,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1870,8 +1870,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x00dfc006605aa466d593d85930d8afae7d846d58fb186dabdffe8120fbbc96be",
@@ -1900,8 +1900,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x2a5b0e1e874f5fd25808b6cc6f30ec0529f2f8b952fb6397999482a01fc11dbe",
@@ -1930,8 +1930,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x6c133bc5dee02847d511186f7b36fff2c3c3643ece1cf651ba6054bdd3348e37",
@@ -1945,12 +1945,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 3356,
+      "fuelQuantity": 3332,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0336,
+      "fillRatio": 0.0333,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -1961,8 +1961,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0xcbcb6e82c7a2f6dc146f93b759d8ca858d8556791b39feeaea11ebf5e5684090",
@@ -1991,8 +1991,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x6dcc9463cca436bb69858cdd5e36f4dded08edff5d34a4cb3f68e9593d15e708",
@@ -2024,8 +2024,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x7712648303323455be1ba0d83bf1059cc950f9298e32b9278e7dce52363456a4",
@@ -2039,12 +2039,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2427,
+      "fuelQuantity": 2212,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0243,
+      "fillRatio": 0.0221,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2059,8 +2059,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0xc04aad660dbf1e19815456f0b00896d14816c0a782ffcf8b71f809b5b2d907a3",
@@ -2091,8 +2091,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x2c481f22f4dc181303b8223b95450fb930802df1bbf970118828c5e71114e085",
@@ -2126,8 +2126,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x060558a5bba5a98ee14bf699eb232496045dea8f9eca4bd70bd8d5c27aa98409",
@@ -2141,12 +2141,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2871,
+      "fuelQuantity": 2817,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78516,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0287,
+      "fillRatio": 0.0282,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2156,8 +2156,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x1efd928d4faa9a5dd4ba57f89557a8a985140bbf5a56c1eac4030deaeedbcfc1",
@@ -2171,12 +2171,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 606,
+      "fuelQuantity": 391,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0061,
+      "fillRatio": 0.0039,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2189,8 +2189,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x26bb7f15bf78286d88b5b26e613533452546c8b44daa43d971f8be7d38ac8d47",
@@ -2219,8 +2219,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x242f44d61754d38c1b212a7fead6d061d44890c225c628980086a22a86d6f704",
@@ -2249,8 +2249,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x428d8ab0dc5382a15d9508080e2463f21bcb351895d86c0bddb8dfad91114971",
@@ -2264,12 +2264,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 465,
+      "fuelQuantity": 250,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0046,
+      "fillRatio": 0.0025,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2281,8 +2281,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.422Z",
+      "updatedAt": "2026-03-27T15:33:04.422Z"
     },
     {
       "id": "0x79a809a1d84545a6388dc087937182736d5e61b3003bd2fdaf20b2b04d1bdd86",
@@ -2296,12 +2296,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 3383,
+      "fuelQuantity": 3359,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0338,
+      "fillRatio": 0.0336,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2311,12 +2311,13 @@
         "0xeb7d0b8a523aceb7cbb07f3c06a5f51793b1389697602a2deea0f073887dfb42",
         "0x1028fda04271af55c9b94546cb0b6952a93f2dc15200d0e5d27a2aacf209b082",
         "0x6fd6dc3f52d72400fbf4fb9809731ac5ec91c016d40548fdb92e207782c757e1",
-        "0x1fce9decba9ac548cba1b41d9638f87d57361014de28280f39c75a04a539bea5"
+        "0x1fce9decba9ac548cba1b41d9638f87d57361014de28280f39c75a04a539bea5",
+        "0xa3de70cf59a8a1aec31565ceb851405198add453e8bb981fef7eab1f9b5fba4a"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x2f191f3d88b53760720e7096805f12b59f709e46244482521c00db2cb2b2e691",
@@ -2330,12 +2331,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1890,
+      "fuelQuantity": 1675,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0189,
+      "fillRatio": 0.0168,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2345,8 +2346,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x08c03c08dec1a04fcd083964ec8b7a4878d21daa4512412c2e7ef2fef232819a",
@@ -2360,12 +2361,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 583,
+      "fuelQuantity": 529,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 84868,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0058,
+      "fillRatio": 0.0053,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2375,8 +2376,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xa61eaf95576d89f86ab3f0c626f77e6b4b9e1bbfd0b568e26fe2e966412c55de",
@@ -2390,12 +2391,12 @@
       "coordY": 841358118957031800,
       "coordZ": -5496881168986829000,
       "solarSystem": 30016355,
-      "fuelQuantity": 816,
+      "fuelQuantity": 793,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0082,
+      "fillRatio": 0.0079,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2406,8 +2407,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x4ae5c590866409125d032ac4c25a13cbce60f3226fc33698036abe1573ba118d",
@@ -2421,12 +2422,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1817,
+      "fuelQuantity": 1794,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0182,
+      "fillRatio": 0.0179,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2436,8 +2437,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.922Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xd31b3441230ea360ebe3e007d382c672303c13d1f3d13f871cc73e104cd2f9c7",
@@ -2451,12 +2452,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2818,
+      "fuelQuantity": 2795,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0282,
+      "fillRatio": 0.0279,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2466,8 +2467,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.922Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x942060f51ba944cc5baf727953d67650746f221213aa4e06cc4853dfc95e0489",
@@ -2481,12 +2482,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2818,
+      "fuelQuantity": 2795,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0282,
+      "fillRatio": 0.0279,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2497,8 +2498,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x72c9d4f36412166eb4f795ce600866e8eaf689165a7484899f9c7f24a2927200",
@@ -2508,16 +2509,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x8b0f723451af407a1acf2e63449d37935b8e25e88dae7655350f5e13024a32a6",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 1820,
+      "coordX": -13603813989225780000,
+      "coordY": 1701341076423916300,
+      "coordZ": -992653634542175600,
+      "solarSystem": 30013131,
+      "fuelQuantity": 1796,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0182,
+      "fillRatio": 0.018,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2528,8 +2529,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x8af747f310d2cd657225d32d66c075dd363bfbe96dc8f0e9bf5a6e70e378243d",
@@ -2543,12 +2544,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1820,
+      "fuelQuantity": 1796,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0182,
+      "fillRatio": 0.018,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2558,8 +2559,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xf273af49994cc07eb8b9883561277025323769b7cd169936ebaa7904dc82a132",
@@ -2589,8 +2590,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x970ed291cbd6cf88782c92a296986b51c58127017fad113806885040d0e682fd",
@@ -2632,8 +2633,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xff82ba784a32c29a568346902a301b3323799890ece2146f4bb6be33d76be62f",
@@ -2647,12 +2648,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1260,
+      "fuelQuantity": 1045,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0126,
+      "fillRatio": 0.0104,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2668,12 +2669,13 @@
         "0xc7044471ce9b5592cf6fc258b75eea3ced0024ca83fcc741ba9c3ff0b6bb72fe",
         "0xa2dbe8f569bbec356fa7aa5e0a5f8331ce9142a3b6274229e6f90f1c4d218d6a",
         "0x3f576babf4fd3eb90b750d2c4e142f13e601d3a254b611d5475645f77737f46a",
-        "0x885dc2381a10791381ca2314b9b62d66a4d2ba4c45dc70f2858c6fce3524513f"
+        "0x885dc2381a10791381ca2314b9b62d66a4d2ba4c45dc70f2858c6fce3524513f",
+        "0xf56755781b8457878e13f263dccf7d70cf0eb821088e6b45332ea07a5b1b7f71"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x8ea0df026316c32a63850e00af9c8993c6cce846802ebb3e69dd780f3c1f8958",
@@ -2703,8 +2705,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xbd294c9b0c2277566f88388a5ee1d07fa70e6c99fedfd0e88c6584afb3b0e5b8",
@@ -2733,8 +2735,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xd6dc0c3d34b5432e53e7c8a5d09d07e6c4f80dd4aaa1c5449e41dfdb5518c8a0",
@@ -2748,12 +2750,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 892,
+      "fuelQuantity": 868,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0089,
+      "fillRatio": 0.0087,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2764,8 +2766,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xaa24f0f27b4df943c7eaddb16d957916dabf8c526ad34fb13c350cd770fb2724",
@@ -2791,12 +2793,13 @@
       "isOnline": false,
       "connectedAssemblyIds": [
         "0x1840453d141280f202802c3eb2a525affe572a887125f47e1dbf43dee5786b31",
-        "0x72941b09adbcd6b366ac430ae7a7c7f836be75d1bd828ba7f612dec76b9a8063"
+        "0x72941b09adbcd6b366ac430ae7a7c7f836be75d1bd828ba7f612dec76b9a8063",
+        "0x00f73d1cf2b408c9e97a88af9ee3278bef05eecc68ecce56b7702d3708ffa71e"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.923Z",
-      "updatedAt": "2026-03-26T18:12:13.923Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xad428c39dcd2ae19f0fe74ef36038732a75d9f1f0b7c1f8ea2058a49bec679d4",
@@ -2843,8 +2846,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xe6866626e1cb84fdadeae508c67b3ba84f0b0132a50716c2a5ea93b8c54070ff",
@@ -2858,12 +2861,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 336,
+      "fuelQuantity": 312,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0034,
+      "fillRatio": 0.0031,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2874,8 +2877,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xde534eb8a98c250d90ab26dfdbf3e40f005ea855229c7d0796cc2322bf041957",
@@ -2904,8 +2907,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xbd356903280f1e60a0a93d64f9f63da213e123f582a5cd4b774e8512c1b51237",
@@ -2935,8 +2938,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x561b18392d5db646a205e678aec005512e0581a15b3cb5cd90f3bb305a66cdc7",
@@ -2965,8 +2968,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xd39c2176053b24e27d6a7b87cc7782d7bfbcb7e3f87ad414f003d448331e1ff7",
@@ -2980,12 +2983,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 853,
+      "fuelQuantity": 829,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0085,
+      "fillRatio": 0.0083,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -2995,8 +2998,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xc15f3b596b8dce9a30140a7232ef3839851a4161cb9976ce23d03481e2ee9c2a",
@@ -3010,12 +3013,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2854,
+      "fuelQuantity": 2830,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0285,
+      "fillRatio": 0.0283,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3027,8 +3030,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xbdd3ce2147de3a6c668e4608f1863a04696be940bca7e0f86e7f171b28ad6021",
@@ -3042,12 +3045,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1248,
+      "fuelQuantity": 1033,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0125,
+      "fillRatio": 0.0103,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3062,8 +3065,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x50dfcf47f974ae2a9fdca171e5fd291d9814759512471c96e4f97c84a166fbb1",
@@ -3077,12 +3080,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 214,
+      "fuelQuantity": 70,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88319,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0021,
+      "fillRatio": 0.0007,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3092,8 +3095,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x0bf819543511fda5684c1a4a228989db4d540021db61356ddc3bad41e676f7d0",
@@ -3107,12 +3110,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2937,
+      "fuelQuantity": 2913,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0294,
+      "fillRatio": 0.0291,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3122,8 +3125,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0x7bfea019cd278c2667ed3ad4c30c833338105e59bf1fac8a6414c3adf188d0a6",
@@ -3137,12 +3140,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 960,
+      "fuelQuantity": 936,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0096,
+      "fillRatio": 0.0094,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3152,8 +3155,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xf041919623e1e2f2730627a93d2e5187f4cd28a26b0f30ded008cb41338f07fc",
@@ -3167,12 +3170,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1894,
+      "fuelQuantity": 1679,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0189,
+      "fillRatio": 0.0168,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3188,8 +3191,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xb421601b4ca1201d8e30440f0e207f162d40cc3b01882d687d7148efab52732a",
@@ -3203,12 +3206,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 392,
+      "fuelQuantity": 368,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0039,
+      "fillRatio": 0.0037,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3224,8 +3227,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:13.924Z",
-      "updatedAt": "2026-03-26T18:12:13.924Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:04.423Z",
+      "updatedAt": "2026-03-27T15:33:04.423Z"
     },
     {
       "id": "0xc1432044f40cab8fdf94e83b24a0a610cefa1ab12d56d8b2d739c60fcee3e3c1",
@@ -3235,16 +3238,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x89701d7f0b028abec95b89caf8e45f8d27ed323c4d35df136449b5bbf4b6dfb4",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 411,
+      "coordX": 10938423955026917000,
+      "coordY": 11030209608534972000,
+      "coordZ": 3961405865933063000,
+      "solarSystem": 30009862,
+      "fuelQuantity": 384,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78515,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0041,
+      "fillRatio": 0.0038,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3254,8 +3257,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x6043f66a5477078233bd169a789f9d5fd6eebd81d46e23e6059ebdba06641e50",
@@ -3265,16 +3268,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0xd38fa6643f42e6880463427959aed5e4d1ddb04f76ddf9821fd68f007e6982cc",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 2051,
+      "coordX": -13610108487588964000,
+      "coordY": 1120377471380092800,
+      "coordZ": -995796092072321000,
+      "solarSystem": 30013132,
+      "fuelQuantity": 2027,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0205,
+      "fillRatio": 0.0203,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3284,8 +3287,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x0413288062cb50edd1629957cd566d841b49d88241c36b8dc46084ceb698486e",
@@ -3314,8 +3317,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xfbd399dbee82cf89500d4702e51895da8e8cfcfd0ed1a28a383803a466db06e5",
@@ -3342,8 +3345,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xd2c7435ab6aaf0dfcbabbedbfe4eb41abdc60480721a227387ef27ad677214d5",
@@ -3370,8 +3373,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x71511217ca04eaea58dfccd1afba69ae7dc300e944998ca6d34b486b323e57d7",
@@ -3398,8 +3401,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xac99c75619182f7a11cd8c3caa0ecc714491367dad59fb77f8d7873864d64d2b",
@@ -3413,24 +3416,24 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 196,
+      "fuelQuantity": 0,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
-      "isBurning": true,
-      "fillRatio": 0.002,
+      "isBurning": false,
+      "fillRatio": 0,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
-      "currentEnergyProduction": 1000,
-      "isOnline": true,
+      "currentEnergyProduction": 0,
+      "isOnline": false,
       "connectedAssemblyIds": [
         "0x6545247aa7cfeb5b3bc4b694f5d0390d90d2276427520c615c11ac1dd9e15ab9",
         "0xdeefb9334ea628100303b2c5e68dbce759bdad41c289ee8d959bfd0e9a197456"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x9e24fb2d333f392590f430f70ab8d69150d5dc12f2f8d06fa16480348ace4c0f",
@@ -3444,12 +3447,12 @@
       "coordY": 1475693265091278300,
       "coordZ": 959037443395865500,
       "solarSystem": 30000149,
-      "fuelQuantity": 314,
+      "fuelQuantity": 99,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0031,
+      "fillRatio": 0.001,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3459,8 +3462,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x1c2b6e6b82f749ec5e984d41b8aacf1121b9c52136c048dd9aa374112e254b07",
@@ -3474,12 +3477,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2519,
+      "fuelQuantity": 2304,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0252,
+      "fillRatio": 0.023,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3490,8 +3493,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x17650d72197c5549b9523b697a18e7fd008affe4b4900ba60ac41774be321844",
@@ -3527,8 +3530,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xeb1cd6d3bb2e3c88c2cb1b62238dfd0336359e7cf052b629a6b88fbd6a817e06",
@@ -3577,8 +3580,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x87e4582b0b0d16cff8a2de55b951fa5e4674f39bd104b6e7193d47b78601de92",
@@ -3588,10 +3591,10 @@
       "ownerAddress": "shared",
       "ownerCapId": "0x1d2b3f4fdda85a8d4216552ff313cd6a8d5715f771407fc998ff8ece208d3294",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
+      "coordX": -13603814565092198000,
+      "coordY": 1701341097759355000,
+      "coordZ": -992652213582609500,
+      "solarSystem": 30013131,
       "fuelQuantity": 0,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": null,
@@ -3608,8 +3611,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xfee3b733d6b97918cc7fdaba8be5a54dbc4a6b0cdd7742fed8d1d70a59c10273",
@@ -3623,12 +3626,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2523,
+      "fuelQuantity": 2308,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0252,
+      "fillRatio": 0.0231,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3638,8 +3641,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x692050a15e789ec7c34658c2d5c080676a987081cac65b9ec17c0bbdfe705eb7",
@@ -3653,12 +3656,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2557,
+      "fuelQuantity": 2342,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0256,
+      "fillRatio": 0.0234,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3668,8 +3671,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x9cf35d5ee9c08ab2f5289dee33e52df031a352a9c7b7f7267a01f6f3f84010e5",
@@ -3683,12 +3686,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2559,
+      "fuelQuantity": 2344,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0256,
+      "fillRatio": 0.0234,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3698,8 +3701,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xdb361f7e19ce8b8314b2fc4785f566b9a7cc9191edc127c203d098adfcf8636b",
@@ -3713,24 +3716,25 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2560,
+      "fuelQuantity": 2345,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0256,
+      "fillRatio": 0.0234,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
       "isOnline": true,
       "connectedAssemblyIds": [
         "0x77ba6c681d50c7ca6974fd865d7f01130164aa535a52f2e03c052c848d900e29",
-        "0x2577d0c73b9afed234b4864ab1325d8342111dbde14e0934f820dcdbdebaacae"
+        "0x2577d0c73b9afed234b4864ab1325d8342111dbde14e0934f820dcdbdebaacae",
+        "0x858c2e1bfb5aeb9dc0a5e24fef0e9ae231914580a5b0ff4d6f8c429af546d388"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x684da587a3fa31b128b5c1c3f84a80372c47f60186d61b24a6cb6f225ee0b6af",
@@ -3744,12 +3748,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2561,
+      "fuelQuantity": 2346,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0256,
+      "fillRatio": 0.0235,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3759,8 +3763,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xb1e07dac05e3fadd5c34018bdbb61bac87a5d0f927f4b861fc823a801ce3d58a",
@@ -3774,12 +3778,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2959,
+      "fuelQuantity": 2935,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0296,
+      "fillRatio": 0.0294,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3789,8 +3793,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xff5e081e75f857a6dadbead0ff1cf715f5048ea36d05ec4eb82e72fdcdc688a6",
@@ -3804,12 +3808,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2959,
+      "fuelQuantity": 2935,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0296,
+      "fillRatio": 0.0294,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3819,8 +3823,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x32d27a43f66b9ed4913688c74aa34cd713a3cd8f8771f0640e0b06bfed83c0e0",
@@ -3834,12 +3838,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2960,
+      "fuelQuantity": 2936,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0296,
+      "fillRatio": 0.0294,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3849,8 +3853,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x9e02d6e1176b22c5bcf306c54120f10346ad4a9c2db710e07e8f1cdd3f8a362b",
@@ -3860,16 +3864,16 @@
       "ownerAddress": "shared",
       "ownerCapId": "0xf9058011ee2364bcd2a46956b9bac1a50519c1425b1da73bf4c0f8c5f8f64752",
       "isPublic": true,
-      "coordX": 0,
-      "coordY": 0,
-      "coordZ": 0,
-      "solarSystem": 0,
-      "fuelQuantity": 1630,
+      "coordX": -13603814405039147000,
+      "coordY": 1701340938070326300,
+      "coordZ": -992652121961946100,
+      "solarSystem": 30013131,
+      "fuelQuantity": 1415,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0163,
+      "fillRatio": 0.0141,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3880,8 +3884,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xae68baa826db0ec9f60d924fb8ba27f6b2cc8f5cf91c6f8e6a1e3f8f9d783c13",
@@ -3895,12 +3899,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2960,
+      "fuelQuantity": 2937,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0296,
+      "fillRatio": 0.0294,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3910,8 +3914,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xf96b02eb949ebaf1f842daec1dd5d23b35e5e0cc11ac58c6783814d97666a772",
@@ -3925,12 +3929,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 2667,
+      "fuelQuantity": 2452,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0267,
+      "fillRatio": 0.0245,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3940,8 +3944,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x04d4d1c272bf572e007b514e46fa637729ab3fbba9febabed7acbcf8966076cd",
@@ -3955,12 +3959,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 1100,
+      "fuelQuantity": 885,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 88335,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.011,
+      "fillRatio": 0.0089,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -3972,14 +3976,19 @@
         "0x3eff18f96859866f61e54ba63961c792012758db772d9284f6f9863cdcabde1b",
         "0xb1fd2ca13a507b5918cb5032a1f407fdbdd73fd9d7f3061e14c880253cf1295b",
         "0x18df6e775b95cdb2616da85638d41e3d1807c6193801734dca138beaefd424ba",
-        "0x905873653cfb4d4e3c8b41cf71e95298995bc793ca42ffb3af8bf7aef497e9ba",
         "0xe13d03d483170f76aad890a74486a0d58e693aa713ed4c31499d0b137f88577f",
-        "0x14dd0005e2ecfc5cee703a331cce74bf4420968300cabf31424db06e23de3f54"
+        "0x14dd0005e2ecfc5cee703a331cce74bf4420968300cabf31424db06e23de3f54",
+        "0x84c8ecdc94075313bc37d63c94f4f5b994dab552c2097ebbc11b47c72123ebee",
+        "0x14ad264b1861cce90f8474cbaedd6a25e94bfb1f5955a7437cb5322927a6bf3c",
+        "0x00c150ec9f36df345fac73afe55fed75760c2e9c528797d7f7d21c35e061ff2c",
+        "0x0cfa98d2e35f3aae38d6a40848116ad20b6536783ed444149c50095a7f4727c8",
+        "0x667b50c2dddd3e86921a31d3ada81678da3e31293a33a6e9a08dcb674aed7668",
+        "0x823c8b4c2ca4b1aef1362769a67e15a5741d9d60a2a0f72f4600922eb75418ad"
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x86505f44156e6e562b7fe579c54026c141c6de2d4675c4772129c677c68aaf70",
@@ -3993,12 +4002,12 @@
       "coordY": 0,
       "coordZ": 0,
       "solarSystem": 0,
-      "fuelQuantity": 989,
+      "fuelQuantity": 965,
       "fuelMaxCapacity": 100000,
       "fuelTypeId": 78437,
       "fuelBurnRate": 3600000,
       "isBurning": true,
-      "fillRatio": 0.0099,
+      "fillRatio": 0.0097,
       "urgency": "critical",
       "maxEnergyProduction": 1000,
       "currentEnergyProduction": 1000,
@@ -4009,8 +4018,8 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0x9e76cec12deaf7cc05cc89c0266d8a6b41ad100bdc1f0bac5ce47fc79cadf22a",
@@ -4037,8 +4046,8 @@
       "connectedAssemblyIds": [],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     },
     {
       "id": "0xda6d14b2b4aecc06ca0088c5e49936dbc4eaa066b0d5419e63bf4e56be656e8d",
@@ -4068,8 +4077,226 @@
       ],
       "description": null,
       "imageUrl": null,
-      "lastUpdatedOnChain": "2026-03-26T18:12:14.515Z",
-      "updatedAt": "2026-03-26T18:12:14.515Z"
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0x292a75ae82a60543c8ca3aeade4a64ab822d2061b178aaf2e937de24b70e5d76",
+      "objectId": "0x292a75ae82a60543c8ca3aeade4a64ab822d2061b178aaf2e937de24b70e5d76",
+      "name": "NetworkNode-0e5d76",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0x9bb17990edc216793bc3ccd722c14f99fd63c62661c027e75f5b337667e53909",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 3271,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": 88335,
+      "fuelBurnRate": 3600000,
+      "isBurning": true,
+      "fillRatio": 0.0327,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 1000,
+      "isOnline": true,
+      "connectedAssemblyIds": [
+        "0x619a06d976188ab015ad495d93e42faff9fe68bf45c86269ebcd870cbae7d888",
+        "0x9af9f8878cd02f4d419140dd02509dcb0d96fad906401f22548c51f71ddc9247",
+        "0x9bdb9426f1b899187f368397b14d6a744f4b596443f09c91aeceef7c148400af"
+      ],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0x6a71109b5be70c663f9e79e8fafa92d55b8a38e391f39c12ff90e579f1d2f6ad",
+      "objectId": "0x6a71109b5be70c663f9e79e8fafa92d55b8a38e391f39c12ff90e579f1d2f6ad",
+      "name": "NetworkNode-d2f6ad",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0x4c01cacc1ee7809dc8026154898ac94a70067db7050cd987ecb43b567cab84f3",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 3554,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": 78437,
+      "fuelBurnRate": 3600000,
+      "isBurning": true,
+      "fillRatio": 0.0355,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 1000,
+      "isOnline": true,
+      "connectedAssemblyIds": [
+        "0xba04e065056b60c98067ea43323b1bf08be35dd88f6e6191ffec8f3ad1ed13cb",
+        "0x2592a3ff0fd3df9878a693b8a7d5478b84f7aeea82350be1700f764327f519e4"
+      ],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0xbe5d04073215e08fb574fe35f7e6549d61f0d6d326fc94d9996c79c192990e76",
+      "objectId": "0xbe5d04073215e08fb574fe35f7e6549d61f0d6d326fc94d9996c79c192990e76",
+      "name": "NetworkNode-990e76",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0x8410866c4b3ee4a6ea9c3794f1a648d6d14d485122f3564e16ccf64102098740",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 3571,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": 78437,
+      "fuelBurnRate": 3600000,
+      "isBurning": false,
+      "fillRatio": 0.0357,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 0,
+      "isOnline": false,
+      "connectedAssemblyIds": [
+        "0xf7167a986c1059dac56e14f5a7b67499e06df75cba57af2a0d57a701a88e794f"
+      ],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0x3a3170465e1298f3e283f0082affffbe86208ed9c2d77be704663c1b1db9c170",
+      "objectId": "0x3a3170465e1298f3e283f0082affffbe86208ed9c2d77be704663c1b1db9c170",
+      "name": "NetworkNode-b9c170",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0x6653ab2ed98f8f299dbd02d983c373742ea75f04ce7bd5395a07ac8c3511cd1c",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 0,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": null,
+      "fuelBurnRate": 3600000,
+      "isBurning": false,
+      "fillRatio": 0,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 0,
+      "isOnline": false,
+      "connectedAssemblyIds": [],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0xb9119b123a0eff87be60039a2ac7c0490a41c0e72cf8637e3d7f216da5451eb2",
+      "objectId": "0xb9119b123a0eff87be60039a2ac7c0490a41c0e72cf8637e3d7f216da5451eb2",
+      "name": "NetworkNode-451eb2",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0xed2d5c04c55b0f8616aca9bc31199bd83313f82faf9b89fdd6293b15dae543de",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 3555,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": 78516,
+      "fuelBurnRate": 3600000,
+      "isBurning": true,
+      "fillRatio": 0.0355,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 1000,
+      "isOnline": true,
+      "connectedAssemblyIds": [
+        "0xeec2a9264f39d82ed37771f6967727a85438ef0cf552dbcb89a317f0812cbcab",
+        "0x95993decacddcd1a906caf69891fbcc52370608b2d61756ffcc8eab11a5cf730",
+        "0x8269bc2414e1a4e963af33d022b210aa1ed5d5d9af5ecddebcba1b8362af1cb1",
+        "0x8e69134233b0d887d939a16f0fa87d48e8c8152a77e29c72fbefc7e2b14f5f3c",
+        "0xf8c97a3d8528180b9a842cef93fdeac27beb2693dab8c87ec357f620a0d7dbd0",
+        "0xaeae6c44a3dad6e302787deb689bdfdc7411eebe1e587596d4c806b8866b66b6",
+        "0xe2b99fd4b672a6626c6b86071f538d057e7521630a458d2eaea6161cf98acf63",
+        "0x3bd0a3c62f6e534402ec6e513d230566311ae80a4f5da4e297f697c75544716b",
+        "0xf513677d6675585d1bb1b546d7807a5f9f021511a2bd83018ea2ace60d0fb1ff",
+        "0x2c421d807bd25c4a8109cccb12ce6a8e604b9e620be11d32c9a902fe948f6419"
+      ],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0x22535589537c22e2283781f1fdf29f81b7797268aab0f9382de49237db3b6837",
+      "objectId": "0x22535589537c22e2283781f1fdf29f81b7797268aab0f9382de49237db3b6837",
+      "name": "NetworkNode-3b6837",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0xac883dabca9bab3c817aeae796771b7b13b65b378a55bfa9527fd301c96c7078",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 0,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": null,
+      "fuelBurnRate": 3600000,
+      "isBurning": false,
+      "fillRatio": 0,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 0,
+      "isOnline": false,
+      "connectedAssemblyIds": [
+        "0x02502f41c2ad955bc8e629a9699d21d77607f7279d02f6fcddad8da1d5b5e8ca"
+      ],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
+    },
+    {
+      "id": "0xa18905dc695836c55bc2122aafbb88f231f834b32feaaf45cd9eb3093a60dbd3",
+      "objectId": "0xa18905dc695836c55bc2122aafbb88f231f834b32feaaf45cd9eb3093a60dbd3",
+      "name": "NetworkNode-60dbd3",
+      "typeId": 88092,
+      "ownerAddress": "shared",
+      "ownerCapId": "0xe6148854191b384bd1edb5613d753c7d2729e5f85df993175811e2e43fbf7b50",
+      "isPublic": true,
+      "coordX": 0,
+      "coordY": 0,
+      "coordZ": 0,
+      "solarSystem": 0,
+      "fuelQuantity": 0,
+      "fuelMaxCapacity": 100000,
+      "fuelTypeId": null,
+      "fuelBurnRate": 3600000,
+      "isBurning": false,
+      "fillRatio": 0,
+      "urgency": "critical",
+      "maxEnergyProduction": 1000,
+      "currentEnergyProduction": 0,
+      "isOnline": false,
+      "connectedAssemblyIds": [],
+      "description": null,
+      "imageUrl": null,
+      "lastUpdatedOnChain": "2026-03-27T15:33:08.493Z",
+      "updatedAt": "2026-03-27T15:33:08.493Z"
     }
   ]
 }

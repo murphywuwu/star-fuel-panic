@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
+import {
+  hydrateRuntimeProjectionFromBackendIfNeeded,
+  persistMatchDetailForTeamToBackend
+} from "@/server/matchBackendStore";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
 import { refundTeamEntry } from "@/server/matchRuntime";
 
@@ -13,6 +17,7 @@ type RefundTeamRequest = {
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) {
     return NextResponse.json(
@@ -48,6 +53,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       ).body
     });
   }
+
+  await persistMatchDetailForTeamToBackend(id);
 
   return finalizeMutation(`POST:/api/teams/${id}/refund`, mutation.mutation, {
     status: 200,

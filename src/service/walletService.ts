@@ -2,6 +2,7 @@ import { fromBase64 } from "@mysten/sui/utils";
 import { verifyTransactionSignature } from "@mysten/sui/verify";
 import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
+import { buildInsufficientGasMessage } from "@/utils/paymentToken";
 
 const LEGACY_STORAGE_IDENTITY_PROOF_KEY = "ffp.wallet.identity_proof";
 
@@ -18,6 +19,7 @@ export interface WalletRuntimeBridge {
   signTransaction: (txBytes: Uint8Array) => Promise<SignedPayload>;
   signAndExecuteTransaction: (transaction: Transaction) => Promise<{ txDigest: string }>;
   getBalance: (address: string) => Promise<number>;
+  objectExists?: (objectId: string) => Promise<boolean>;
 }
 
 export class WalletServiceError extends Error {
@@ -197,6 +199,103 @@ class WalletServiceImpl {
     );
   }
 
+  async signAndExecuteTeamEntryEscrowPayment(input: {
+    packageId: string;
+    roomId: string;
+    escrowId: string;
+    teamRef: string;
+    memberCount: number;
+    quotedAmountLux: number;
+    amountBaseUnits: bigint;
+    coinType: string;
+  }): Promise<{ txDigest: string }> {
+    const runtime = this.ensureRuntime();
+    const address = runtime.currentAddress();
+
+    if (!address) {
+      throw new WalletServiceError("E_WALLET_NOT_CONNECTED", "wallet not connected");
+    }
+    if (!input.packageId.trim() || !input.roomId.trim() || !input.escrowId.trim()) {
+      throw new WalletServiceError("E_WALLET_UNAVAILABLE", "match escrow payment is not configured");
+    }
+    if (input.amountBaseUnits <= 0n) {
+      throw new WalletServiceError("E_INSUFFICIENT_BALANCE", "invalid payment amount");
+    }
+
+    const tx = new Transaction();
+    tx.setSender(address);
+    const paymentCoin = coinWithBalance({
+      balance: input.amountBaseUnits,
+      type: input.coinType,
+      useGasCoin: input.coinType === "0x2::sui::SUI"
+    });
+    tx.moveCall({
+      target: `${input.packageId}::fuel_frog_panic::lock_team_entry_with_escrow`,
+      typeArguments: [input.coinType],
+      arguments: [
+        tx.object(input.roomId),
+        tx.object(input.escrowId),
+        tx.pure.address(input.teamRef),
+        tx.pure.u64(input.memberCount),
+        tx.pure.u64(input.quotedAmountLux),
+        paymentCoin
+      ]
+    });
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const execution = await runtime.signAndExecuteTransaction(tx);
+        const txDigest = this.extractTxDigest(execution);
+        if (!txDigest) {
+          throw new WalletServiceError("E_WALLET_NETWORK", "wallet execution returned no tx digest");
+        }
+        return { txDigest };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await this.shortDelay(250);
+        }
+      }
+    }
+
+    throw new WalletServiceError(
+      this.parseErrorCode(lastError, "E_WALLET_NETWORK"),
+      this.resolveErrorMessage(lastError, "wallet team escrow payment transaction failed")
+    );
+  }
+
+  async executeTransaction(transaction: Transaction): Promise<{ txDigest: string }> {
+    const runtime = this.ensureRuntime();
+    const address = runtime.currentAddress();
+
+    if (!address) {
+      throw new WalletServiceError("E_WALLET_NOT_CONNECTED", "wallet not connected");
+    }
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const execution = await runtime.signAndExecuteTransaction(transaction);
+        const txDigest = this.extractTxDigest(execution);
+        if (!txDigest) {
+          throw new WalletServiceError("E_WALLET_NETWORK", "wallet execution returned no tx digest");
+        }
+        return { txDigest };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) {
+          await this.shortDelay(250);
+        }
+      }
+    }
+
+    throw new WalletServiceError(
+      this.parseErrorCode(lastError, "E_WALLET_NETWORK"),
+      this.resolveErrorMessage(lastError, "wallet transaction execution failed")
+    );
+  }
+
   /**
    * 获取余额
    */
@@ -213,6 +312,22 @@ class WalletServiceImpl {
       throw new WalletServiceError(
         this.parseErrorCode(error, "E_WALLET_NETWORK"),
         this.resolveErrorMessage(error, "wallet balance query failed")
+      );
+    }
+  }
+
+  async objectExists(objectId: string): Promise<boolean> {
+    const runtime = this.ensureRuntime();
+    if (!runtime.objectExists) {
+      throw new WalletServiceError("E_WALLET_UNAVAILABLE", "wallet chain object lookup unavailable");
+    }
+
+    try {
+      return await runtime.objectExists(objectId);
+    } catch (error) {
+      throw new WalletServiceError(
+        this.parseErrorCode(error, "E_WALLET_NETWORK"),
+        this.resolveErrorMessage(error, "wallet object lookup failed")
       );
     }
   }
@@ -274,6 +389,14 @@ class WalletServiceImpl {
       return "E_WALLET_NETWORK";
     }
 
+    if (
+      raw.includes("gas selection") ||
+      raw.includes("insufficient sui balance") ||
+      raw.includes("satisfy required budget")
+    ) {
+      return "E_INSUFFICIENT_GAS";
+    }
+
     if (raw.includes("insufficient") || raw.includes("not enough") || raw.includes("balance")) {
       return "E_INSUFFICIENT_BALANCE";
     }
@@ -297,6 +420,14 @@ class WalletServiceImpl {
     const lower = combined.toLowerCase();
     if (lower === "unknown error" || lower.endsWith(": unknown error")) {
       return fallback;
+    }
+
+    if (
+      lower.includes("gas selection") ||
+      lower.includes("insufficient sui balance") ||
+      lower.includes("satisfy required budget")
+    ) {
+      return buildInsufficientGasMessage();
     }
 
     return combined;

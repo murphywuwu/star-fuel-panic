@@ -1,10 +1,29 @@
 import { authStore, type AuthStore } from "@/model/authStore";
 import { WalletServiceError, walletService, type WalletService } from "@/service/walletService";
 import type { ControllerResult, FuelMissionErrorCode } from "@/types/fuelMission";
+import { describePackageAvailabilityMismatch } from "@/utils/suiPackageProbe";
+import { toBaseUnits } from "@/utils/tokenAmount";
 
 const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT?.trim() ?? "";
+const FUEL_FROG_PACKAGE_ID =
+  process.env.NEXT_PUBLIC_FUEL_FROG_PACKAGE_ID?.trim() ??
+  process.env.NEXT_PUBLIC_FUEL_FROG_CONTRACT_PACKAGE_ID?.trim() ??
+  "";
+const MATCH_SPONSORSHIP_RECIPIENT =
+  process.env.NEXT_PUBLIC_MATCH_SPONSORSHIP_RECIPIENT?.trim() ??
+  process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT?.trim() ??
+  "";
 const LUX_COIN_TYPE = process.env.NEXT_PUBLIC_LUX_COIN_TYPE?.trim() || "0x2::sui::SUI";
 const LUX_DECIMALS = Number(process.env.NEXT_PUBLIC_LUX_DECIMALS ?? Number.NaN);
+const SUI_NETWORK_LABEL = process.env.NEXT_PUBLIC_SUI_NETWORK?.trim() || "configured";
+
+export type TeamEntryEscrowPaymentInput = {
+  roomId: string;
+  escrowId: string;
+  teamRef: string;
+  memberCount: number;
+  amountLux: number;
+};
 
 /**
  * AuthService - 钱包认证服务
@@ -192,7 +211,44 @@ class AuthService {
   /**
    * 执行入场费支付
    */
-  async executeEntryPayment(amountLux: number): Promise<ControllerResult<{
+  async executeEntryPayment(input: number | TeamEntryEscrowPaymentInput): Promise<ControllerResult<{
+    txDigest: string;
+    recipient: string;
+    luxBalance: number;
+  } | undefined>> {
+    if (typeof input === "number") {
+      return this.executeLuxTransfer(
+        input,
+        PAYMENT_RECIPIENT,
+        "entry payment recipient is not configured",
+        "entry payment executed"
+      );
+    }
+
+    return this.executeTeamEntryEscrowPayment(input);
+  }
+
+  async executeSponsorshipPayment(amountLux: number): Promise<ControllerResult<{
+    txDigest: string;
+    recipient: string;
+    luxBalance: number;
+  } | undefined>> {
+    return this.executeLuxTransfer(
+      amountLux,
+      MATCH_SPONSORSHIP_RECIPIENT,
+      "match sponsorship recipient is not configured",
+      "match sponsorship payment executed"
+    );
+  }
+
+  // ============ Private Helpers ============
+
+  private async executeLuxTransfer(
+    amountLux: number,
+    recipient: string,
+    missingRecipientMessage: string,
+    successMessage: string
+  ): Promise<ControllerResult<{
     txDigest: string;
     recipient: string;
     luxBalance: number;
@@ -202,18 +258,18 @@ class AuthService {
       return this.result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
     }
 
-    if (!PAYMENT_RECIPIENT) {
-      return this.result(false, "entry payment recipient is not configured", undefined, "E_WALLET_UNAVAILABLE");
+    if (!recipient) {
+      return this.result(false, missingRecipientMessage, undefined, "E_WALLET_UNAVAILABLE");
     }
 
-    const amountBaseUnits = this.toBaseUnits(amountLux, LUX_DECIMALS);
+    const amountBaseUnits = toBaseUnits(amountLux, LUX_DECIMALS);
     if (amountBaseUnits <= 0n) {
       return this.result(false, "invalid entry fee amount", undefined, "E_INSUFFICIENT_BALANCE");
     }
 
     try {
       const payment = await this.wallet.signAndExecuteEntryPayment({
-        recipient: PAYMENT_RECIPIENT,
+        recipient,
         amountBaseUnits,
         coinType: LUX_COIN_TYPE
       });
@@ -221,9 +277,9 @@ class AuthService {
       const balance = await this.wallet.getBalance(state.walletAddress);
       this.store.getState().updateBalance(balance);
 
-      return this.result(true, "entry payment executed", {
+      return this.result(true, successMessage, {
         txDigest: payment.txDigest,
-        recipient: PAYMENT_RECIPIENT,
+        recipient,
         luxBalance: balance
       });
     } catch (error) {
@@ -231,7 +287,73 @@ class AuthService {
     }
   }
 
-  // ============ Private Helpers ============
+  private async executeTeamEntryEscrowPayment(
+    input: TeamEntryEscrowPaymentInput
+  ): Promise<ControllerResult<{
+    txDigest: string;
+    recipient: string;
+    luxBalance: number;
+  } | undefined>> {
+    const state = this.store.getState();
+    if (!state.walletAddress || !state.isConnected) {
+      return this.result(false, "wallet not connected", undefined, "E_WALLET_NOT_CONNECTED");
+    }
+
+    if (!FUEL_FROG_PACKAGE_ID) {
+      return this.result(false, "fuel frog package id is not configured", undefined, "E_WALLET_UNAVAILABLE");
+    }
+    if (!input.roomId.trim() || !input.escrowId.trim()) {
+      return this.result(false, "match escrow is not ready", undefined, "E_WALLET_UNAVAILABLE");
+    }
+
+    const amountBaseUnits = toBaseUnits(input.amountLux, LUX_DECIMALS);
+    if (amountBaseUnits <= 0n) {
+      return this.result(false, "invalid entry fee amount", undefined, "E_INSUFFICIENT_BALANCE");
+    }
+
+    try {
+      const packageExists = await this.wallet.objectExists(FUEL_FROG_PACKAGE_ID);
+      if (!packageExists) {
+        const hint = await describePackageAvailabilityMismatch(FUEL_FROG_PACKAGE_ID, SUI_NETWORK_LABEL);
+        return this.result(
+          false,
+          hint,
+          undefined,
+          "E_WALLET_UNAVAILABLE"
+        );
+      }
+
+      const payment = await this.wallet.signAndExecuteTeamEntryEscrowPayment({
+        packageId: FUEL_FROG_PACKAGE_ID,
+        roomId: input.roomId,
+        escrowId: input.escrowId,
+        teamRef: input.teamRef,
+        memberCount: input.memberCount,
+        quotedAmountLux: input.amountLux,
+        amountBaseUnits,
+        coinType: LUX_COIN_TYPE
+      });
+
+      const balance = await this.wallet.getBalance(state.walletAddress);
+      this.store.getState().updateBalance(balance);
+
+      return this.result(true, "entry payment locked into match escrow", {
+        txDigest: payment.txDigest,
+        recipient: input.escrowId,
+        luxBalance: balance
+      });
+    } catch (error) {
+      if (error instanceof WalletServiceError && error.message.includes(FUEL_FROG_PACKAGE_ID) && /object .*not found/i.test(error.message)) {
+        return this.result(
+          false,
+          `escrow package ${FUEL_FROG_PACKAGE_ID} is not available on ${SUI_NETWORK_LABEL}; check wallet network and NEXT_PUBLIC_FUEL_FROG_PACKAGE_ID`,
+          undefined,
+          "E_WALLET_UNAVAILABLE"
+        );
+      }
+      return this.resolveWalletError(error, "E_WALLET_NETWORK", "team escrow payment transaction failed");
+    }
+  }
 
   private result<T>(
     ok: boolean,
@@ -255,18 +377,6 @@ class AuthService {
 
   private normalizeAddress(address: string | null | undefined): string | null {
     return address?.trim().toLowerCase() ?? null;
-  }
-
-  private toBaseUnits(amount: number, decimals: number): bigint {
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return 0n;
-    }
-
-    const safeDecimals = Number.isFinite(decimals) && decimals >= 0 ? Math.floor(decimals) : 9;
-    const fixed = amount.toFixed(safeDecimals);
-    const [wholePart, fractionPart = ""] = fixed.split(".");
-    const combined = `${wholePart}${fractionPart.padEnd(safeDecimals, "0")}`.replace(/^0+/, "") || "0";
-    return BigInt(combined);
   }
 }
 

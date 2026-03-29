@@ -1,7 +1,9 @@
 -- F-005 Settlement table
 create table if not exists public.settlements (
   id uuid primary key default gen_random_uuid(),
-  match_id uuid not null references public.matches(id) on delete cascade,
+  -- Attach FK in a later migration because this legacy file can run before
+  -- `202603210002_f002_lobby_match_tables.sql` on a fresh local bootstrap.
+  match_id uuid not null,
   gross_pool numeric(20, 2) not null default 0,
   platform_fee numeric(20, 2) not null default 0,
   payout_pool numeric(20, 2) not null default 0,

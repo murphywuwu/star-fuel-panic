@@ -1,4 +1,5 @@
 import type { PlayerContribution, SettlementBill, TeamState } from "@/types/fuelMission";
+import { formatPaymentTokenAmount } from "@/utils/paymentToken";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
 interface ScoreSummaryProps {
@@ -18,7 +19,7 @@ interface EarningsCardProps {
 }
 
 function money(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} LUX`;
+  return formatPaymentTokenAmount(value, { maximumFractionDigits: 2 });
 }
 
 export function ScoreSummary({ contributions, teams, teamScore }: ScoreSummaryProps) {

@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Match } from "../types/match.ts";
 import type { Team, TeamMember } from "../types/team.ts";
-import { buildSettlementBill, getSettlementStatus, resolveSettlementBill } from "./settlementRuntime.ts";
+import {
+  buildSettlementBill,
+  getSettlementStatus,
+  materializeSettlementFact,
+  resolveSettlementBill
+} from "./settlementRuntime.ts";
 import { __setMatchDetailForTests, resetMatchRuntime } from "./matchRuntime.ts";
-import { createEmptyProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
+import { createEmptyProjectionState, readRuntimeProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
 
 function buildMatch(status: Match["status"] = "settled", prizePool = 1200): Match {
   return {
@@ -152,18 +157,44 @@ test("exposes pending, running, and succeeded settlement status snapshots", () =
   const runningDetail = buildDetail([500, 300], "settling");
   __setMatchDetailForTests(runningDetail);
   const runningStatus = getSettlementStatus(runningDetail.match.id);
+  const runningProjection = readRuntimeProjectionState();
 
   assert.ok(runningStatus);
   assert.equal(runningStatus?.status, "running");
   assert.equal(runningStatus?.progress, 75);
   assert.equal(runningStatus?.payoutTxDigest, null);
+  assert.equal(runningProjection.settlements.length, 1);
+  assert.equal(runningProjection.settlements[0]?.status, "running");
+  assert.equal(runningProjection.settlements[0]?.bill.payoutTxDigest, null);
 
   const succeededDetail = buildDetail([500, 300], "settled");
   __setMatchDetailForTests(succeededDetail);
   const succeededStatus = getSettlementStatus(succeededDetail.match.id);
+  const succeededProjection = readRuntimeProjectionState();
 
   assert.ok(succeededStatus);
   assert.equal(succeededStatus?.status, "succeeded");
   assert.equal(succeededStatus?.progress, 100);
   assert.equal(succeededStatus?.payoutTxDigest, "tx-team-1");
+  assert.equal(succeededProjection.settlements.length, 1);
+  assert.equal(succeededProjection.settlements[0]?.status, "succeeded");
+  assert.equal(succeededProjection.settlements[0]?.payoutTxDigest, "tx-team-1");
+});
+
+test("materialized running settlement fact does not unlock result bill early", () => {
+  resetMatchRuntime();
+  writeRuntimeProjectionState(createEmptyProjectionState());
+
+  const settlingDetail = buildDetail([500, 300], "settling");
+  __setMatchDetailForTests(settlingDetail);
+
+  const materialized = materializeSettlementFact(settlingDetail.match.id);
+  assert.ok(materialized);
+  assert.equal(materialized?.status, "running");
+
+  const resolved = resolveSettlementBill(settlingDetail);
+  assert.equal(resolved.ok, false);
+  if (!resolved.ok) {
+    assert.equal(resolved.reason, "not_ready");
+  }
 });

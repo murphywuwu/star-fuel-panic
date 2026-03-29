@@ -17,6 +17,7 @@ export function useCreateMatchController() {
       selectSystem: createMatchService.selectSystem.bind(createMatchService),
       toggleTargetNode: createMatchService.toggleTargetNode.bind(createMatchService),
       createDraft: createMatchService.createDraft.bind(createMatchService),
+      executePublishEscrowTransaction: createMatchService.executePublishEscrowTransaction.bind(createMatchService),
       publish: createMatchService.publish.bind(createMatchService),
       reset: createMatchService.reset.bind(createMatchService)
     }),

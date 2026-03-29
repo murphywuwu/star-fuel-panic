@@ -5,6 +5,7 @@ import { FuelMissionShell } from "@/view/components/FuelMissionShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 import type { PlayerRole } from "@/types/team";
+import { PAYMENT_TOKEN_SYMBOL } from "@/utils/paymentToken";
 
 const ROLE_ORDER: PlayerRole[] = ["collector", "hauler", "escort"];
 
@@ -35,8 +36,8 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
               <div className="grid gap-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/78 md:grid-cols-2">
                 <p>MATCH: {state.match.id}</p>
                 <p>STATUS: {state.match.status}</p>
-                <p>ENTRY FEE: {state.match.entryFee} LUX</p>
-                <p>PRIZE POOL: {state.match.prizePool} LUX</p>
+                <p>ENTRY FEE: {state.match.entryFee} {PAYMENT_TOKEN_SYMBOL}</p>
+                <p>PRIZE POOL: {state.match.prizePool} {PAYMENT_TOKEN_SYMBOL}</p>
                 <p>REGISTERED TEAMS: {state.teams.length}</p>
                 <p>MAX TEAMS: {state.match.maxTeams}</p>
               </div>
@@ -105,7 +106,7 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
 
                     <div className="mt-3 grid gap-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-3">
                       <p>MEMBERS: {team.memberCount}/{team.maxSize}</p>
-                      <p>PAYMENT: {team.paymentAmount} LUX</p>
+                      <p>PAYMENT: {team.paymentAmount} {PAYMENT_TOKEN_SYMBOL}</p>
                       <p>WL: {team.whitelistCount}</p>
                     </div>
 

@@ -1,4 +1,5 @@
 import { verifyPersonalMessageSignature } from "@mysten/sui/verify";
+import { hydrateRuntimeProjectionFromBackendIfNeeded, persistMatchDetailToBackend } from "./matchBackendStore.ts";
 import { __setMatchDetailForTests, getMatchDetail, listMatches } from "./matchRuntime.ts";
 import {
   getPersistedMatchDetail,
@@ -9,6 +10,7 @@ import {
   type PersistedTeamPayment
 } from "./runtimeProjectionStore.ts";
 import type { ErrorCode } from "../types/common.ts";
+import { deriveTeamPaymentRef } from "../utils/teamPaymentRef.ts";
 import type {
   JoinTeamResponse,
   PlayerRole,
@@ -38,11 +40,15 @@ type RuntimeTeam = Team & {
 type RuntimeMatchState = {
   id: string;
   status: "draft" | "lobby" | "prestart" | "running" | "panic" | "settling" | "settled" | "cancelled";
+  roomId: string | null;
+  escrowId: string | null;
   entryFee: number;
   prizePool: number;
   minTeams: number;
   maxTeams: number;
   teams: RuntimeTeam[];
+  teamPayments: PersistedTeamPayment[];
+  whitelists: PersistedMatchWhitelist[];
 };
 
 type RuntimeStore = {
@@ -100,6 +106,31 @@ type PayTeamInput = SignedPayload & {
   memberAddresses?: string[];
 };
 
+export type TeamPaymentQuote = {
+  amount: number;
+  memberCount: number;
+  roomId: string | null;
+  escrowId: string | null;
+  teamRef: string;
+};
+
+export function getExpectedTeamPayment(teamId: string): TeamPaymentQuote | null {
+  const found = findTeam(teamId.trim());
+  if (!found) {
+    return null;
+  }
+
+  const { match, team } = found;
+  const memberCount = team.members.length;
+  return {
+    amount: match.entryFee * memberCount,
+    memberCount,
+    roomId: match.roomId,
+    escrowId: match.escrowId,
+    teamRef: deriveTeamPaymentRef(team.id)
+  };
+}
+
 const ROLE_ORDER: PlayerRole[] = ["collector", "hauler", "escort"];
 
 function failure(status: number, code: ErrorCode, message: string): ApiFailure {
@@ -117,6 +148,26 @@ function failure(status: number, code: ErrorCode, message: string): ApiFailure {
 
 function normalizeWallet(walletAddress: string) {
   return walletAddress.trim().toLowerCase();
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function uniqueWallets(addresses: string[]) {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const address of addresses) {
+    const normalized = normalizeWallet(address);
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    unique.push(normalized);
+  }
+
+  return unique;
 }
 
 export function createTestTeamSignature(walletAddress: string, message: string) {
@@ -249,7 +300,172 @@ function mapPersistedTeam(team: PersistedTeam, members: RuntimeMember[], applica
   };
 }
 
+function normalizePersistedTeamPayment(
+  matchId: string,
+  payment: PersistedTeamPayment
+): PersistedTeamPayment | null {
+  const teamId = payment.teamId.trim();
+  const txDigest = payment.txDigest.trim();
+  const walletAddress = normalizeWallet(payment.walletAddress);
+
+  if (payment.matchId !== matchId || !teamId || !txDigest || !walletAddress) {
+    return null;
+  }
+
+  const amount = parseTxAmount(payment.amount);
+  return {
+    matchId,
+    teamId,
+    walletAddress,
+    txDigest,
+    amount: amount !== null && amount >= 0 ? amount : 0,
+    memberAddresses: uniqueWallets(payment.memberAddresses ?? []),
+    createdAt: payment.createdAt || nowIso()
+  };
+}
+
+function normalizePersistedMatchWhitelist(
+  matchId: string,
+  whitelist: PersistedMatchWhitelist
+): PersistedMatchWhitelist | null {
+  const teamId = whitelist.teamId.trim();
+  const walletAddress = normalizeWallet(whitelist.walletAddress);
+  const sourcePaymentTx = whitelist.sourcePaymentTx.trim();
+
+  if (whitelist.matchId !== matchId || !teamId || !walletAddress || !sourcePaymentTx) {
+    return null;
+  }
+
+  return {
+    matchId,
+    teamId,
+    walletAddress,
+    sourcePaymentTx,
+    createdAt: whitelist.createdAt || nowIso()
+  };
+}
+
+function normalizeTeamPayments(matchId: string, payments: PersistedTeamPayment[]) {
+  const byTeam = new Map<string, PersistedTeamPayment>();
+
+  for (const payment of payments) {
+    const normalized = normalizePersistedTeamPayment(matchId, payment);
+    if (!normalized) {
+      continue;
+    }
+    byTeam.set(normalized.teamId, normalized);
+  }
+
+  return [...byTeam.values()];
+}
+
+function normalizeMatchWhitelists(matchId: string, whitelists: PersistedMatchWhitelist[]) {
+  const byKey = new Map<string, PersistedMatchWhitelist>();
+
+  for (const whitelist of whitelists) {
+    const normalized = normalizePersistedMatchWhitelist(matchId, whitelist);
+    if (!normalized) {
+      continue;
+    }
+    byKey.set(`${normalized.teamId}:${normalized.walletAddress}`, normalized);
+  }
+
+  return [...byKey.values()];
+}
+
+function getTeamPaymentFact(match: RuntimeMatchState, teamId: string) {
+  return match.teamPayments.find((payment) => payment.teamId === teamId) ?? null;
+}
+
+function getTeamWhitelistFacts(match: RuntimeMatchState, teamId: string) {
+  return match.whitelists.filter((whitelist) => whitelist.teamId === teamId);
+}
+
+function buildWhitelistFacts(match: RuntimeMatchState, team: RuntimeTeam, memberAddresses: string[]) {
+  const sourcePaymentTx = team.payTxDigest?.trim();
+  if (!sourcePaymentTx) {
+    return [];
+  }
+
+  const joinedAtByWallet = new Map(
+    team.members.map((member) => [normalizeWallet(member.walletAddress), member.joinedAt] as const)
+  );
+
+  return memberAddresses.map((walletAddress) => ({
+    matchId: match.id,
+    teamId: team.id,
+    walletAddress,
+    sourcePaymentTx,
+    createdAt: joinedAtByWallet.get(walletAddress) ?? team.createdAt
+  }));
+}
+
+function rebuildMatchFacts(match: RuntimeMatchState) {
+  const teamIds = new Set(match.teams.map((team) => team.id));
+  const payments = normalizeTeamPayments(match.id, match.teamPayments).filter((payment) => teamIds.has(payment.teamId));
+  const whitelists = normalizeMatchWhitelists(match.id, match.whitelists).filter((whitelist) => teamIds.has(whitelist.teamId));
+  const paymentByTeam = new Map(payments.map((payment) => [payment.teamId, payment] as const));
+
+  for (const team of match.teams) {
+    const memberAddresses = uniqueWallets(team.members.map((member) => member.walletAddress));
+    let payment = paymentByTeam.get(team.id) ?? null;
+
+    if (!payment && team.hasPaid && team.payTxDigest) {
+      payment = {
+        matchId: match.id,
+        teamId: team.id,
+        walletAddress: normalizeWallet(team.captainAddress),
+        txDigest: team.payTxDigest,
+        amount: match.entryFee * memberAddresses.length,
+        memberAddresses,
+        createdAt: team.createdAt
+      };
+      payments.push(payment);
+      paymentByTeam.set(team.id, payment);
+    }
+
+    if (payment) {
+      const teamWhitelistWallets = new Set(
+        whitelists.filter((whitelist) => whitelist.teamId === team.id).map((whitelist) => whitelist.walletAddress)
+      );
+      const canonicalWhitelistMembers = payment.memberAddresses.length > 0 ? payment.memberAddresses : memberAddresses;
+      const missingMembers = canonicalWhitelistMembers.filter((walletAddress) => !teamWhitelistWallets.has(walletAddress));
+      if (missingMembers.length > 0) {
+        whitelists.push(...buildWhitelistFacts(match, { ...team, payTxDigest: payment.txDigest }, missingMembers));
+      }
+    }
+  }
+
+  match.teamPayments = normalizeTeamPayments(match.id, payments);
+  match.whitelists = normalizeMatchWhitelists(match.id, whitelists);
+
+  const finalPaymentByTeam = new Map(match.teamPayments.map((payment) => [payment.teamId, payment] as const));
+  const whitelistCountByTeam = new Map<string, number>();
+  for (const whitelist of match.whitelists) {
+    whitelistCountByTeam.set(whitelist.teamId, (whitelistCountByTeam.get(whitelist.teamId) ?? 0) + 1);
+  }
+
+  for (const team of match.teams) {
+    const payment = getTeamPaymentFact(match, team.id) ?? finalPaymentByTeam.get(team.id);
+    if (payment) {
+      team.hasPaid = true;
+      team.payTxDigest = payment.txDigest;
+      team.isLocked = true;
+      if (team.status !== "ready") {
+        team.status = "paid";
+      }
+      team.whitelistCount = getTeamWhitelistFacts(match, team.id).length || whitelistCountByTeam.get(team.id) || payment.memberAddresses.length;
+      touchMemberStatuses(team);
+      continue;
+    }
+
+    team.whitelistCount = 0;
+  }
+}
+
 function persistMatchState(match: RuntimeMatchState) {
+  rebuildMatchFacts(match);
+
   const teams: PersistedTeam[] = match.teams.map((team) => ({
     id: team.id,
     matchId: team.matchId,
@@ -269,30 +485,8 @@ function persistMatchState(match: RuntimeMatchState) {
   }));
   const members = match.teams.flatMap((team) => team.members.map((member) => mapMember(member)));
   const applications = match.teams.flatMap((team) => team.applications.map((application) => mapApplication(application)));
-  const teamPayments: PersistedTeamPayment[] = match.teams
-    .filter((team) => team.payTxDigest)
-    .map((team) => ({
-      matchId: match.id,
-      teamId: team.id,
-      walletAddress: team.captainAddress,
-      txDigest: team.payTxDigest as string,
-      amount: match.entryFee * team.members.length,
-      memberAddresses: team.members.map((member) => normalizeWallet(member.walletAddress)),
-      createdAt: team.createdAt
-    }));
-  const whitelists: PersistedMatchWhitelist[] = match.teams.flatMap((team) =>
-    team.hasPaid && team.payTxDigest
-      ? team.members.map((member) => ({
-          matchId: match.id,
-          teamId: team.id,
-          walletAddress: normalizeWallet(member.walletAddress),
-          sourcePaymentTx: team.payTxDigest as string,
-          createdAt: member.joinedAt
-        }))
-      : []
-  );
 
-  savePersistedTeamState(match.id, teams, members, applications, teamPayments, whitelists);
+  savePersistedTeamState(match.id, teams, members, applications, match.teamPayments, match.whitelists);
 
   const baseMatch = getMatchDetail(match.id)?.match ?? listMatches().find((candidate) => candidate.id === match.id);
   if (baseMatch) {
@@ -306,7 +500,7 @@ function persistMatchState(match: RuntimeMatchState) {
       minTeams: match.minTeams,
       maxTeams: match.maxTeams,
       registeredTeams: match.teams.length,
-      paidTeams: match.teams.filter((team) => team.hasPaid).length
+      paidTeams: match.teamPayments.length
     });
   }
 
@@ -321,7 +515,7 @@ function persistMatchState(match: RuntimeMatchState) {
         minTeams: match.minTeams,
         maxTeams: match.maxTeams,
         registeredTeams: match.teams.length,
-        paidTeams: match.teams.filter((team) => team.hasPaid).length
+        paidTeams: match.teamPayments.length
       },
       teams: match.teams.map((team) => mapTeam(team)),
       members
@@ -388,6 +582,8 @@ function getMatchState(matchId: string) {
   const existing = runtimeStore.matches.get(matchId);
   if (existing) {
     existing.status = baseMatch.status;
+    existing.roomId = baseMatch.onChainId ?? null;
+    existing.escrowId = baseMatch.escrowId ?? null;
     existing.entryFee = baseMatch.entryFee;
     existing.prizePool = baseMatch.prizePool;
     existing.minTeams = baseMatch.minTeams;
@@ -413,14 +609,19 @@ function getMatchState(matchId: string) {
     const restored: RuntimeMatchState = {
       id: projection.match.id,
       status: projection.match.status,
+      roomId: projection.match.onChainId ?? null,
+      escrowId: projection.match.escrowId ?? null,
       entryFee: projection.match.entryFee,
       prizePool: projection.match.prizePool,
       minTeams: projection.match.minTeams,
       maxTeams: projection.match.maxTeams,
       teams: projection.teams.map((team) =>
         mapPersistedTeam(team, membersByTeam.get(team.id) ?? [], applicationsByTeam.get(team.id) ?? [])
-      )
+      ),
+      teamPayments: projection.teamPayments,
+      whitelists: projection.whitelists
     };
+    rebuildMatchFacts(restored);
     runtimeStore.matches.set(matchId, restored);
     return restored;
   }
@@ -428,14 +629,19 @@ function getMatchState(matchId: string) {
   const created: RuntimeMatchState = {
     id: baseMatch.id,
     status: baseMatch.status,
+    roomId: baseMatch.onChainId ?? null,
+    escrowId: baseMatch.escrowId ?? null,
     entryFee: baseMatch.entryFee,
     prizePool: baseMatch.prizePool,
     minTeams: baseMatch.minTeams,
     maxTeams: baseMatch.maxTeams,
     teams: detail
       ? detail.teams.map((team) => hydrateTeam(baseMatch.id, team, detail.members))
-      : []
+      : [],
+    teamPayments: [],
+    whitelists: []
   };
+  rebuildMatchFacts(created);
   runtimeStore.matches.set(matchId, created);
   return created;
 }
@@ -525,6 +731,7 @@ function validateTxDigest(txDigest: string) {
 }
 
 export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{ team: Team; member: TeamMember }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: input.matchId });
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -585,6 +792,7 @@ export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{
 
   match.teams.push(team);
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -596,6 +804,7 @@ export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{
 }
 
 export async function joinTeam(input: JoinTeamInput): Promise<ActionResult<JoinTeamResponse>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -637,6 +846,7 @@ export async function joinTeam(input: JoinTeamInput): Promise<ActionResult<JoinT
   };
   team.applications.push(application);
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -650,6 +860,7 @@ export async function joinTeam(input: JoinTeamInput): Promise<ActionResult<JoinT
 export async function approveJoinApplication(
   input: ReviewJoinApplicationInput
 ): Promise<ActionResult<{ team: TeamDetail; member: TeamMember; application: TeamApplication }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -690,6 +901,7 @@ export async function approveJoinApplication(
   application.reviewedAt = new Date().toISOString();
   application.reviewedBy = walletAddress;
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -704,6 +916,7 @@ export async function approveJoinApplication(
 export async function rejectJoinApplication(
   input: ReviewJoinApplicationInput
 ): Promise<ActionResult<{ team: TeamDetail; application: TeamApplication }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -734,6 +947,7 @@ export async function rejectJoinApplication(
   application.reviewedAt = new Date().toISOString();
   application.reviewedBy = walletAddress;
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -747,6 +961,7 @@ export async function rejectJoinApplication(
 export async function leaveTeam(
   input: LeaveTeamInput
 ): Promise<ActionResult<{ ok: true; teamDeleted: boolean; team: TeamDetail | null }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -775,6 +990,7 @@ export async function leaveTeam(
     if (team.members.length > 0) {
       team.captainAddress = team.members[0]?.walletAddress ?? team.captainAddress;
       persistMatchState(match);
+      await persistMatchDetailToBackend(match.id);
       return {
         status: 200,
         body: {
@@ -786,6 +1002,7 @@ export async function leaveTeam(
     }
     match.teams = match.teams.filter((item) => item.id !== team.id);
     persistMatchState(match);
+    await persistMatchDetailToBackend(match.id);
     return {
       status: 200,
       body: {
@@ -800,6 +1017,7 @@ export async function leaveTeam(
   if (team.members.length === 0) {
     match.teams = match.teams.filter((item) => item.id !== team.id);
     persistMatchState(match);
+    await persistMatchDetailToBackend(match.id);
     return {
       status: 200,
       body: {
@@ -811,6 +1029,7 @@ export async function leaveTeam(
   }
 
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -823,6 +1042,7 @@ export async function leaveTeam(
 }
 
 export async function lockTeam(input: LockTeamInput): Promise<ActionResult<{ team: TeamDetail }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -862,6 +1082,7 @@ export async function lockTeam(input: LockTeamInput): Promise<ActionResult<{ tea
   team.isLocked = true;
   touchMemberStatuses(team);
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,
@@ -874,6 +1095,7 @@ export async function lockTeam(input: LockTeamInput): Promise<ActionResult<{ tea
 export async function payTeamEntry(
   input: PayTeamInput
 ): Promise<ActionResult<{ team: TeamDetail; whitelistCount: number }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const isAuthorized = await verifySignedPayload(input);
   if (!isAuthorized) {
     return failure(401, "UNAUTHORIZED", "Wallet signature is invalid");
@@ -915,27 +1137,44 @@ export async function payTeamEntry(
 
   const memberAddresses =
     input.memberAddresses && input.memberAddresses.length > 0
-      ? input.memberAddresses.map((address) => normalizeWallet(address))
-      : team.members.map((member) => normalizeWallet(member.walletAddress));
+      ? uniqueWallets(input.memberAddresses)
+      : uniqueWallets(team.members.map((member) => normalizeWallet(member.walletAddress)));
 
-  const actualAddresses = new Set(team.members.map((member) => normalizeWallet(member.walletAddress)));
+  const actualAddresses = uniqueWallets(team.members.map((member) => normalizeWallet(member.walletAddress)));
   if (
-    memberAddresses.length !== actualAddresses.size ||
-    memberAddresses.some((address) => !actualAddresses.has(address))
+    memberAddresses.length !== actualAddresses.length ||
+    actualAddresses.some((address) => !memberAddresses.includes(address))
   ) {
     return failure(400, "INVALID_INPUT", "Member whitelist payload does not match team members");
   }
 
+  team.payTxDigest = txDigest;
   team.status = "paid";
   team.hasPaid = true;
-  team.payTxDigest = txDigest;
   team.whitelistCount = memberAddresses.length;
-  touchMemberStatuses(team);
+  match.teamPayments = [
+    ...match.teamPayments.filter((payment) => payment.teamId !== team.id),
+    {
+      matchId: match.id,
+      teamId: team.id,
+      walletAddress,
+      txDigest,
+      amount: expectedAmount,
+      memberAddresses,
+      createdAt: new Date().toISOString()
+    }
+  ];
+  match.whitelists = [
+    ...match.whitelists.filter((whitelist) => whitelist.teamId !== team.id),
+    ...buildWhitelistFacts(match, team, memberAddresses)
+  ];
   match.prizePool += expectedAmount;
-  if (match.teams.filter((candidate) => candidate.hasPaid).length >= match.minTeams) {
+  rebuildMatchFacts(match);
+  if (match.teamPayments.length >= match.minTeams) {
     match.status = "prestart";
   }
   persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
 
   return {
     status: 200,

@@ -27,6 +27,7 @@ const STREAM_EVENT_TYPES: MatchStreamEvent["type"][] = [
   "panic_mode",
   "node_status",
   "settlement_start",
+  "settlement_complete",
   "heartbeat"
 ];
 const STREAM_RETRY_MS = 3_000;

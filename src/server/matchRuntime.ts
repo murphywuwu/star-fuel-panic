@@ -1,11 +1,18 @@
 import { Buffer } from "node:buffer";
+import type { MatchPublishedCommitment } from "./devnetChainRuntime.ts";
+import { hydrateRuntimeProjectionFromBackendIfNeeded, persistMatchDetailToBackend } from "./matchBackendStore.ts";
 import { getMissionById, listMissions } from "./missionRuntime.ts";
 import { getNodeById, listNodes } from "./nodeRuntime.ts";
+import { syncSettlementProjectionForTransition } from "./settlementRuntime.ts";
 import {
+  appendPersistedMatchStreamEvents,
   deletePersistedMatch,
   getPersistedMatchDetail,
+  getPersistedSettlement,
+  listPersistedMatchStreamEvents,
   listPersistedMatches,
   savePersistedMatchDetail,
+  type PersistedMatchStreamEvent,
   type PersistedMatchScore,
   type PersistedTeam
 } from "./runtimeProjectionStore.ts";
@@ -75,6 +82,7 @@ type CreateDraftInput = {
 type PublishMatchInput = {
   matchId: string;
   publishTxDigest: string;
+  publishCommitment?: MatchPublishedCommitment | null;
   idempotencyKey?: string;
   walletAddress: string;
   signature: string;
@@ -197,6 +205,127 @@ function buildPersistedTargetNodes(match: Match) {
     name: `Node ${nodeObjectId.slice(-6)}`,
     isOnline: true
   }));
+}
+
+function toPersistedStreamEvents(events: MatchStreamEvent[]): PersistedMatchStreamEvent[] {
+  const createdAt = nowIso();
+  return events.map((event) => {
+    if (event.type === "settlement_start") {
+      return {
+        matchId: event.matchId,
+        eventType: event.type,
+        payload: {
+          progress: event.progress
+        },
+        createdAt
+      };
+    }
+
+    if (event.type === "settlement_complete") {
+      return {
+        matchId: event.matchId,
+        eventType: event.type,
+        payload: {
+          result: event.result
+        },
+        createdAt
+      };
+    }
+
+    return {
+      matchId: event.matchId,
+      eventType: event.type,
+      payload: event,
+      createdAt
+    };
+  });
+}
+
+export function getMatchStreamEventSignature(event: MatchStreamEvent) {
+  if (event.type === "score_update") {
+    return JSON.stringify({
+      ...event,
+      scoreboard: {
+        ...event.scoreboard,
+        updatedAt: "__normalized__"
+      }
+    });
+  }
+
+  if (event.type === "phase_change" || event.type === "panic_mode") {
+    return JSON.stringify({
+      ...event,
+      status: {
+        ...event.status,
+        serverTime: "__normalized__"
+      }
+    });
+  }
+
+  return JSON.stringify(event);
+}
+
+function hydratePersistedStreamEvent(row: PersistedMatchStreamEvent): MatchStreamEvent | null {
+  const payload = row.payload as Record<string, unknown> | null;
+
+  switch (row.eventType) {
+    case "score_update":
+      if (!payload || !("scoreboard" in payload)) {
+        return null;
+      }
+      return {
+        type: "score_update",
+        matchId: row.matchId,
+        scoreboard: payload.scoreboard as MatchScoreboardSnapshot
+      };
+    case "phase_change":
+    case "panic_mode":
+      if (!payload || !("status" in payload)) {
+        return null;
+      }
+      return {
+        type: row.eventType,
+        matchId: row.matchId,
+        status: payload.status as {
+          status: MatchStatus;
+          remainingSeconds: number;
+          panicMode: boolean;
+          serverTime: string;
+        }
+      };
+    case "node_status":
+      if (!payload || !("targetNodes" in payload)) {
+        return null;
+      }
+      return {
+        type: "node_status",
+        matchId: row.matchId,
+        targetNodes: payload.targetNodes as MatchScoreboardSnapshot["targetNodes"]
+      };
+    case "settlement_start":
+      return {
+        type: "settlement_start",
+        matchId: row.matchId,
+        progress: Number(payload?.progress ?? 75)
+      };
+    case "settlement_complete":
+      if (!payload || !("result" in payload)) {
+        return null;
+      }
+      return {
+        type: "settlement_complete",
+        matchId: row.matchId,
+        result: payload.result as import("../types/settlement.ts").SettlementBill
+      };
+    case "heartbeat":
+      return {
+        type: "heartbeat",
+        matchId: row.matchId,
+        serverTime: String(payload?.serverTime ?? row.createdAt)
+      };
+    default:
+      return null;
+  }
 }
 
 function fail<T>(status: number, code: ErrorCode, message: string): ApiResult<T> {
@@ -330,6 +459,8 @@ function getDetail(matchId: string) {
 }
 
 function persist(detail: MatchDetail) {
+  const previousStatus =
+    mutableMatchDetails.get(detail.match.id)?.match.status ?? getPersistedMatchDetail(detail.match.id)?.match.status ?? null;
   const cloned = cloneDetail(detail);
   mutableMatchDetails.set(cloned.match.id, cloned);
   savePersistedMatchDetail({
@@ -339,6 +470,11 @@ function persist(detail: MatchDetail) {
     scores: (cloned.scores ?? []) as PersistedMatchScore[],
     targetNodes: buildPersistedTargetNodes(cloned.match)
   });
+
+  const settlementTransition = syncSettlementProjectionForTransition(cloned, previousStatus);
+  if (settlementTransition.streamEvents.length > 0) {
+    appendPersistedMatchStreamEvents(toPersistedStreamEvents(settlementTransition.streamEvents));
+  }
 }
 
 function roleCount(detail: MatchDetail, teamId: string, role: PlayerRole) {
@@ -425,6 +561,38 @@ export function getMatchDetail(matchId: string) {
   return detail ? cloneDetail(detail) : null;
 }
 
+export function listMaterializedMatchStreamEvents(matchId: string): MatchStreamEvent[] {
+  return listPersistedMatchStreamEvents(matchId)
+    .map((row) => hydratePersistedStreamEvent(row))
+    .filter((event): event is MatchStreamEvent => event !== null);
+}
+
+function syncMaterializedLiveStreamEvents(matchId: string, events: MatchStreamEvent[]) {
+  const candidates = events.filter((event) => event.type !== "heartbeat");
+  if (candidates.length === 0) {
+    return;
+  }
+
+  const latestByType = new Map<MatchStreamEvent["type"], MatchStreamEvent>();
+  for (const event of listMaterializedMatchStreamEvents(matchId)) {
+    if (event.type === "heartbeat") {
+      continue;
+    }
+    latestByType.set(event.type, event);
+  }
+
+  const changed = candidates.filter((event) => {
+    const previous = latestByType.get(event.type);
+    return !previous || getMatchStreamEventSignature(previous) !== getMatchStreamEventSignature(event);
+  });
+
+  if (changed.length === 0) {
+    return;
+  }
+
+  appendPersistedMatchStreamEvents(toPersistedStreamEvents(changed));
+}
+
 export function getMatchStatusSnapshot(matchId: string): MatchStatusSnapshot | null {
   const detail = getMatchDetail(matchId);
   if (!detail) return null;
@@ -500,6 +668,7 @@ async function resolveTargetNodes(detail: MatchDetail): Promise<ScoreboardTarget
 }
 
 export async function getMatchScoreboardSnapshot(matchId: string): Promise<MatchScoreboardSnapshot | null> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
   const detail = getMatchDetail(matchId);
   if (!detail) return null;
 
@@ -528,6 +697,7 @@ export async function getMatchScoreboardSnapshot(matchId: string): Promise<Match
 }
 
 export async function buildMatchStreamFrame(matchId: string): Promise<MatchStreamEvent[] | null> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
   const status = getMatchStatusSnapshot(matchId);
   const scoreboard = await getMatchScoreboardSnapshot(matchId);
   if (!status || !scoreboard) return null;
@@ -568,6 +738,18 @@ export async function buildMatchStreamFrame(matchId: string): Promise<MatchStrea
     });
   }
 
+  if (status.status === "settled") {
+    const settlement = getPersistedSettlement(matchId);
+    if (settlement?.status === "succeeded") {
+      events.push({
+        type: "settlement_complete",
+        matchId,
+        result: settlement.bill
+      });
+    }
+  }
+
+  syncMaterializedLiveStreamEvents(matchId, events);
   return events;
 }
 
@@ -846,6 +1028,7 @@ export function cancelHostedMatch(input: { matchId: string; walletAddress: strin
 }
 
 export async function publishMatch(input: PublishMatchInput): Promise<ApiResult<{ match: Match }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: input.matchId });
   const detail = getDetail(input.matchId);
   if (!detail) return fail(404, "NOT_FOUND", "match not found");
   if (!isSigned(input.walletAddress, input.signature, input.message, "FuelFrogPanic:publish-match", input.matchId)) {
@@ -867,8 +1050,27 @@ export async function publishMatch(input: PublishMatchInput): Promise<ApiResult<
     return fail(409, "MATCH_NOT_PUBLISHABLE", "match already published");
   }
   if (detail.match.status !== "draft") return fail(409, "MATCH_NOT_PUBLISHABLE", "match is not publishable");
-  if ((detail.match.sponsorshipFee ?? detail.match.hostPrizePool) < 500) return fail(400, "SPONSORSHIP_TOO_LOW", "SPONSORSHIP_TOO_LOW");
+  if ((detail.match.sponsorshipFee ?? detail.match.hostPrizePool) < 50) return fail(400, "SPONSORSHIP_TOO_LOW", "SPONSORSHIP_TOO_LOW");
   if (!detail.match.solarSystemId || detail.match.solarSystemId <= 0) return fail(400, "SYSTEM_NOT_FOUND", "SYSTEM_NOT_FOUND");
+
+  if (input.publishCommitment) {
+    if (input.publishCommitment.mode && input.publishCommitment.mode !== detail.match.creationMode) {
+      return fail(409, "MATCH_NOT_PUBLISHABLE", "publish commitment mode does not match draft");
+    }
+    if (
+      input.publishCommitment.solarSystemId !== null &&
+      input.publishCommitment.solarSystemId !== detail.match.solarSystemId
+    ) {
+      return fail(409, "MATCH_NOT_PUBLISHABLE", "publish commitment system does not match draft");
+    }
+    if (
+      detail.match.creationMode === "precision" &&
+      input.publishCommitment.targetNodeCount !== null &&
+      input.publishCommitment.targetNodeCount !== detail.match.targetNodeIds.length
+    ) {
+      return fail(409, "MATCH_NOT_PUBLISHABLE", "publish commitment target count does not match draft");
+    }
+  }
 
   const nodesInSystem = await listNodes({ solarSystem: detail.match.solarSystemId });
   const selectableNodes = nodesInSystem.filter((node) => node.isOnline && node.isPublic);
@@ -893,12 +1095,14 @@ export async function publishMatch(input: PublishMatchInput): Promise<ApiResult<
 
   const updated = cloneDetail(detail);
   updated.match.status = "lobby";
-  updated.match.onChainId = `draft_${publishTxDigest}`;
+  updated.match.onChainId = input.publishCommitment?.roomId ?? `draft_${publishTxDigest}`;
+  updated.match.escrowId = input.publishCommitment?.escrowId ?? updated.match.escrowId ?? null;
   updated.match.prizePool = updated.match.sponsorshipFee ?? updated.match.hostPrizePool;
   updated.match.hostPrizePool = updated.match.sponsorshipFee ?? updated.match.hostPrizePool;
   updated.match.publishedAt = nowIso();
   updated.match.publishIdempotencyKey = input.idempotencyKey ?? null;
   persist(updated);
+  await persistMatchDetailToBackend(updated.match.id);
   return { ok: true, data: { match: updated.match } };
 }
 

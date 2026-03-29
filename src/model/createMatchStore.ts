@@ -51,7 +51,7 @@ const initialState: CreateMatchState = {
   mode: "free",
   solarSystemId: null,
   targetNodeIds: [],
-  sponsorshipFee: 500,
+  sponsorshipFee: 50,
   maxTeams: 8,
   entryFee: 50,
   durationHours: 2,

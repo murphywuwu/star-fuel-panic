@@ -3,6 +3,8 @@ import path from "node:path";
 
 import type { NetworkNode } from "../types/node.ts";
 
+export const CURRENT_NODE_INDEX_VERSION = 3 as const;
+
 export type NodeIndexCursor = {
   eventSeq: string;
   txDigest: string;
@@ -11,7 +13,7 @@ export type NodeIndexCursor = {
 export type IndexedNodeSnapshot = Omit<NetworkNode, "activeMatchId">;
 
 export type NodeIndexSnapshot = {
-  version: 2;
+  version: 1 | 2 | 3;
   lastSyncAt: string | null;
   discoveryCursor: NodeIndexCursor;
   locationCursor: NodeIndexCursor;
@@ -26,7 +28,7 @@ function resolveIndexPath() {
 
 export function createEmptyNodeIndexSnapshot(): NodeIndexSnapshot {
   return {
-    version: 2 as const,
+    version: CURRENT_NODE_INDEX_VERSION,
     lastSyncAt: null,
     discoveryCursor: null,
     locationCursor: null,
@@ -46,6 +48,16 @@ export async function readNodeIndexSnapshot(): Promise<NodeIndexSnapshot> {
 
     if (!parsed || !Array.isArray(parsed.nodes)) {
       return createEmptyNodeIndexSnapshot();
+    }
+
+    if (parsed.version === 3) {
+      return {
+        version: 3 as const,
+        lastSyncAt: typeof parsed.lastSyncAt === "string" ? parsed.lastSyncAt : null,
+        discoveryCursor: parsed.discoveryCursor ?? null,
+        locationCursor: parsed.locationCursor ?? null,
+        nodes: parsed.nodes
+      };
     }
 
     if (parsed.version === 2) {

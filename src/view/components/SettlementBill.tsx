@@ -1,4 +1,5 @@
 import type { SettlementBill } from "@/types/settlement";
+import { formatPaymentTokenAmount } from "@/utils/paymentToken";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
 interface SettlementBillProps {
@@ -6,8 +7,7 @@ interface SettlementBillProps {
 }
 
 function money(value: string | number) {
-  const amount = typeof value === "string" ? Number(value) : value;
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} LUX`;
+  return formatPaymentTokenAmount(value, { maximumFractionDigits: 2 });
 }
 
 function percent(value: number) {

@@ -1,4 +1,5 @@
 import { calculateJumps } from "./gateTopologyRuntime.ts";
+import { hydrateRuntimeProjectionFromBackendIfNeeded } from "./matchBackendStore.ts";
 import { getMatchDetail, listMatches } from "./matchRuntime.ts";
 import { listNodes } from "./nodeRuntime.ts";
 import { getSolarSystemById } from "./solarSystemRuntime.ts";
@@ -160,6 +161,7 @@ export async function listMatchDiscoveryItems(options: {
   filters?: MatchFilters;
   currentSystemId?: number | null;
 }) {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const [matches, nodes] = await Promise.all([Promise.resolve(listMatches(options.filters)), listNodes({})]);
   const nodeById = createNodeLookup(nodes);
 
@@ -167,6 +169,7 @@ export async function listMatchDiscoveryItems(options: {
 }
 
 export async function getMatchDiscoveryDetail(matchId: string, currentSystemId?: number | null): Promise<MatchDiscoveryDetail | null> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
   const [detail, nodes] = await Promise.all([Promise.resolve(getMatchDetail(matchId)), listNodes({})]);
 
   if (!detail) {

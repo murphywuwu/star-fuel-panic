@@ -9,6 +9,7 @@ import { GET as getConstellationDetail } from "../constellations/[id]/route.ts";
 import { GET as getSearch } from "../search/route.ts";
 import { GET as getSolarSystemRecommendations } from "../solar-systems/recommendations/route.ts";
 import { GET as getNodeRecommendations } from "../network-nodes/recommendations/route.ts";
+import { __resetSolarSystemAliasStoreForTests } from "../../../server/solarSystemAliasStore.ts";
 import { __resetSolarSystemRuntimeForTests } from "../../../server/solarSystemRuntime.ts";
 import {
   createEmptyProjectionState,
@@ -18,6 +19,7 @@ import {
 const originalFetch = global.fetch;
 const originalNodeIndexStorePath = process.env.NODE_INDEX_STORE_PATH;
 const originalProjectionStorePath = process.env.RUNTIME_PROJECTION_STORE_PATH;
+const originalSolarSystemAliasStorePath = process.env.SOLAR_SYSTEM_ALIAS_STORE_PATH;
 const originalCacheTtl = process.env.EVE_FRONTIER_WORLD_API_CACHE_TTL_MS;
 
 function createResponse(body: unknown, status = 200) {
@@ -36,9 +38,10 @@ function createResponse(body: unknown, status = 200) {
 function createNodeIndexSnapshot() {
   const now = "2026-03-26T12:00:00.000Z";
   return {
-    version: 1 as const,
+    version: 3 as const,
     lastSyncAt: now,
-    cursor: null,
+    discoveryCursor: null,
+    locationCursor: null,
     nodes: [
       {
         id: "node-jita-critical",
@@ -177,7 +180,8 @@ function buildTempPaths() {
   return {
     root,
     nodeIndexPath: path.join(root, "node-index.json"),
-    projectionPath: path.join(root, "projection.json")
+    projectionPath: path.join(root, "projection.json"),
+    aliasPath: path.join(root, "solar-systems-alias.json")
   };
 }
 
@@ -185,10 +189,28 @@ test.beforeEach(() => {
   const paths = buildTempPaths();
   process.env.NODE_INDEX_STORE_PATH = paths.nodeIndexPath;
   process.env.RUNTIME_PROJECTION_STORE_PATH = paths.projectionPath;
+  process.env.SOLAR_SYSTEM_ALIAS_STORE_PATH = paths.aliasPath;
   process.env.EVE_FRONTIER_WORLD_API_CACHE_TTL_MS = "60000";
   writeFileSync(paths.nodeIndexPath, JSON.stringify(createNodeIndexSnapshot(), null, 2), "utf8");
+  writeFileSync(
+    paths.aliasPath,
+    JSON.stringify(
+      {
+        version: 1,
+        systems: [
+          { systemId: 30000141, systemName: "Kisogo" },
+          { systemId: 30000142, systemName: "Jita" },
+          { systemId: 30000143, systemName: "Perimeter" }
+        ]
+      },
+      null,
+      2
+    ),
+    "utf8"
+  );
   writeRuntimeProjectionState(createEmptyProjectionState());
   __resetSolarSystemRuntimeForTests();
+  __resetSolarSystemAliasStoreForTests();
   installWorldApiSuccessStub();
   (globalThis as typeof globalThis & { __f007DiscoveryTmpRoot?: string }).__f007DiscoveryTmpRoot = paths.root;
 });
@@ -202,8 +224,10 @@ test.afterEach(() => {
   global.fetch = originalFetch;
   process.env.NODE_INDEX_STORE_PATH = originalNodeIndexStorePath;
   process.env.RUNTIME_PROJECTION_STORE_PATH = originalProjectionStorePath;
+  process.env.SOLAR_SYSTEM_ALIAS_STORE_PATH = originalSolarSystemAliasStorePath;
   process.env.EVE_FRONTIER_WORLD_API_CACHE_TTL_MS = originalCacheTtl;
   __resetSolarSystemRuntimeForTests();
+  __resetSolarSystemAliasStoreForTests();
 });
 
 test("F-007 T-0702 discovery APIs cover constellations, search, system recommendations, and node recommendations", async () => {
@@ -262,4 +286,40 @@ test("F-007 T-0705 search falls back to cached world data and marks stale when r
   const staleJson = await staleResponse.json();
   assert.equal(staleJson.stale, true);
   assert.equal(staleJson.hits[0].label, "Kisogo (30000141)");
+});
+
+test("F-007 T-0730 search supports legacy solar-system aliases when live world-api names are coded", async () => {
+  global.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/v2/solarsystems?")) {
+      return createResponse({
+        data: [
+          {
+            id: 30000142,
+            name: "EHK-KH7",
+            constellationId: 20000020,
+            regionId: 10000002,
+            location: { x: 4, y: 5, z: 6 }
+          }
+        ],
+        metadata: {
+          limit: 50,
+          offset: 0,
+          total: 1
+        }
+      });
+    }
+
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  __resetSolarSystemRuntimeForTests();
+  __resetSolarSystemAliasStoreForTests();
+
+  const searchResponse = await getSearch(new Request("http://localhost/api/search?q=jita"));
+  assert.equal(searchResponse.status, 200);
+  const searchJson = await searchResponse.json();
+  assert.equal(searchJson.hits.length, 1);
+  assert.equal(searchJson.hits[0].id, 30000142);
+  assert.equal(searchJson.hits[0].label, "Jita // EHK-KH7 (30000142)");
 });

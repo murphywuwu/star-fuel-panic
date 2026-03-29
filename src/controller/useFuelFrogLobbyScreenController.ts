@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
+import { PAYMENT_TOKEN_SYMBOL } from "@/utils/paymentToken";
 import { useFuelMissionController } from "@/controller/useFuelMissionController";
 import type { TeamRole, TeamState } from "@/types/fuelMission";
 
@@ -158,7 +159,7 @@ export function useFuelFrogLobbyScreenController() {
       blockers.push(`Not enough players. Minimum ${minPlayersPerTeam}`);
     }
     if (authState.luxBalance < payAmount) {
-      blockers.push(`Insufficient balance (need ${payAmount} LUX)`);
+      blockers.push(`Insufficient balance (need ${payAmount} ${PAYMENT_TOKEN_SYMBOL})`);
     }
 
     return blockers;

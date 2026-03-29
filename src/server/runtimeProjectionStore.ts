@@ -10,6 +10,7 @@ import path from "node:path";
 
 import type { Match, MatchStreamEvent } from "../types/match.ts";
 import type { NetworkNode } from "../types/node.ts";
+import type { PlanningTeam } from "../types/planningTeam.ts";
 import type { SettlementBill, SettlementStatus } from "../types/settlement.ts";
 import type { SolarSystem } from "../types/solarSystem.ts";
 import type { PlayerRole, Team, TeamApplication, TeamMember } from "../types/team.ts";
@@ -84,7 +85,7 @@ export type PersistedSettlement = {
   matchId: string;
   bill: SettlementBill;
   payoutTxDigest: string | null;
-  settledAt: string;
+  updatedAt: string;
   status: SettlementStatus["status"];
 };
 
@@ -134,6 +135,7 @@ export type RuntimeProjectionState = {
   solarSystemsCache: SolarSystem[];
   constellationSummaries: ConstellationProjectionSummary[];
   matches: Match[];
+  planningTeams: PlanningTeam[];
   teams: PersistedTeam[];
   teamMembers: TeamMember[];
   teamJoinApplications: TeamApplication[];
@@ -170,6 +172,39 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function normalizePersistedSettlement(candidate: unknown): PersistedSettlement | null {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const settlement = candidate as Partial<PersistedSettlement> & {
+    settledAt?: string;
+  };
+  if (typeof settlement.matchId !== "string" || !settlement.matchId.trim() || !settlement.bill) {
+    return null;
+  }
+
+  const status = settlement.status;
+  if (status !== "pending" && status !== "running" && status !== "succeeded" && status !== "failed") {
+    return null;
+  }
+
+  const updatedAt =
+    typeof settlement.updatedAt === "string"
+      ? settlement.updatedAt
+      : typeof settlement.settledAt === "string"
+        ? settlement.settledAt
+        : nowIso();
+
+  return {
+    matchId: settlement.matchId,
+    bill: clone(settlement.bill),
+    payoutTxDigest: typeof settlement.payoutTxDigest === "string" ? settlement.payoutTxDigest : null,
+    updatedAt,
+    status
+  };
+}
+
 function createDefaultMeta(): ProjectionRuntimeMeta {
   return {
     nodes: {
@@ -199,6 +234,7 @@ export function createEmptyProjectionState(): RuntimeProjectionState {
     solarSystemsCache: [],
     constellationSummaries: [],
     matches: [],
+    planningTeams: [],
     teams: [],
     teamMembers: [],
     teamJoinApplications: [],
@@ -252,6 +288,7 @@ function sanitizeProjectionState(candidate: unknown): RuntimeProjectionState {
     ? clone(value.constellationSummaries)
     : [];
   state.matches = Array.isArray(value.matches) ? clone(value.matches) : [];
+  state.planningTeams = Array.isArray(value.planningTeams) ? clone(value.planningTeams) : [];
   state.teams = Array.isArray(value.teams) ? clone(value.teams) : [];
   state.teamMembers = Array.isArray(value.teamMembers) ? clone(value.teamMembers) : [];
   state.teamJoinApplications = Array.isArray(value.teamJoinApplications) ? clone(value.teamJoinApplications) : [];
@@ -260,7 +297,11 @@ function sanitizeProjectionState(candidate: unknown): RuntimeProjectionState {
   state.matchStreamEvents = Array.isArray(value.matchStreamEvents) ? clone(value.matchStreamEvents) : [];
   state.teamPayments = Array.isArray(value.teamPayments) ? clone(value.teamPayments) : [];
   state.matchWhitelists = Array.isArray(value.matchWhitelists) ? clone(value.matchWhitelists) : [];
-  state.settlements = Array.isArray(value.settlements) ? clone(value.settlements) : [];
+  state.settlements = Array.isArray(value.settlements)
+    ? value.settlements
+        .map((settlement) => normalizePersistedSettlement(settlement))
+        .filter((settlement): settlement is PersistedSettlement => settlement !== null)
+    : [];
   state.idempotencyKeys = Array.isArray(value.idempotencyKeys) ? clone(value.idempotencyKeys) : [];
   state.workerHealth = Array.isArray(value.workerHealth) ? clone(value.workerHealth) : [];
 
@@ -313,7 +354,7 @@ export function writeRuntimeProjectionState(state: RuntimeProjectionState) {
     version: 1 as const,
     updatedAt: nowIso()
   });
-  const tempPath = `${filePath}.tmp`;
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
   writeFileSync(tempPath, JSON.stringify(nextState, null, 2), "utf8");
   renameSync(tempPath, filePath);
   const stat = statSync(filePath);
@@ -380,6 +421,23 @@ export function writePersistedConstellationSummaries(summaries: ConstellationPro
 
 export function listPersistedMatches() {
   return clone(getRuntimeProjectionState().matches);
+}
+
+export function listPersistedPlanningTeams() {
+  return clone(getRuntimeProjectionState().planningTeams);
+}
+
+export function writePersistedPlanningTeams(teams: PlanningTeam[]) {
+  updateRuntimeProjectionState((state) => {
+    state.planningTeams = clone(teams);
+  });
+}
+
+export function upsertPersistedPlanningTeam(team: PlanningTeam) {
+  updateRuntimeProjectionState((state) => {
+    const existing = state.planningTeams.filter((item) => item.id !== team.id);
+    state.planningTeams = [clone(team), ...existing];
+  });
 }
 
 export function getPersistedMatch(matchId: string) {

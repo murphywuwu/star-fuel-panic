@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
-import { verifySubmittedTxDigest } from "@/server/devnetChainRuntime";
+import {
+  buildTeamPaymentTransferExpectation,
+  readTeamEntryLockedCommitment,
+  verifySubmittedTxDigest
+} from "@/server/devnetChainRuntime";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
-import { payTeamEntry } from "@/server/teamRuntime";
+import { getExpectedTeamPayment, payTeamEntry } from "@/server/teamRuntime";
 
 export const dynamic = "force-dynamic";
+
+function normalizeId(value: string) {
+  return value.trim().toLowerCase();
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -35,8 +43,45 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return mutation.response;
   }
 
+  const expectedPayment = getExpectedTeamPayment(id);
+  if (!expectedPayment) {
+    return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
+      status: 404,
+      body: buildErrorRecord(mutation.mutation.requestId, 404, "NOT_FOUND", "Team not found").body
+    });
+  }
+
+  if (!expectedPayment.roomId || !expectedPayment.escrowId) {
+    return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
+      status: 409,
+      body: buildErrorRecord(
+        mutation.mutation.requestId,
+        409,
+        "CONFLICT",
+        "Match escrow is not configured for this team payment"
+      ).body
+    });
+  }
+
+  const expectedTransfer = buildTeamPaymentTransferExpectation(
+    expectedPayment.amount,
+    String(candidate.walletAddress ?? "")
+  );
+  if (!expectedTransfer) {
+    return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
+      status: 503,
+      body: buildErrorRecord(
+        mutation.mutation.requestId,
+        503,
+        "CHAIN_SYNC_ERROR",
+        "Team payment wallet address is required for escrow verification"
+      ).body
+    });
+  }
+
   const txCheck = await verifySubmittedTxDigest(candidate.txDigest ?? "", {
-    operation: "team payment"
+    operation: "team payment",
+    expectedTransfer
   });
   if (!txCheck.ok) {
     return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
@@ -46,6 +91,50 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         txCheck.code === "TX_REJECTED" ? 400 : 502,
         txCheck.code,
         txCheck.message
+      ).body
+    });
+  }
+
+  const paymentCommitment =
+    txCheck.ok && txCheck.verified
+      ? await readTeamEntryLockedCommitment(String(candidate.txDigest ?? ""))
+      : {
+          txDigest: String(candidate.txDigest ?? ""),
+          roomId: expectedPayment.roomId,
+          escrowId: expectedPayment.escrowId,
+          teamRef: expectedPayment.teamRef,
+          captain: String(candidate.walletAddress ?? ""),
+          memberCount: expectedPayment.memberCount,
+          quotedAmountLux: expectedPayment.amount,
+          lockedAmountBaseUnits: Number(expectedTransfer.exactAmountBaseUnits ?? 0n)
+        };
+
+  if (!paymentCommitment) {
+    return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
+      status: 400,
+      body: buildErrorRecord(
+        mutation.mutation.requestId,
+        400,
+        "TX_REJECTED",
+        "Team payment transaction does not contain a TeamEntryLocked event"
+      ).body
+    });
+  }
+
+  if (
+    normalizeId(paymentCommitment.roomId) !== normalizeId(expectedPayment.roomId) ||
+    normalizeId(paymentCommitment.escrowId) !== normalizeId(expectedPayment.escrowId) ||
+    normalizeId(paymentCommitment.teamRef) !== normalizeId(expectedPayment.teamRef) ||
+    paymentCommitment.memberCount !== expectedPayment.memberCount ||
+    paymentCommitment.quotedAmountLux !== expectedPayment.amount
+  ) {
+    return finalizeMutation(`POST:/api/teams/${id}/pay`, mutation.mutation, {
+      status: 400,
+      body: buildErrorRecord(
+        mutation.mutation.requestId,
+        400,
+        "TX_REJECTED",
+        "Team payment commitment does not match the expected escrow quote"
       ).body
     });
   }

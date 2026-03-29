@@ -48,9 +48,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const view = searchParams.get("view");
     const regionIdRaw = searchParams.get("regionId");
-    const regionId = Number(regionIdRaw);
+    const hasRegionId = regionIdRaw !== null && regionIdRaw.trim() !== "";
+    const regionId = hasRegionId ? Number(regionIdRaw) : null;
+    const validRegionId =
+      hasRegionId && regionId !== null && Number.isFinite(regionId) && regionId >= 0 ? regionId : null;
 
-    if (regionIdRaw && (!Number.isFinite(regionId) || regionId < 0)) {
+    if (hasRegionId && (regionId === null || !Number.isFinite(regionId) || regionId < 0)) {
       return NextResponse.json(
         {
           ok: false,
@@ -66,8 +69,8 @@ export async function GET(request: Request) {
     const payload =
       view === "regions"
         ? { regions: listRegions(constellations) }
-        : Number.isFinite(regionId) && regionId >= 0
-          ? { constellations: constellations.filter((item) => item.regionId === regionId) }
+        : validRegionId !== null
+          ? { constellations: constellations.filter((item) => item.regionId === validRegionId) }
           : { constellations };
 
     const meta = getProjectionRuntimeMeta();

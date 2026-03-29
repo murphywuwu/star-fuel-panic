@@ -1,17 +1,18 @@
 # SPEC: Fuel Frog Panic — Interface Contracts
 
-Version: v6.0
-Last Updated: 2026-03-27
-Source PRD: `docs/PRD.md` v2.6
-Source Architecture: `docs/architecture.md` v6.0
+Version: v6.4
+Last Updated: 2026-03-28
+Source PRD: `docs/PRD.md` v2.6.1
+Source Architecture: `docs/architecture.md` v6.2
 
 ---
 
 ## 0. Scope
 
-本 SPEC 只覆盖 PRD v2.6 已批准范围内的实现契约：
+本 SPEC 只覆盖 PRD v2.6.1 已批准范围内的实现契约：
 
 - 比赛创建：自由模式、精准模式、星系选择、赞助费锁定、发布。
+- 独立战队注册：查看当前战队总数、创建不绑定比赛的战队。
 - 比赛发现：Lobby 列表、筛选、位置设置、距离提示、推荐节点。
 - 组队：创建、加入、离开、锁队、报名付费。
 - 比赛运行：状态机、实时流、计分、Panic Mode。
@@ -28,8 +29,8 @@ Source Architecture: `docs/architecture.md` v6.0
 
 | PRD 章节 | 验收点 | SPEC 落点 |
 |---|---|---|
-| 4.1 创建 & 发布比赛 | 两种模式、星系选择、赞助费 >= 500、精准模式选点、创建与发布分离 | 第 2.4 节、第 3.1 节、第 4.2 节 `POST /api/matches` 和 `POST /api/matches/{id}/publish` |
-| 4.2 创建战队 | 创建/加入/离开战队、角色槽、锁队 | 第 2.4 节、第 3.3 节、第 4.3 节 |
+| 4.1 创建 & 发布比赛 | 两种模式、星系选择、赞助费 >= 50、精准模式选点、创建与发布分离 | 第 2.4 节、第 3.1 节、第 4.2 节 `POST /api/matches` 和 `POST /api/matches/{id}/publish` |
+| 4.2 创建战队 | `/planning` 首屏显示总战队数、独立战队列表、支持独立创建/加入战队；后续比赛报名链路保留 match-specific 创建/加入/离开/锁队 | 第 2.4 节、第 3.3 节、第 3.7 节、第 4.3 节和第 4.5 节 |
 | 4.3 发现 & 参加比赛 | Lobby 列表、位置选择、距离、推荐节点、比赛详情 | 第 2.3 节、第 3.2 节、第 4.1 节和第 4.2 节读接口 |
 | 4.4 启动比赛 | 状态机、得分板、流事件、三重过滤、Panic Mode | 第 2.5 节、第 3.4 节、第 4.2 节 `status/scoreboard/stream`、第 5.7 节 |
 | 4.5 自动分账 | 5% 平台抽成、95% 玩家奖池、排名分配、个人贡献占比 | 第 2.5 节、第 3.5 节、第 4.4 节、第 5.8 节 |
@@ -342,6 +343,16 @@ type CreateTeamRequest = {
   roleSlots: RoleSlots;
 };
 
+type CreatePlanningTeamRequest = {
+  name: string;
+  maxMembers: number;
+  roleSlots: RoleSlots;
+};
+
+type JoinPlanningTeamRequest = {
+  role: PlayerRole;
+};
+
 type JoinTeamRequest = {
   role: PlayerRole;
 };
@@ -354,6 +365,75 @@ type JoinTeamResponse = {
 type PayTeamRequest = {
   matchId: string;
   payTxDigest: string;
+};
+
+type PlanningTeam = {
+  id: string;
+  name: string;
+  captainAddress: string;
+  maxMembers: number;
+  memberCount: number;
+  roleSlots: RoleSlots;
+  members: Array<{
+    walletAddress: string;
+    role: PlayerRole;
+    joinedAt: string;
+  }>;
+  createdAt: string;
+};
+
+type TeamDossierMatch = {
+  matchId: string;
+  matchName: string;
+  matchStatus: MatchStatus;
+  mode: MatchMode;
+  modeLabel: string;
+  solarSystemId: number | null;
+  solarSystemName: string;
+  entryFee: number;
+  grossPool: number;
+  createdAt: string;
+};
+
+type TeamParticipation = {
+  teamId: string;
+  teamName: string;
+  captainAddress: string;
+  teamStatus: TeamStatus;
+  memberCount: number;
+  maxMembers: number;
+  role: PlayerRole;
+  isCaptain: boolean;
+  totalScore: number;
+  personalScore: number;
+  payout: string;
+  rank: number | null;
+  joinedAt: string;
+  createdAt: string;
+  match: TeamDossierMatch;
+};
+
+type ActiveTeamDeployment = {
+  team: TeamDetail;
+  match: TeamDossierMatch;
+  myRole: PlayerRole;
+  isCaptain: boolean;
+};
+
+type TeamDossierSummary = {
+  totalMatches: number;
+  totalTeams: number;
+  wins: number;
+  totalScore: number;
+  totalEarnings: string;
+  activeDeployments: number;
+};
+
+type PlayerTeamDossier = {
+  address: string;
+  summary: TeamDossierSummary;
+  currentDeployment: ActiveTeamDeployment | null;
+  participations: TeamParticipation[];
 };
 ```
 
@@ -495,11 +575,28 @@ type MatchStreamEvent =
 
 Create Match can render either as a dedicated planning surface or as a modal launched from Lobby. The controller/store/service contract is shared between both surfaces.
 
+交互顺序契约：
+
+- 默认填写顺序为 `mode -> economics -> solarSystemId -> targetNodeIds(if precision) -> draft/publish`。
+- `solarSystemId` 在 `free / precision` 两种模式下都必填。
+- `Target System` 区块在 `free / precision` 两种模式下都必须使用同一套 system + network-node tactical layout。
+- `targetNodeIds` 仅在 `precision` 模式下可交互并参与填写；`free` 模式展示同一套 node tactical UI，但只作为系统内 online nodes 的只读 scoring 范围预览。
+- tactical node grid 的 hover/focus tooltip 必须展示节点名，以及燃料 `remaining / capacity / deficit` 三项读数，且不得依赖浏览器原生 `title` 作为唯一提示方式。
+- tactical node tooltip 应包含一个可视化 fuel gauge / load bar，直观表达当前载油占比与缺口段，避免用户只能通过数字心算状态。
+- create-match 的 system search 必须保留所有文本命中系统，但把 `selectable` 系统排在前面；`no_nodes / offline_only / not_public` 系统下沉展示，不得直接隐藏。
+- create-match 搜索框 focus 且 query 为空时，应优先显示一组 `Ready Systems` 候选，默认来源于推荐星系接口。
+- create-match 搜索结果 UI 必须分组为：
+  - `Ready Systems`：`selectableState='selectable'`，允许选择。
+  - `Unavailable Systems`：`no_nodes / offline_only / not_public`，仅展示，不允许选择。
+- `system` 搜索匹配必须同时支持当前 live 系统名、canonical/legacy 别名和 `systemId`。
+- 若 alias 与当前 live 名称不同，搜索结果 label 应同时展示两者。
+
 View 事件：
 
 - `onOpenCreateMatch()`
 - `onCloseCreateMatch()`
 - `onModeChange(mode)`
+- `onEconomicsChange(key, value)`
 - `onOpenSystemPicker()`
 - `onSystemSelect(systemId)`
 - `onTargetNodeToggle(objectId)`
@@ -707,6 +804,46 @@ Selectors:
 - `selectCurrentPlayerTeam`
 - `selectPaymentAmount(teamId)`
 
+Team dossier page (`/team`)：
+
+View 事件：
+
+- `onLoadTeamDossier(address)`
+- `onClearTeamDossier()`
+
+```ts
+interface TeamDossierController {
+  dossier: PlayerTeamDossier | null;
+  isLoading: boolean;
+  error: string | null;
+  actions: {
+    load(address: string): Promise<void>;
+    clear(): void;
+  };
+}
+
+interface TeamDossierService {
+  getByPlayer(address: string): Promise<PlayerTeamDossier>;
+}
+
+interface TeamDossierStoreState {
+  loadedAddress: string | null;
+  dossier: PlayerTeamDossier | null;
+  isLoading: boolean;
+  error: string | null;
+  setLoadedAddress(address: string | null): void;
+  setDossier(dossier: PlayerTeamDossier | null): void;
+  setLoading(isLoading: boolean): void;
+  setError(error: string | null): void;
+  reset(): void;
+}
+```
+
+Selectors:
+
+- `selectCurrentDeployment`
+- `selectParticipationHistory`
+
 ### 3.4 Match Runtime and Overlay
 
 View 事件：
@@ -745,6 +882,79 @@ interface MatchRuntimeStoreState {
 }
 ```
 
+Hackathon demo replay 扩展：
+
+```ts
+type MatchPresentationMode = 'demo-replay' | 'live';
+
+interface MatchDemoReplayController {
+  state: {
+    playbackSec: number;
+    loopSec: number;
+    isPlaying: boolean;
+    isPanic: boolean;
+    frame: {
+      status: 'running' | 'panic' | 'settling';
+      remainingSeconds: number;
+      teams: Array<{
+        teamId: string;
+        teamCode: 'A' | 'B' | 'C' | 'D';
+        teamName: string;
+        mascotSrc: string;
+        score: number;
+        lastAction: string;
+      }>;
+      targetNodes: Array<{
+        nodeId: string;
+        name: string;
+        fillRatio: number;
+        urgencyLabel: 'SAFE' | 'WARN' | 'CRITICAL';
+      }>;
+      feed: Array<{
+        id: string;
+        atSec: number;
+        message: string;
+        kind: 'score' | 'system' | 'panic';
+      }>;
+    };
+  };
+  actions: {
+    play(): void;
+    pause(): void;
+    replay(): void;
+    jumpToPanic(): void;
+  };
+}
+
+interface MatchDemoReplayService {
+  start(): void;
+  stop(): void;
+  pause(): void;
+  replay(): void;
+  jumpToPanic(): void;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): MatchDemoReplayStoreState;
+}
+
+interface MatchDemoReplayStoreState {
+  playbackSec: number;
+  loopSec: number;
+  isPlaying: boolean;
+  frame: MatchDemoReplayController['state']['frame'];
+  setPlaybackSec(sec: number): void;
+  setPlaying(next: boolean): void;
+  setFrame(frame: MatchDemoReplayController['state']['frame']): void;
+  reset(): void;
+}
+```
+
+`useFuelFrogMatchScreenController` 必须作为 `/match` View 的唯一入口，负责：
+
+- 默认选择 `demo-replay`
+- 切换 `demo-replay / live` 时统一编排 replay service 与 live stream 的启停
+- 给 View 输出统一的 scoreboard / target node / event feed 展示模型
+- 将 `Replay / Pause / Jump to Panic / Switch to Live` 作为 controller actions 暴露给 View
+
 Selectors:
 
 - `selectPanicMode`
@@ -782,6 +992,68 @@ interface SettlementStoreState {
 }
 ```
 
+Hackathon settlement demo 扩展：
+
+```ts
+type SettlementPresentationMode = 'demo-report' | 'live';
+
+interface SettlementDemoController {
+  state: {
+    playbackSec: number;
+    isPlaying: boolean;
+    frame: {
+      phase: 'settling' | 'report';
+      roomId: string;
+      progress: number;
+      simulationLabel: string;
+      hero: {
+        championTeamName: string;
+        championPrizeAmount: string;
+        myPayoutAmount: string;
+        mvpPilotName: string;
+        mvpRole: string;
+        mvpScore: number;
+      };
+      bill: SettlementBill;
+      honorTags: string[];
+    };
+  };
+  actions: {
+    play(): void;
+    pause(): void;
+    replay(): void;
+    jumpToReport(): void;
+  };
+}
+
+interface SettlementDemoService {
+  start(): void;
+  stop(): void;
+  pause(): void;
+  replay(): void;
+  jumpToReport(): void;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): SettlementDemoStoreState;
+}
+
+interface SettlementDemoStoreState {
+  playbackSec: number;
+  isPlaying: boolean;
+  frame: SettlementDemoController['state']['frame'];
+  setPlaybackSec(sec: number): void;
+  setPlaying(next: boolean): void;
+  setFrame(frame: SettlementDemoController['state']['frame']): void;
+  reset(): void;
+}
+```
+
+`useFuelFrogSettlementScreenController` 必须作为 `/settlement` View 的唯一入口，负责：
+
+- 默认选择 `demo-report`
+- 切换 `demo-report / live` 时统一编排 demo service 与真实结算状态/账单加载
+- 给 View 输出统一的 `hero / bill / honors / progress / actions` 展示模型
+- 将 `Replay / Pause / Jump to Report / Switch to Live` 作为 controller actions 暴露给 View
+
 Selectors:
 
 - `selectWinningTeam`
@@ -802,6 +1074,7 @@ Selectors:
 - 当前实现要求以下 orchestration controllers 持续存在并作为 View 唯一入口：
   - `useLobbyDiscoveryScreenController`
   - `useCreateMatchScreenController`
+  - `usePlanningTeamScreenController`
   - `useTeamLobbyScreenController`
   - `useFuelFrogMatchScreenController`
   - `useFuelFrogSettlementScreenController`
@@ -812,6 +1085,47 @@ Selectors:
   - `useTargetNodePanelController`
   - `useSettlementBillPanelController`
 - 例外：hover/focus/animation 这类纯呈现微状态可继续留在 View，但不能访问 service/model，也不能发起副作用。
+
+### 3.7 Planning Team Registry
+
+View 事件：
+
+- `onRefreshPlanningTeams()`
+- `onOpenCreatePlanningTeam()`
+- `onCloseCreatePlanningTeam()`
+- `onCreatePlanningTeam(payload)`
+
+```ts
+interface PlanningTeamController {
+  teams: PlanningTeam[];
+  totalTeams: number;
+  currentWalletAddress: string | null;
+  actions: {
+    load(): Promise<void>;
+    createTeam(input: CreatePlanningTeamRequest): Promise<PlanningTeam>;
+  };
+}
+
+interface PlanningTeamService {
+  listTeams(): Promise<PlanningTeam[]>;
+  createTeam(input: CreatePlanningTeamRequest): Promise<PlanningTeam>;
+}
+
+interface PlanningTeamStoreState {
+  teams: PlanningTeam[];
+  isLoading: boolean;
+  isMutating: boolean;
+  setTeams(teams: PlanningTeam[]): void;
+  upsertTeam(team: PlanningTeam): void;
+  setLoading(isLoading: boolean): void;
+  setMutating(isMutating: boolean): void;
+}
+```
+
+Selectors:
+
+- `selectPlanningTeamCount`
+- `selectLatestPlanningTeams(limit?)`
 
 ---
 
@@ -866,6 +1180,7 @@ ApiResult<{
 type SearchQuery = {
   q: string;
   type?: 'all' | 'constellation' | 'system';
+  context?: 'default' | 'create_match';
 };
 ```
 
@@ -873,12 +1188,23 @@ Response: `ApiResult<{ items: SearchHit[] }>`
 
 - `SearchHit.regionId`
   - constellation/system 命中都应带上 `regionId`，便于前端直接展开对应 region。
+- Create Match search ordering
+  - `context='create_match'` 时，排序与展示规则独立于其他搜索入口。
+  - `system` 命中需优先返回 `selectableState='selectable'` 的系统。
+  - `system` 匹配源需包含当前 live 名称、canonical/legacy alias、以及 `systemId`。
+  - 若 alias 与当前名称不同，返回 label 形如 `Jita // EHK-KH7 (30000142)`。
+  - 其后按 `nodeCount(desc)`、`urgentNodeCount(desc)`、`warningNodeCount(desc)` 排序。
+  - `no_nodes / offline_only / not_public` 结果必须保留，但排在 `selectable` 结果之后。
 
 #### `GET /api/solar-systems/recommendations`
 
-Query: `limit?: number`
+Query: `limit?: number`, `context?: 'default' | 'create_match'`
 
 Response: `ApiResult<{ items: SolarSystemRecommendation[] }>`
+
+- `context='create_match'`
+  - 用于 create-match 搜索框 focus 空态候选。
+  - 默认优先返回 `selectable` 系统，供 `Ready Systems` 区块直接消费。
 
 #### `GET /api/solar-systems`
 
@@ -965,7 +1291,7 @@ ApiResult<{
 校验规则：
 
 - `name` 可缺省；缺省时由服务端按模式和目标星系生成默认名称
-- `sponsorshipFee >= 500`
+- `sponsorshipFee >= 50`
 - `2 <= maxTeams <= 16`
 - `0 <= entryFee <= 1000`
 - `1 <= durationHours <= 72`
@@ -985,7 +1311,10 @@ Response: `ApiResult<MatchDetail>`
 校验规则：
 
 - 比赛必须仍为 `draft`
-- `publishTxDigest` 必须可验证，且金额等于 `sponsorshipFee`
+- `publishTxDigest` 必须可验证
+- `publishTxDigest` 对应交易必须包含 `fuel_frog_panic::MatchPublished` 事件
+- `publishTxDigest` 对应交易的付款钱包扣款 `coinType` 必须等于当前配置的 LUX / EVE test token 类型
+- `publishTxDigest` 对应交易的付款钱包扣款金额必须精确等于 `sponsorshipFee`
 - 精准模式目标节点必须全部属于目标星系
 
 #### `GET /api/matches/{matchId}/status`
@@ -1018,6 +1347,18 @@ Payload: `MatchStreamEvent`
 #### `GET /api/matches/{matchId}/teams`
 
 Response: `ApiResult<{ items: TeamDetail[] }>`
+
+#### `GET /api/players/{address}/team-dossier`
+
+Response: `ApiResult<PlayerTeamDossier>`
+
+规则：
+
+- 地址按 lowercase 规范化后参与查询与比对。
+- `currentDeployment` 优先返回最近的非 `settled` 参赛记录；若当前没有 active squad，则返回 `null`。
+- `participations` 必须按 `createdAt` 倒序返回。
+- 如果玩家从未加入任何战队，接口返回 200 和 zeroed summary，而不是 404。
+- `participations[].match` 至少包含比赛名、模式、状态、目标星系、入场费、总奖池，用于 `/team` 页面单接口渲染。
 
 #### `POST /api/teams`
 
@@ -1108,6 +1449,9 @@ Response: `ApiResult<TeamDetail>`
 
 - 仅队长可调用。
 - `payTxDigest` 对应支付金额必须等于 `entryFee * memberCount`。
+- `payTxDigest` 对应交易必须包含 `fuel_frog_panic::TeamEntryLocked` 事件。
+- `payTxDigest` 对应交易的付款钱包扣款 `coinType` 必须等于当前配置的 LUX / EVE test token 类型，且扣款金额必须精确等于当前队伍报价。
+- `TeamEntryLocked` 事件中的 `room_id`、`escrow_id`、`team_ref`、`member_count`、`quoted_amount_lux`、`locked_amount` 必须与当前比赛和战队事实完全匹配。
 - 成功后写入白名单快照。
 
 ### 4.4 Settlement APIs
@@ -1120,7 +1464,48 @@ Response: `ApiResult<SettlementBill>`
 
 Response: `ApiResult<SettlementStatus>`
 
-### 4.5 Legacy Alias Policy
+### 4.5 Planning Team APIs
+
+#### `GET /api/planning-teams`
+
+Response: `ApiResult<{ items: PlanningTeam[]; totalTeams: number }>`
+
+规则：
+
+- 默认按 `createdAt desc` 返回。
+- `totalTeams` 必须与 `items.length` 在同一读时点一致。
+- `items[].members` 必须随同返回，用于前端直接展示成员与空槽。
+
+#### `POST /api/planning-teams`
+
+Headers:
+
+- `X-Idempotency-Key: string`
+
+Request: `CreatePlanningTeamRequest`
+
+Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
+
+校验规则：
+
+- `3 <= maxMembers <= 8`
+- `roleSlots.collector + roleSlots.hauler + roleSlots.escort = maxMembers`
+- 不要求 `matchId`
+
+#### `POST /api/planning-teams/{teamId}/join`
+
+Request: `JoinPlanningTeamRequest`
+
+Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
+
+校验规则：
+
+- 同一钱包在独立战队注册表中同一时间只能属于 1 支战队。
+- `memberCount < maxMembers` 时才允许加入。
+- 目标角色当前占用数必须小于 `roleSlots[role]`。
+- 成功后必须立即写入 projection，并回传最新 team 快照。
+
+### 4.6 Legacy Alias Policy
 
 - 若保留 `/api/nodes`，其响应必须与 `/api/network-nodes` 完全同构。
 - 若保留 `/api/missions`，其返回结构必须与 `/api/matches` 完全同构。
@@ -1143,6 +1528,8 @@ Response: `ApiResult<SettlementStatus>`
 - 规则：
   - 星系 `selectable` 的判断来自该星系是否存在 `isOnline && isPublic` 的节点。
   - 推荐星系按紧急节点优先，再按可选系统数和名称排序。
+  - create-match 搜索结果必须保留全部文本命中系统，但将 `selectable` 系统前置，不可选系统下沉。
+  - create-match 空态候选由推荐星系接口提供，优先产出 `Ready Systems`。
 
 ### 5.3 `nodeRuntime`
 
@@ -1151,6 +1538,7 @@ Response: `ApiResult<SettlementStatus>`
 - 刷新频率：5 秒。
 - 规则：
   - 必须输出 PRD 0.6 定义的 `/api/network-nodes` 统一字段口径。
+  - 若 `NetworkNode` 自身没有可用公开位置，允许从其 `connectedAssemblyIds` 对应设施的已公开位置回填 `coordX/coordY/coordZ/solarSystem`。
   - `activeMatchId` 只来自平台比赛展示投影，不是链上原生字段，也不代表节点只能被单个比赛引用。
 
 ### 5.4 `nodeRecommendationRuntime`
@@ -1172,6 +1560,8 @@ Response: `ApiResult<SettlementStatus>`
   - `draft -> lobby` 只能通过 publish 进入。
   - `running -> panic` 在最后 90 秒触发。
   - 状态迁移必须 CAS，防止重复推进。
+  - 当状态迁移进入 `settling` 或 `settled` 时，必须同步触发 settlement fact materialization，并分别写入 `settlement_start` / `settlement_complete` 流事件；不能等读接口首次访问后再补写。
+  - `score_update`、`phase_change/panic_mode`、`node_status` 也应以 persisted stream snapshot 形式按变更落入 `match_stream_events`，SSE 对已 materialized 的同签名 live frame 必须去重。
 
 ### 5.6 `teamRuntime`
 
@@ -1180,7 +1570,10 @@ Response: `ApiResult<SettlementStatus>`
 - 规则：
   - 角色槽必须遵守 `roleSlots` 上限。
   - 锁队后成员名单冻结。
+  - 队伍支付必须通过比赛发布阶段生成的同一个 `MatchEscrow` 完成，不允许地址直收款作为规范路径。
   - 支付确认成功后，整队地址一次性写入白名单快照。
+  - `team_payments` 的规范链上来源是 `TeamEntryLocked` commitment，而不是“transfer 到固定 recipient”的地址到账口径。
+  - `team_payments` 与 `match_whitelists` 是 paid/whitelist 状态的规范事实；runtime 重建时必须优先从这两类 persisted fact 恢复，不得只依赖 `team.hasPaid / whitelistCount` 反推。
 
 ### 5.7 `chainSyncEngine`
 
@@ -1205,6 +1598,18 @@ Response: `ApiResult<SettlementStatus>`
   - 两队分配 `[0.7, 0.3]`；三队及以上 `[0.6, 0.3, 0.1]`
   - 个人奖金按个人得分占比分配
   - 链上发奖成功后才能标记 `settled`
+  - `settlements` 是结算阶段的规范事实，至少支持 `running` 和 `succeeded` 两种 materialized 状态；`GET /result` 只能在 `status = succeeded` 时返回账单，不能直接绕过 persisted settlement fact 读取临时 bill。
+  - settlement fact 的写入由状态迁移侧效触发，读接口只消费已存在事实并在缺失时做幂等补偿，不能成为主触发源。
+
+### 5.9 `planningTeamRuntime`
+
+- 输入：`planning-teams` 读写请求、钱包签名、runtime projection。
+- 输出：独立战队列表、总战队数。
+- 约束：
+  - 战队创建不要求比赛上下文。
+  - `/planning` 所需 team board 必须由单次读取直接驱动，不要求前端额外聚合。
+  - 独立战队加入不走审批流，成功后直接落成员事实。
+  - 创建成功后必须立即写入 projection，确保刷新后总数可恢复。
 
 ---
 

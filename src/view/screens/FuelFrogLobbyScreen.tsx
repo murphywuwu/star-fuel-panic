@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFuelFrogLobbyScreenController } from "@/controller/useFuelFrogLobbyScreenController";
 import type { TeamRole } from "@/types/fuelMission";
+import { PAYMENT_TOKEN_SYMBOL } from "@/utils/paymentToken";
 import { MatchShell } from "@/view/components/MatchShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
@@ -282,7 +283,7 @@ export function FuelFrogLobbyScreen() {
                     </div>
 
                     {captainMatch ? (
-                      <p className="mt-2 text-xs text-eve-offwhite/70">ENTRY TOTAL: {payAmount} LUX</p>
+                      <p className="mt-2 text-xs text-eve-offwhite/70">ENTRY TOTAL: {payAmount} {PAYMENT_TOKEN_SYMBOL}</p>
                     ) : null}
 
                     {captainMatch && lockBlockers.length > 0 ? (

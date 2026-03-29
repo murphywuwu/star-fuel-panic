@@ -2,6 +2,7 @@ import type { EventId, SuiEvent, SuiObjectResponse } from "@mysten/sui/jsonRpc";
 
 import { getServerSuiClient } from "./suiClient.ts";
 import {
+  CURRENT_NODE_INDEX_VERSION,
   readNodeIndexSnapshot,
   writeNodeIndexSnapshot,
   type IndexedNodeSnapshot,
@@ -21,7 +22,7 @@ const DEFAULT_BATCH_LIMIT = 50;
 const DEFAULT_MAX_EVENT_PAGES = 0;
 
 type ChainObjectJson = Record<string, unknown>;
-type NodeLocation = { x: number; y: number; z: number; solarSystem: number };
+export type NodeLocation = { x: number; y: number; z: number; solarSystem: number };
 
 function resolveMaxEventPages() {
   const raw = Number(process.env.NODE_INDEXER_MAX_EVENT_PAGES ?? DEFAULT_MAX_EVENT_PAGES);
@@ -296,7 +297,38 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-function parseNodeObject(response: SuiObjectResponse, location?: NodeLocation): IndexedNodeSnapshot | null {
+function hasResolvedSolarSystem(location?: NodeLocation | null) {
+  return Boolean(location && location.solarSystem > 0);
+}
+
+export function shouldReplayFullLocationHistory(snapshot: NodeIndexSnapshot) {
+  return snapshot.version < CURRENT_NODE_INDEX_VERSION;
+}
+
+export function resolveNodeLocationForHydration(
+  location: NodeLocation | undefined,
+  connectedAssemblyIds: string[],
+  locations: Map<string, NodeLocation>
+) {
+  if (hasResolvedSolarSystem(location)) {
+    return location;
+  }
+
+  for (const assemblyId of connectedAssemblyIds) {
+    const candidate = locations.get(assemblyId);
+    if (hasResolvedSolarSystem(candidate)) {
+      return candidate;
+    }
+  }
+
+  return location;
+}
+
+function parseNodeObject(
+  response: SuiObjectResponse,
+  location: NodeLocation | undefined,
+  locations: Map<string, NodeLocation>
+): IndexedNodeSnapshot | null {
   const data = response.data;
   const nodeType = data?.type;
   if (!nodeType) {
@@ -337,6 +369,7 @@ function parseNodeObject(response: SuiObjectResponse, location?: NodeLocation): 
   const typeId = readTypeId(fields);
   const ownerCapId = readOwnerCapId(fields);
   const connectedAssemblyIds = readConnectedAssemblyIds(fields);
+  const resolvedLocation = resolveNodeLocationForHydration(location, connectedAssemblyIds, locations);
 
   // === 读取元数据 ===
   const name = data.display?.data?.name ?? readMetadataName(fields, fallbackName);
@@ -356,10 +389,10 @@ function parseNodeObject(response: SuiObjectResponse, location?: NodeLocation): 
     isPublic: readIsSharedOwner(data.owner),
 
     // === 位置信息 ===
-    coordX: location?.x ?? 0,
-    coordY: location?.y ?? 0,
-    coordZ: location?.z ?? 0,
-    solarSystem: location?.solarSystem ?? 0,
+    coordX: resolvedLocation?.x ?? 0,
+    coordY: resolvedLocation?.y ?? 0,
+    coordZ: resolvedLocation?.z ?? 0,
+    solarSystem: resolvedLocation?.solarSystem ?? 0,
 
     // === 燃料数据 ===
     fuelQuantity,
@@ -535,7 +568,7 @@ async function hydrateIndexedNodes(objectIds: string[], locations: Map<string, N
 
     for (const response of responses) {
       const objectId = response.data?.objectId;
-      const node = parseNodeObject(response, objectId ? locations.get(objectId) : undefined);
+      const node = parseNodeObject(response, objectId ? locations.get(objectId) : undefined, locations);
       if (node) {
         nodes.push(node);
       }
@@ -558,6 +591,7 @@ function normalizeCursor(cursor: EventId | null): EventId | null {
 
 export async function syncNodeIndexOnce() {
   const snapshot = await readNodeIndexSnapshot();
+  const replayFullLocationHistory = shouldReplayFullLocationHistory(snapshot);
 
   const [discoveryResult, locationResult] = await Promise.all([
     fetchEventPages(
@@ -568,14 +602,14 @@ export async function syncNodeIndexOnce() {
     fetchEventPages(
       `${EVE_FRONTIER_PACKAGE_ID}::location::LocationRevealedEvent`,
       "LocationRevealedEvent",
-      snapshot.locationCursor
+      replayFullLocationHistory ? null : snapshot.locationCursor
     )
   ]);
 
   const merged = mergeEventPage(snapshot, [...discoveryResult.events, ...locationResult.events]);
 
   const nextSnapshot: NodeIndexSnapshot = {
-    version: 2 as const,
+    version: CURRENT_NODE_INDEX_VERSION,
     lastSyncAt: new Date().toISOString(),
     discoveryCursor: discoveryResult.cursor,
     locationCursor: locationResult.cursor,
@@ -588,7 +622,7 @@ export async function syncNodeIndexOnce() {
 
 export async function readIndexedNodes() {
   const snapshot = await readNodeIndexSnapshot();
-  if (snapshot.nodes.length > 0) {
+  if (snapshot.nodes.length > 0 && !shouldReplayFullLocationHistory(snapshot)) {
     return snapshot;
   }
 
@@ -597,7 +631,7 @@ export async function readIndexedNodes() {
 
 export async function bootstrapNodeIndex() {
   const snapshot = await readNodeIndexSnapshot();
-  if (snapshot.lastSyncAt) {
+  if (snapshot.lastSyncAt && !shouldReplayFullLocationHistory(snapshot)) {
     return snapshot;
   }
 

@@ -1,4 +1,6 @@
 -- F-001: missions table + indexes + read-only RLS
+-- Note: legacy migration filenames do not sort in dependency order, so
+-- downstream FKs are attached in a later reconciliation migration.
 
 create table if not exists public.missions (
   id uuid primary key default gen_random_uuid(),

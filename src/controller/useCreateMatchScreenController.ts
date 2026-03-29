@@ -9,9 +9,19 @@ interface CreateMatchScreenControllerOptions {
   onPublished?: (matchId: string) => void;
 }
 
+type PrizeLadderItem = {
+  label: string;
+  ratio: number;
+  amount: number;
+  tone: string;
+};
+
 export type PlottedNode = {
   objectId: string;
   name: string;
+  fuelQuantity: number;
+  fuelMaxCapacity: number;
+  fuelDeficit: number;
   fillRatio: number;
   urgency: "critical" | "warning" | "safe";
   plotLeft: number;
@@ -33,6 +43,8 @@ function buildNodePlot(
   nodes: Array<{
     objectId: string;
     name: string;
+    fuelQuantity: number;
+    fuelMaxCapacity: number;
     coordX: number;
     coordZ: number;
     fillRatio: number;
@@ -45,14 +57,17 @@ function buildNodePlot(
 
   const withCoords = nodes.filter((node) => node.coordX !== 0 || node.coordZ !== 0);
   if (withCoords.length === 0) {
-    return nodes.map((node, index) => ({
-      objectId: node.objectId,
-      name: node.name,
-      fillRatio: node.fillRatio,
-      urgency: node.urgency,
-      plotLeft: FALLBACK_PLOT_POINTS[index % FALLBACK_PLOT_POINTS.length]?.left ?? 50,
-      plotTop: FALLBACK_PLOT_POINTS[index % FALLBACK_PLOT_POINTS.length]?.top ?? 50
-    }));
+      return nodes.map((node, index) => ({
+        objectId: node.objectId,
+        name: node.name,
+        fuelQuantity: node.fuelQuantity,
+        fuelMaxCapacity: node.fuelMaxCapacity,
+        fuelDeficit: Math.max(0, node.fuelMaxCapacity - node.fuelQuantity),
+        fillRatio: node.fillRatio,
+        urgency: node.urgency,
+        plotLeft: FALLBACK_PLOT_POINTS[index % FALLBACK_PLOT_POINTS.length]?.left ?? 50,
+        plotTop: FALLBACK_PLOT_POINTS[index % FALLBACK_PLOT_POINTS.length]?.top ?? 50
+      }));
   }
 
   const xs = withCoords.map((node) => node.coordX);
@@ -67,6 +82,9 @@ function buildNodePlot(
       return {
         objectId: node.objectId,
         name: node.name,
+        fuelQuantity: node.fuelQuantity,
+        fuelMaxCapacity: node.fuelMaxCapacity,
+        fuelDeficit: Math.max(0, node.fuelMaxCapacity - node.fuelQuantity),
         fillRatio: node.fillRatio,
         urgency: node.urgency,
         plotLeft: FALLBACK_PLOT_POINTS[index % FALLBACK_PLOT_POINTS.length]?.left ?? 50,
@@ -80,6 +98,9 @@ function buildNodePlot(
     return {
       objectId: node.objectId,
       name: node.name,
+      fuelQuantity: node.fuelQuantity,
+      fuelMaxCapacity: node.fuelMaxCapacity,
+      fuelDeficit: Math.max(0, node.fuelMaxCapacity - node.fuelQuantity),
       fillRatio: node.fillRatio,
       urgency: node.urgency,
       plotLeft: Number(left.toFixed(2)),
@@ -91,6 +112,21 @@ function buildNodePlot(
 function pulseSize(fillRatio: number) {
   const deficit = 1 - fillRatio;
   return Math.max(24, Math.min(60, Math.round(26 + deficit * 28)));
+}
+
+function buildPrizeLadder(maxTeams: number, payoutPool: number): PrizeLadderItem[] {
+  if (maxTeams <= 2) {
+    return [
+      { label: "1st", ratio: 0.7, amount: Math.round(payoutPool * 0.7), tone: "text-eve-yellow" },
+      { label: "2nd", ratio: 0.3, amount: Math.round(payoutPool * 0.3), tone: "text-eve-offwhite" }
+    ];
+  }
+
+  return [
+    { label: "1st", ratio: 0.6, amount: Math.round(payoutPool * 0.6), tone: "text-eve-yellow" },
+    { label: "2nd", ratio: 0.3, amount: Math.round(payoutPool * 0.3), tone: "text-eve-offwhite" },
+    { label: "3rd", ratio: 0.1, amount: Math.round(payoutPool * 0.1), tone: "text-eve-red" }
+  ];
 }
 
 function clampNumber(value: number, minimum: number, maximum: number, fallback: number) {
@@ -108,6 +144,9 @@ export function useCreateMatchScreenController({
   const { state, actions } = useCreateMatchController();
   const [systemQuery, setSystemQuery] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [sponsorshipFeeInput, setSponsorshipFeeInput] = useState(() => String(state.sponsorshipFee));
+  const [entryFeeInput, setEntryFeeInput] = useState(() => String(state.entryFee));
+  const [pendingPublishTxDigest, setPendingPublishTxDigest] = useState<string | null>(null);
 
   useEffect(() => {
     const trimmed = systemQuery.trim();
@@ -131,6 +170,14 @@ export function useCreateMatchScreenController({
     };
   }, [actions]);
 
+  useEffect(() => {
+    setSponsorshipFeeInput(String(state.sponsorshipFee));
+  }, [state.sponsorshipFee]);
+
+  useEffect(() => {
+    setEntryFeeInput(String(state.entryFee));
+  }, [state.entryFee]);
+
   const selectedSystem = state.selectedSystem;
   const selectedNodeCount = state.targetNodeIds.length;
   const precisionMode = state.mode === "precision";
@@ -140,6 +187,8 @@ export function useCreateMatchScreenController({
         state.systemNodes.map((node) => ({
           objectId: node.objectId,
           name: node.name,
+          fuelQuantity: node.fuelQuantity,
+          fuelMaxCapacity: node.fuelMaxCapacity,
           coordX: node.coordX,
           coordZ: node.coordZ,
           fillRatio: node.fillRatio,
@@ -152,6 +201,24 @@ export function useCreateMatchScreenController({
     const assumedPilotsPerTeam = 3;
     return state.sponsorshipFee + state.entryFee * state.maxTeams * assumedPilotsPerTeam;
   }, [state.entryFee, state.maxTeams, state.sponsorshipFee]);
+  const selectedNodes = useMemo(
+    () => state.systemNodes.filter((node) => state.targetNodeIds.includes(node.objectId)),
+    [state.systemNodes, state.targetNodeIds]
+  );
+  const displayNodes = useMemo(
+    () => (precisionMode ? selectedNodes : state.systemNodes),
+    [precisionMode, selectedNodes, state.systemNodes]
+  );
+  const guaranteedPool = state.sponsorshipFee;
+  const projectedEntryFlow = Math.max(0, estimatedMaxGrossPool - guaranteedPool);
+  const projectedPlatformFee = Math.floor(estimatedMaxGrossPool * 0.05);
+  const projectedPayoutPool = Math.max(0, estimatedMaxGrossPool - projectedPlatformFee);
+  const guaranteedSharePct = estimatedMaxGrossPool > 0 ? Math.max(8, Math.round((guaranteedPool / estimatedMaxGrossPool) * 100)) : 0;
+  const entrySharePct = estimatedMaxGrossPool > 0 ? Math.max(0, Math.round((projectedEntryFlow / estimatedMaxGrossPool) * 100)) : 0;
+  const payoutSharePct = estimatedMaxGrossPool > 0 ? Math.max(0, Math.round((projectedPayoutPool / estimatedMaxGrossPool) * 100)) : 0;
+  const prizeLadder = useMemo(() => buildPrizeLadder(state.maxTeams, projectedPayoutPool), [projectedPayoutPool, state.maxTeams]);
+  const topPrize = prizeLadder[0]?.amount ?? 0;
+  const systemLoadingNotice = state.loadingSystem ? "Loading system detail and indexed network nodes..." : null;
 
   const handleModeChange = (mode: "free" | "precision") => {
     actions.setField("mode", mode);
@@ -182,7 +249,49 @@ export function useCreateMatchScreenController({
     setStatusMessage(null);
   };
 
+  const handleSponsorshipFeeInputChange = (rawValue: string) => {
+    setSponsorshipFeeInput(rawValue);
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 50) {
+      return;
+    }
+
+    actions.setField("sponsorshipFee", Math.max(50, Math.floor(parsed)));
+  };
+
+  const commitSponsorshipFeeInput = () => {
+    const parsed = Number(sponsorshipFeeInput);
+    const nextValue = Number.isFinite(parsed) ? Math.max(50, Math.floor(parsed)) : state.sponsorshipFee;
+    actions.setField("sponsorshipFee", nextValue);
+    setSponsorshipFeeInput(String(nextValue));
+  };
+
+  const handleEntryFeeInputChange = (rawValue: string) => {
+    setEntryFeeInput(rawValue);
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return;
+    }
+
+    actions.setField("entryFee", Math.max(0, Math.floor(parsed)));
+  };
+
+  const commitEntryFeeInput = () => {
+    const parsed = Number(entryFeeInput);
+    const nextValue = Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : state.entryFee;
+    actions.setField("entryFee", nextValue);
+    setEntryFeeInput(String(nextValue));
+  };
+
   const handlePublish = async () => {
+    const parsedSponsorshipFee = Number(sponsorshipFeeInput);
+    const sponsorshipFeeAmount = Number.isFinite(parsedSponsorshipFee)
+      ? Math.max(50, Math.floor(parsedSponsorshipFee))
+      : state.sponsorshipFee;
+
+    commitSponsorshipFeeInput();
+    commitEntryFeeInput();
+
     if (!authState.walletAddress) {
       setStatusMessage("Connect a wallet before publishing a match.");
       return;
@@ -208,8 +317,26 @@ export function useCreateMatchScreenController({
       return;
     }
 
+    if (!pendingPublishTxDigest) {
+      setStatusMessage("LOCKING SPONSORSHIP INTO ESCROW...");
+    }
+
+    const paymentResult =
+      pendingPublishTxDigest !== null
+        ? {
+            ok: true as const,
+            message: "SPONSORSHIP_PAYMENT_REUSED",
+            payload: { txDigest: pendingPublishTxDigest }
+          }
+        : await actions.executePublishEscrowTransaction(authState.walletAddress);
+    if (!paymentResult.ok || !paymentResult.payload?.txDigest) {
+      setStatusMessage(paymentResult.message);
+      return;
+    }
+
+    setPendingPublishTxDigest(paymentResult.payload.txDigest);
     setStatusMessage("LOCKING SPONSORSHIP AND PUBLISHING...");
-    const publishResult = await actions.publish(authState.walletAddress);
+    const publishResult = await actions.publish(authState.walletAddress, paymentResult.payload.txDigest);
     if (!publishResult.ok) {
       setStatusMessage(publishResult.message);
       return;
@@ -218,6 +345,7 @@ export function useCreateMatchScreenController({
     const matchId = draftResult.payload;
     actions.reset();
     setSystemQuery("");
+    setPendingPublishTxDigest(null);
 
     if (onPublished) {
       onPublished(matchId);
@@ -231,6 +359,7 @@ export function useCreateMatchScreenController({
     actions.reset();
     setSystemQuery("");
     setStatusMessage(null);
+    setPendingPublishTxDigest(null);
     onClose?.();
   };
 
@@ -240,11 +369,32 @@ export function useCreateMatchScreenController({
     view: {
       systemQuery,
       feedbackMessage: statusMessage ?? state.error,
+      sponsorshipFeeInput,
+      entryFeeInput,
       selectedSystem,
       selectedNodeCount,
       precisionMode,
       plottedNodes,
+      selectedNodes,
       estimatedMaxGrossPool,
+      guaranteedPool,
+      projectedEntryFlow,
+      projectedPlatformFee,
+      projectedPayoutPool,
+      guaranteedSharePct,
+      entrySharePct,
+      payoutSharePct,
+      prizeLadder,
+      topPrize,
+      systemLoadingNotice,
+      targetPanelTitle: "Target System & Network Nodes",
+      targetPanelEyebrow: "Search / Select / Review Topology",
+      targetGridSummaryLabel: precisionMode ? `${selectedNodeCount}/5 locked` : `${state.systemNodes.length} online`,
+      targetGridInstruction: precisionMode
+        ? "Click flashing dots to lock scoring targets"
+        : "All online nodes in the selected system score automatically",
+      targetLegendAccentLabel: precisionMode ? "Selected Target" : "Auto Scoring",
+      displayNodes,
       pulseSize
     },
     actions: {
@@ -254,12 +404,16 @@ export function useCreateMatchScreenController({
       handleToggleTargetNode,
       handlePublish,
       handleClose,
+      handleSponsorshipFeeInputChange,
+      commitSponsorshipFeeInput,
+      handleEntryFeeInputChange,
+      commitEntryFeeInput,
       setMode: (mode: "free" | "precision") => handleModeChange(mode),
-      setSponsorshipFee: (value: number) => actions.setField("sponsorshipFee", Math.max(500, value || 500)),
+      setSponsorshipFee: (value: number) => actions.setField("sponsorshipFee", Math.max(50, value || 50)),
       setMaxTeams: (value: number) => actions.setField("maxTeams", clampNumber(value, 2, 16, state.maxTeams)),
       setEntryFee: (value: number) => actions.setField("entryFee", Math.max(0, value || 0)),
       setDurationHours: (value: number) =>
-        actions.setField("durationHours", clampNumber(value, 1, 24, state.durationHours))
+        actions.setField("durationHours", clampNumber(value, 1, 72, state.durationHours))
     }
   };
 }

@@ -1,4 +1,5 @@
 import type { Mission, MissionTeamRuleSummary } from "@/types/mission";
+import { formatPaymentTokenAmount } from "@/utils/paymentToken";
 
 type TeamRuleSummaryInput = {
   minTeams: number;
@@ -11,7 +12,7 @@ type TeamRuleSummaryInput = {
 };
 
 export function formatLux(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)} LUX`;
+  return formatPaymentTokenAmount(value, { maximumFractionDigits: 0 });
 }
 
 export function formatCountdown(countdownSec: number | null) {

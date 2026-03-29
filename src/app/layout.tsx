@@ -3,7 +3,7 @@ import { DAppKitClientProvider } from "@/app/DAppKitClientProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fuel Frog Panic",
+  title: "Star Fuel Panic",
   description: "Co-op fuel logistics arcade"
 };
 

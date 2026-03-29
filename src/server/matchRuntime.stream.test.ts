@@ -9,6 +9,7 @@ import {
   resetMatchRuntime,
   type MatchDetail
 } from "./matchRuntime.ts";
+import { createEmptyProjectionState, readRuntimeProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
 
 function nowIso() {
   return new Date().toISOString();
@@ -20,6 +21,7 @@ function buildMessage(scope: string, walletAddress: string) {
 
 test.beforeEach(() => {
   resetMatchRuntime();
+  writeRuntimeProjectionState(createEmptyProjectionState());
 });
 
 test("scoreboard snapshot exposes target node contract for runtime API", async () => {
@@ -144,6 +146,12 @@ test("stream frame emits score_update + panic_mode + heartbeat for panic matches
   assert.equal(scoreEvent.scoreboard.targetNodes[0]?.objectId, "0xpanicnode");
   assert.equal(scoreEvent.scoreboard.teams[0]?.teamName, "Aster");
   assert.equal(scoreEvent.scoreboard.teams[0]?.rank, 1);
+
+  const projection = readRuntimeProjectionState();
+  const eventTypes = projection.matchStreamEvents
+    .filter((event) => event.matchId === matchId)
+    .map((event) => event.eventType);
+  assert.deepEqual(eventTypes, ["score_update", "node_status", "panic_mode"]);
 });
 
 test("stream frame emits node_status and settlement_start during settling phase", async () => {
@@ -203,4 +211,144 @@ test("stream frame emits node_status and settlement_start during settling phase"
     assert.fail("expected settlement_start frame");
   }
   assert.equal(settlementStart.progress, 75);
+
+  const projection = readRuntimeProjectionState();
+  assert.equal(projection.settlements.length, 1);
+  assert.equal(projection.settlements[0]?.status, "running");
+  const events = projection.matchStreamEvents.filter((event) => event.matchId === matchId);
+  assert.equal(events.length, 4);
+  assert.deepEqual(events.map((event) => event.eventType).sort(), [
+    "node_status",
+    "phase_change",
+    "score_update",
+    "settlement_start"
+  ]);
+});
+
+test("stream frame emits settlement_complete during settled phase and persists completion event", async () => {
+  const matchId = `settled-${Date.now()}`;
+  const settlingDetail: MatchDetail = {
+    match: {
+      id: matchId,
+      onChainId: "0xsettlednode",
+      status: "settling",
+      creationMode: "precision",
+      solarSystemId: 30000142,
+      targetNodeIds: ["0xsettlednode"],
+      prizePool: 2000,
+      hostPrizePool: 1200,
+      sponsorshipFee: 1200,
+      entryFee: 100,
+      minTeams: 2,
+      maxTeams: 4,
+      durationMinutes: 10,
+      scoringMode: "weighted",
+      triggerMode: "min_threshold",
+      startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      endedAt: nowIso(),
+      createdBy: "0xhostsettled",
+      hostAddress: "0xhostsettled",
+      publishedAt: nowIso(),
+      publishIdempotencyKey: "settled-key",
+      createdAt: nowIso()
+    },
+    teams: [],
+    members: []
+  };
+
+  __setMatchDetailForTests(settlingDetail);
+
+  __setMatchDetailForTests({
+    ...settlingDetail,
+    match: {
+      ...settlingDetail.match,
+      status: "settled"
+    }
+  });
+
+  const frame = await buildMatchStreamFrame(matchId);
+
+  assert.ok(frame);
+  if (!frame) {
+    return;
+  }
+
+  assert.equal(frame[4]?.type, "settlement_complete");
+  const completion = frame[4];
+  if (completion.type !== "settlement_complete") {
+    assert.fail("expected settlement_complete frame");
+  }
+  assert.equal(completion.result.matchId, matchId);
+
+  const projection = readRuntimeProjectionState();
+  assert.equal(projection.settlements.length, 1);
+  assert.equal(projection.settlements[0]?.status, "succeeded");
+  const events = projection.matchStreamEvents
+    .filter((event) => event.matchId === matchId)
+    .map((event) => event.eventType);
+  assert.deepEqual(events.sort(), [
+    "node_status",
+    "phase_change",
+    "score_update",
+    "settlement_complete",
+    "settlement_start"
+  ]);
+});
+
+test("rebuilding the same frame does not duplicate persisted live snapshot events", async () => {
+  const matchId = `stable-${Date.now()}`;
+  const detail: MatchDetail = {
+    match: {
+      id: matchId,
+      onChainId: "0xstablestream",
+      status: "panic",
+      creationMode: "precision",
+      solarSystemId: 30000142,
+      targetNodeIds: ["0xstablestream"],
+      prizePool: 1800,
+      hostPrizePool: 1200,
+      sponsorshipFee: 1200,
+      entryFee: 100,
+      minTeams: 2,
+      maxTeams: 4,
+      durationMinutes: 10,
+      scoringMode: "weighted",
+      triggerMode: "min_threshold",
+      startedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      endedAt: null,
+      createdBy: "0xhoststable",
+      hostAddress: "0xhoststable",
+      publishedAt: nowIso(),
+      publishIdempotencyKey: "stable-key",
+      createdAt: nowIso()
+    },
+    teams: [
+      {
+        id: `${matchId}-team-a`,
+        matchId,
+        name: "Stable A",
+        captainAddress: "0xstable-a",
+        maxSize: 3,
+        isLocked: true,
+        hasPaid: true,
+        payTxDigest: "tx_stable_a",
+        totalScore: 500,
+        rank: 1,
+        prizeAmount: null,
+        status: "paid",
+        createdAt: nowIso()
+      }
+    ],
+    members: []
+  };
+
+  __setMatchDetailForTests(detail);
+  await buildMatchStreamFrame(matchId);
+  await buildMatchStreamFrame(matchId);
+
+  const projection = readRuntimeProjectionState();
+  const eventTypes = projection.matchStreamEvents
+    .filter((event) => event.matchId === matchId)
+    .map((event) => event.eventType);
+  assert.deepEqual(eventTypes, ["score_update", "node_status", "panic_mode"]);
 });

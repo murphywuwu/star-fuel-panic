@@ -30,12 +30,18 @@ import {
 } from "../../../server/teamRuntime.ts";
 import {
   createEmptyProjectionState,
+  readRuntimeProjectionState,
   writeRuntimeProjectionState
 } from "../../../server/runtimeProjectionStore.ts";
 
 const originalFetch = global.fetch;
 const originalNodeIndexStorePath = process.env.NODE_INDEX_STORE_PATH;
 const originalProjectionStorePath = process.env.RUNTIME_PROJECTION_STORE_PATH;
+const originalMatchSponsorshipRecipient = process.env.NEXT_PUBLIC_MATCH_SPONSORSHIP_RECIPIENT;
+const originalEntryPaymentRecipient = process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT;
+const originalLuxCoinType = process.env.NEXT_PUBLIC_LUX_COIN_TYPE;
+const originalLuxDecimals = process.env.NEXT_PUBLIC_LUX_DECIMALS;
+const originalChainMode = process.env.FUEL_FROG_CHAIN_MODE;
 
 function createResponse(body: unknown, status = 200) {
   return {
@@ -82,9 +88,10 @@ function writeNodeIndexSnapshot(filePath: string) {
     filePath,
     JSON.stringify(
       {
-        version: 1,
+        version: 3,
         lastSyncAt: now,
-        cursor: null,
+        discoveryCursor: null,
+        locationCursor: null,
         nodes: [
           {
             id: "node-jita-critical",
@@ -274,6 +281,11 @@ test.beforeEach(() => {
   const paths = buildTempPaths();
   process.env.NODE_INDEX_STORE_PATH = paths.nodeIndexPath;
   process.env.RUNTIME_PROJECTION_STORE_PATH = paths.projectionPath;
+  process.env.NEXT_PUBLIC_MATCH_SPONSORSHIP_RECIPIENT = "0xtest_sponsorship_recipient";
+  process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT = "0xtest_entry_recipient";
+  process.env.NEXT_PUBLIC_LUX_COIN_TYPE = "0x2::sui::SUI";
+  process.env.NEXT_PUBLIC_LUX_DECIMALS = "9";
+  process.env.FUEL_FROG_CHAIN_MODE = "mock";
   writeNodeIndexSnapshot(paths.nodeIndexPath);
   writeRuntimeProjectionState(createEmptyProjectionState());
   installWorldApiSuccessStub();
@@ -291,6 +303,11 @@ test.afterEach(() => {
   global.fetch = originalFetch;
   process.env.NODE_INDEX_STORE_PATH = originalNodeIndexStorePath;
   process.env.RUNTIME_PROJECTION_STORE_PATH = originalProjectionStorePath;
+  process.env.NEXT_PUBLIC_MATCH_SPONSORSHIP_RECIPIENT = originalMatchSponsorshipRecipient;
+  process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT = originalEntryPaymentRecipient;
+  process.env.NEXT_PUBLIC_LUX_COIN_TYPE = originalLuxCoinType;
+  process.env.NEXT_PUBLIC_LUX_DECIMALS = originalLuxDecimals;
+  process.env.FUEL_FROG_CHAIN_MODE = originalChainMode;
   resetMatchRuntime();
   resetTeamRuntime();
 });
@@ -565,10 +582,21 @@ test("F-007 T-0703/T-0705 route-level E2E covers draft, publish, apply, approve/
   assert.equal(streamResponse.status, 200);
   const reader = streamResponse.body?.getReader();
   assert.ok(reader);
-  const chunk = await reader!.read();
+  const decoder = new TextDecoder();
+  let chunkText = "";
+  for (let index = 0; index < 8; index += 1) {
+    const chunk = await reader!.read();
+    if (chunk.done) {
+      break;
+    }
+    chunkText += decoder.decode(chunk.value, { stream: true });
+    if (chunkText.includes("event: score_update") && chunkText.includes("event: settlement_complete")) {
+      break;
+    }
+  }
   await reader!.cancel();
-  const chunkText = new TextDecoder().decode(chunk.value);
   assert.match(chunkText, /event: score_update/);
+  assert.match(chunkText, /event: settlement_complete/);
 
   const settlementSucceededResponse = await getMatchSettlementRoute(
     new Request(`http://localhost/api/matches/${match.id}/settlement`),
@@ -577,6 +605,15 @@ test("F-007 T-0703/T-0705 route-level E2E covers draft, publish, apply, approve/
   assert.equal(settlementSucceededResponse.status, 200);
   const settlementSucceededJson = await settlementSucceededResponse.json();
   assert.equal(settlementSucceededJson.status, "succeeded");
+  const succeededProjection = readRuntimeProjectionState();
+  assert.equal(succeededProjection.settlements.length, 1);
+  assert.equal(succeededProjection.settlements[0]?.status, "succeeded");
+  assert.equal(succeededProjection.settlements[0]?.payoutTxDigest, "tx_pay_valid");
+  assert.ok(
+    succeededProjection.matchStreamEvents.some(
+      (event) => event.matchId === match.id && event.eventType === "settlement_complete"
+    )
+  );
 
   const firstResultResponse = await getMatchResultRoute(new Request(`http://localhost/api/matches/${match.id}/result`), {
     params: Promise.resolve({ id: match.id })

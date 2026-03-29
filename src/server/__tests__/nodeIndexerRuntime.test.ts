@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  resolveNodeLocationForHydration as resolveNodeLocationForHydrationRuntime,
+  shouldReplayFullLocationHistory as shouldReplayFullLocationHistoryRuntime
+} from "../nodeIndexerRuntime.ts";
 
 /**
  * Node Indexer Runtime 测试
@@ -352,6 +356,81 @@ test("LocationRevealedEvent 解析坐标", () => {
   assert.equal(y, 5678.9);
   assert.equal(z, 9012.3);
   assert.equal(solarSystem, 42);
+});
+
+test("resolveNodeLocationForHydration 在节点自身缺少星系时回退到 connected assembly 位置", () => {
+  const directLocation = {
+    x: 0,
+    y: 0,
+    z: 0,
+    solarSystem: 0
+  };
+  const locations = new Map([
+    [
+      "0xassembly1",
+      {
+        x: 11,
+        y: 22,
+        z: 33,
+        solarSystem: 30000142
+      }
+    ]
+  ]);
+
+  const resolved = resolveNodeLocationForHydrationRuntime(directLocation, ["0xassembly1"], locations);
+  assert.deepEqual(resolved, {
+    x: 11,
+    y: 22,
+    z: 33,
+    solarSystem: 30000142
+  });
+});
+
+test("resolveNodeLocationForHydration 优先保留节点自身已解析的星系", () => {
+  const directLocation = {
+    x: 1,
+    y: 2,
+    z: 3,
+    solarSystem: 30000144
+  };
+  const locations = new Map([
+    [
+      "0xassembly1",
+      {
+        x: 11,
+        y: 22,
+        z: 33,
+        solarSystem: 30000142
+      }
+    ]
+  ]);
+
+  const resolved = resolveNodeLocationForHydrationRuntime(directLocation, ["0xassembly1"], locations);
+  assert.deepEqual(resolved, directLocation);
+});
+
+test("shouldReplayFullLocationHistory 对旧 v2 快照返回 true，对 v3 返回 false", () => {
+  assert.equal(
+    shouldReplayFullLocationHistoryRuntime({
+      version: 2,
+      lastSyncAt: "2026-03-26T00:00:00.000Z",
+      discoveryCursor: null,
+      locationCursor: null,
+      nodes: []
+    }),
+    true
+  );
+
+  assert.equal(
+    shouldReplayFullLocationHistoryRuntime({
+      version: 3,
+      lastSyncAt: "2026-03-26T00:00:00.000Z",
+      discoveryCursor: null,
+      locationCursor: null,
+      nodes: []
+    }),
+    false
+  );
 });
 
 // === 辅助函数实现（用于测试） ===

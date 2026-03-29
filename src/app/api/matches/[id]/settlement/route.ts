@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { hydrateRuntimeProjectionFromBackendIfNeeded } from "@/server/matchBackendStore";
 import { getSettlementStatus } from "@/server/settlementRuntime";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
   const settlement = getSettlementStatus(id);
 
   if (!settlement) {

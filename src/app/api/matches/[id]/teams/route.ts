@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
+import { hydrateRuntimeProjectionFromBackendIfNeeded } from "@/server/matchBackendStore";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
 import { createTeam, getMatchTeamsSnapshot } from "@/server/teamRuntime";
 import type { PlayerRole, RoleSlots } from "@/types/team";
@@ -29,6 +30,7 @@ function parseRoleSlots(value: unknown): RoleSlots {
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
   const snapshot = getMatchTeamsSnapshot(id);
 
   if (!snapshot) {
@@ -49,6 +51,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
 
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) {

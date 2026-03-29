@@ -196,7 +196,7 @@ cp .env.example .env
 - `NEXT_PUBLIC_SUI_NETWORK`
 - `NEXT_PUBLIC_SUI_RPC_URL`
 - `NEXT_PUBLIC_LUX_COIN_TYPE`
-- `NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT`
+- `NEXT_PUBLIC_FUEL_FROG_PACKAGE_ID`
 - `SUI_RPC_URL`
 - `EVE_FRONTIER_WORLD_API_BASE_URL`
 
@@ -208,10 +208,15 @@ cp .env.example .env
 - `DEFAULT_MAX_TEAMS`
 - `FORCE_START_SEC`
 
+兼容/旧路径变量：
+
+- `NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT`
+
 说明：
 
 - 文档基线的平台费率是 `5%`，即 `500 bps`
 - 实际运行时以 `SETTLEMENT_PLATFORM_FEE_BPS` 为准
+- 当前主路径下，创建比赛 sponsorship 和 `pay-team` 都走 `fuel_frog_panic` escrow 合约；`NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT` 仅保留给旧入口或兼容路径
 - 本地配置时请确保环境变量与 PRD/SPEC 业务口径保持一致
 
 ### 3) 启动前端

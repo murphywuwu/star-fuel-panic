@@ -1,6 +1,11 @@
 import { listNodes } from "@/server/nodeRuntime";
 import { getSolarSystems } from "@/server/solarSystemRuntime";
 import {
+  buildSolarSystemSearchLabel,
+  matchesSolarSystemSearch,
+  readSolarSystemAliases
+} from "@/server/solarSystemAliasStore";
+import {
   readPersistedConstellationSummaries,
   updateProjectionRuntimeMeta,
   writePersistedConstellationSummaries,
@@ -172,6 +177,7 @@ export async function searchSolarSystemsAndConstellations(query: string, options
     listNodes({}, options)
   ]);
   const nodesBySystem = groupNodesBySystem(nodes);
+  const aliases = readSolarSystemAliases();
 
   const constellationHits = constellations
     .filter(
@@ -187,12 +193,12 @@ export async function searchSolarSystemsAndConstellations(query: string, options
 
   const systemHits = systems
     .filter(
-      (item) => item.systemName.toLowerCase().includes(trimmed) || String(item.systemId).includes(trimmed)
+      (item) => matchesSolarSystemSearch(trimmed, item.systemId, item.systemName, aliases.get(item.systemId) ?? null)
     )
     .map((item) => ({
       type: "system" as const,
       id: item.systemId,
-      label: `${item.systemName} (${item.systemId})`,
+      label: buildSolarSystemSearchLabel(item.systemId, item.systemName, aliases.get(item.systemId) ?? null),
       regionId: item.regionId,
       constellationId: item.constellationId,
       constellationName: constellationName(item.constellationId),

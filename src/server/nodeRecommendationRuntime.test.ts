@@ -17,7 +17,7 @@ test("getNodeRecommendations falls back to same-system nodes when topology is un
     snapshotPath,
     JSON.stringify(
       {
-        version: 2,
+        version: 3,
         lastSyncAt: "2026-03-26T00:00:00.000Z",
         discoveryCursor: null,
         locationCursor: null,
@@ -76,7 +76,7 @@ test("getNodeRecommendations returns empty recommendations when no same-system n
     snapshotPath,
     JSON.stringify(
       {
-        version: 2,
+        version: 3,
         lastSyncAt: "2026-03-26T00:00:00.000Z",
         discoveryCursor: null,
         locationCursor: null,

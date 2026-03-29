@@ -40,6 +40,8 @@ export type BountyRouteDeps = {
     bountyAmount: number;
     txDigest: string;
   }) => BountyMutationResult;
+  ensureHydrated?: (matchId: string) => Promise<void>;
+  afterSuccess?: (matchId: string) => Promise<void>;
 };
 
 function errorResponse(status: number, code: string, message: string) {
@@ -121,6 +123,9 @@ export function parseBountyRoutePayload(body: unknown): BountyRoutePayload | nul
 export function createBountyPostHandler(deps: BountyRouteDeps) {
   return async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
     const { id } = await context.params;
+    if (deps.ensureHydrated) {
+      await deps.ensureHydrated(id);
+    }
 
     let body: unknown;
     try {
@@ -151,6 +156,10 @@ export function createBountyPostHandler(deps: BountyRouteDeps) {
 
     if (!result.ok) {
       return errorResponse(result.status, result.code, result.message);
+    }
+
+    if (deps.afterSuccess) {
+      await deps.afterSuccess(id);
     }
 
     return NextResponse.json({

@@ -1,4 +1,5 @@
 import type { FundingSources, NodeDeficitSnapshot, TeamRole, TeamState } from "@/types/fuelMission";
+import { formatPaymentTokenAmount } from "@/utils/paymentToken";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 import { buildTeamRuleSummary } from "@/view/utils/missionRuleSummary";
@@ -22,7 +23,7 @@ interface RoleSelectorProps {
 }
 
 function money(value: number) {
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)} LUX`;
+  return formatPaymentTokenAmount(value, { maximumFractionDigits: 0 });
 }
 
 function urgencyColor(deficitRatio: number) {

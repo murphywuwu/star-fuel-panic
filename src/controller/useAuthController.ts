@@ -5,8 +5,10 @@ import { normalizeStructTag, toBase64 } from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { authService } from "@/service/authService";
+import type { TeamEntryEscrowPaymentInput } from "@/service/authService";
 import { setWalletRuntimeBridge } from "@/service/walletService";
 import type { FuelMissionErrorCode } from "@/types/fuelMission";
+import { PAYMENT_TOKEN_LABEL } from "@/utils/paymentToken";
 import { balanceToDisplayUnits, normalizeWalletDecimals } from "@/utils/walletBalance";
 
 const WALLET_ERROR_LABEL: Partial<Record<FuelMissionErrorCode, string>> = {
@@ -15,7 +17,8 @@ const WALLET_ERROR_LABEL: Partial<Record<FuelMissionErrorCode, string>> = {
   E_WALLET_CONNECT_REJECTED: "WALLET AUTH REJECTED",
   E_WALLET_SIGN_REJECTED: "SIGNATURE REJECTED",
   E_WALLET_NETWORK: "WALLET NETWORK ERROR",
-  E_INSUFFICIENT_BALANCE: "INSUFFICIENT LUX BALANCE"
+  E_INSUFFICIENT_BALANCE: `INSUFFICIENT ${PAYMENT_TOKEN_LABEL} BALANCE`,
+  E_INSUFFICIENT_GAS: "INSUFFICIENT SUI GAS"
 };
 
 const DEFAULT_COIN_TYPE = process.env.NEXT_PUBLIC_LUX_COIN_TYPE?.trim() || "0x2::sui::SUI";
@@ -176,6 +179,27 @@ export function useAuthController() {
       },
       getBalance: async (address: string) => {
         return resolveBalanceFromClient(address);
+      },
+      objectExists: async (objectId: string) => {
+        if (!objectId.trim()) {
+          return false;
+        }
+
+        try {
+          const response = await client.core.getObject({
+            objectId,
+            include: {
+              content: false
+            }
+          });
+
+          return Boolean(response.object?.objectId);
+        } catch (error) {
+          if (error instanceof Error && /not found/i.test(error.message)) {
+            return false;
+          }
+          throw error;
+        }
       }
     });
   }, [account?.address, client, dAppKit, walletConnection.status, wallets]);
@@ -232,7 +256,8 @@ export function useAuthController() {
       onDisconnectWallet: () => authService.disconnectWallet(),
       onRefreshBalance: () => authService.refreshBalance(),
       onSignTransaction: (txBytes: Uint8Array) => authService.signTransaction(txBytes),
-      onExecuteEntryPayment: (amountLux: number) => authService.executeEntryPayment(amountLux)
+      onExecuteEntryPayment: (input: number | TeamEntryEscrowPaymentInput) => authService.executeEntryPayment(input),
+      onExecuteSponsorshipPayment: (amountLux: number) => authService.executeSponsorshipPayment(amountLux)
     }
   };
 }

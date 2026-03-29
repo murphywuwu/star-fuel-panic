@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
 import { useTeamLobbyController } from "@/controller/useTeamLobbyController";
 import type { PlayerRole, RoleSlots, TeamApplication, TeamDetail } from "@/types/team";
+import { deriveTeamPaymentRef } from "@/utils/teamPaymentRef";
 
 const DEFAULT_CREATE_TEAM_FORM = {
   teamName: "Alpha Squad",
@@ -208,7 +209,20 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
 
   const handlePay = async (team: TeamDetail) => {
     const amount = selectors.paymentAmount(team.id);
-    const payment = await authActions.onExecuteEntryPayment(amount);
+    const roomId = state.match?.onChainId?.trim() ?? "";
+    const escrowId = state.match?.escrowId?.trim() ?? "";
+    if (!roomId || !escrowId) {
+      setMessage("MATCH ESCROW NOT READY // PUBLISH THE MATCH BEFORE TEAM PAYMENT");
+      return;
+    }
+
+    const payment = await authActions.onExecuteEntryPayment({
+      roomId,
+      escrowId,
+      teamRef: deriveTeamPaymentRef(team.id),
+      memberCount: team.members.length,
+      amountLux: amount
+    });
     if (!payment.ok || !payment.payload?.txDigest) {
       setMessage(`${payment.errorCode ?? "UNKNOWN"} // ${walletErrorMessage(payment.errorCode, payment.message)}`);
       return;

@@ -5,7 +5,9 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.matches (
   id uuid primary key default gen_random_uuid(),
-  mission_id uuid not null references public.missions(id) on delete cascade,
+  -- Attach FK in a later migration because this legacy file can run before
+  -- `20260321_f001_missions.sql` on a fresh local bootstrap.
+  mission_id uuid not null,
   status text not null default 'lobby' check (status in ('lobby', 'pre_start', 'running', 'panic', 'settling', 'settled')),
   start_rule_mode text not null default 'min_team_force_start' check (start_rule_mode in ('full_paid', 'min_team_force_start')),
   min_teams int not null default 1 check (min_teams >= 1),

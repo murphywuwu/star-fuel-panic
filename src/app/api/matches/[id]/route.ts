@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
+import {
+  deleteMatchDetailFromBackend,
+  hydrateRuntimeProjectionFromBackendIfNeeded,
+  persistMatchDetailToBackend
+} from "@/server/matchBackendStore";
 import { getMatchDiscoveryDetail } from "@/server/matchDiscoveryRuntime";
 import { cancelHostedMatch } from "@/server/matchRuntime";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
@@ -8,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
   const { searchParams } = new URL(request.url);
   const currentSystem = Number(searchParams.get("currentSystem"));
 
@@ -34,6 +40,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
 
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) {
@@ -78,6 +85,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       ).body
     });
   }
+
+  await deleteMatchDetailFromBackend(id);
 
   return finalizeMutation(`DELETE:/api/matches/${id}`, mutation.mutation, {
     status: 200,

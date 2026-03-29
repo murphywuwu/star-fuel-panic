@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWalletConnection, useWallets } from "@mysten/dapp-kit-react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
+import { PAYMENT_TOKEN_LABEL } from "@/utils/paymentToken";
 import { formatWalletBalance } from "@/utils/walletBalance";
 
-const SHELL_PREFETCH_ROUTES = ["/lobby", "/planning", "/match", "/settlement"];
+const SHELL_PREFETCH_ROUTES = ["/lobby", "/planning", "/team", "/match", "/settlement"];
 
 function hasCompatibleEveWallet(wallets: ReturnType<typeof useWallets>) {
   return wallets.some((wallet) => wallet.name.toLowerCase().includes("eve"));
@@ -66,7 +67,7 @@ export function useFuelMissionShellController() {
       return;
     }
     setWalletNotice(
-      `BALANCE REFRESHED // ${formatWalletBalance(refreshed.payload?.luxBalance ?? authState.luxBalance)} LUX`
+      `BALANCE REFRESHED // ${formatWalletBalance(refreshed.payload?.luxBalance ?? authState.luxBalance)} ${PAYMENT_TOKEN_LABEL}`
     );
   }, [authActions, authState.luxBalance]);
 
@@ -77,7 +78,7 @@ export function useFuelMissionShellController() {
       hasEveWallet,
       providerNames,
       shortAddress: isMounted ? selectors.walletShort : "NOT CONNECTED",
-      balanceLabel: isMounted ? `${formatWalletBalance(authState.luxBalance)} LUX` : "0 LUX",
+      balanceLabel: isMounted ? `${formatWalletBalance(authState.luxBalance)} ${PAYMENT_TOKEN_LABEL}` : `0 ${PAYMENT_TOKEN_LABEL}`,
       isBalanceLow: isMounted && authState.luxBalance < 100,
       showProviderList: isMounted && !authState.isConnected && wallets.length > 0 && walletConnection.status === "disconnected"
     },

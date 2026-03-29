@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useFuelMissionShellController } from "@/controller/useFuelMissionShellController";
 import type { ReactNode } from "react";
@@ -30,7 +31,8 @@ interface FuelMissionShellProps {
 
 const NAV_ITEMS = [
   { href: "/lobby", label: "MISSION LOBBY", hint: "Discover matches, set position, and route into squad planning" },
-  { href: "/planning", label: "SQUAD LOBBY", hint: "Create a team, lock roles, and prepare to enter" },
+  { href: "/planning", label: "TEAM REGISTRY", hint: "Review current team count and register a new formation" },
+  { href: "/team", label: "SQUAD DOSSIER", hint: "Inspect active squad structure, role occupancy, and deployment history" },
   { href: "/match", label: "LIVE MATCH", hint: "Submit supply runs, watch the board, beat the timer" },
   { href: "/settlement", label: "SETTLEMENT LEDGER", hint: "Review payouts, MVP, and final rewards" }
 ];
@@ -49,6 +51,9 @@ function navClass(active: boolean) {
     ? "border-eve-red bg-eve-red text-black shadow-[0_0_0_1px_rgba(255,95,0,0.28)]"
     : "border-eve-offwhite/15 bg-transparent text-eve-offwhite/80 hover:border-eve-red/50 hover:text-eve-offwhite";
 }
+
+const BRAND_NAME = "Star Fuel Panic";
+const BRAND_MASCOT_SRC = "/mascot-hero-waving.png";
 
 export function FuelMissionShell({
   title,
@@ -74,8 +79,22 @@ export function FuelMissionShell({
       ) : null}
 
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-eve-red/25 bg-[#0e0e0e]/96 px-4 shadow-[0_0_24px_rgba(255,95,0,0.08)] backdrop-blur-md sm:px-6 lg:px-8">
-        <Link href="/lobby" prefetch className="text-2xl font-black italic tracking-[-0.08em] text-eve-red">
-          FUEL_FROG_PANIC
+        <Link
+          href="/lobby"
+          prefetch
+          className="inline-flex items-center gap-3 whitespace-nowrap text-eve-red transition hover:text-[#ffb599]"
+        >
+          <span className="flex h-11 w-11 items-center justify-center border border-eve-red/35 bg-[#080808] shadow-[0_0_18px_rgba(255,95,0,0.12)]">
+            <Image
+              src={BRAND_MASCOT_SRC}
+              alt={`${BRAND_NAME} mascot`}
+              width={40}
+              height={40}
+              priority
+              className="h-10 w-10 object-contain"
+            />
+          </span>
+          <span className="text-xl font-black italic tracking-[-0.05em] sm:text-2xl">{BRAND_NAME}</span>
         </Link>
         <div className="hidden items-center gap-2 lg:flex">
           {NAV_ITEMS.map((item) => (
@@ -103,8 +122,8 @@ export function FuelMissionShell({
         </div>
       </nav>
 
-      <aside className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 border-r border-eve-red/15 bg-[#1c1b1b]/96 backdrop-blur-md lg:flex lg:flex-col">
-        <div className="border-b border-eve-red/15 p-5">
+      <aside className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 overflow-hidden border-r border-eve-red/15 bg-[#1c1b1b]/96 backdrop-blur-md lg:flex lg:flex-col">
+        <div className="shrink-0 border-b border-eve-red/15 p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center bg-eve-red text-black">
               <span className="text-sm font-black">◉</span>
@@ -160,7 +179,7 @@ export function FuelMissionShell({
           </div>
         </div>
 
-        <div className="flex-1 px-2 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4">
           <div className="space-y-1">
             {NAV_ITEMS.map((item) => (
               <Link
@@ -182,7 +201,7 @@ export function FuelMissionShell({
           </div>
         </div>
 
-        <div className="border-t border-eve-red/15 p-4">
+        <div className="shrink-0 border-t border-eve-red/15 p-4">
           <button className="w-full border border-eve-red/50 bg-transparent px-3 py-3 text-xs font-black uppercase tracking-[0.22em] text-eve-red transition hover:bg-eve-red/10">
             DEPLOY
           </button>

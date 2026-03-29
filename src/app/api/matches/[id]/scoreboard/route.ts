@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { hydrateRuntimeProjectionFromBackendIfNeeded } from "@/server/matchBackendStore";
 import { getMatchScoreboardSnapshot } from "@/server/matchRuntime";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const requestId = randomUUID();
   const { id } = await context.params;
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: id });
   const scoreboard = await getMatchScoreboardSnapshot(id);
 
   if (!scoreboard) {

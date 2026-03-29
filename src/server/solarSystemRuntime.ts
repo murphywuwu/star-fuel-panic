@@ -1,5 +1,10 @@
 import { listNodes } from "./nodeRuntime.ts";
 import {
+  buildSolarSystemSearchLabel,
+  matchesSolarSystemSearch,
+  readSolarSystemAliases
+} from "./solarSystemAliasStore.ts";
+import {
   readPersistedSolarSystems,
   updateProjectionRuntimeMeta,
   writePersistedSolarSystems
@@ -876,6 +881,7 @@ export async function searchSolarSystemsAndConstellations(
     listConstellations(options),
     listNodes({}, options)
   ]);
+  const aliases = readSolarSystemAliases();
 
   const nodesBySystem = new Map<number, NetworkNode[]>();
   for (const node of nodes) {
@@ -885,11 +891,11 @@ export async function searchSolarSystemsAndConstellations(
   }
 
   const systemHits = systems
-    .filter((system) => system.systemName.toLowerCase().includes(trimmed) || String(system.systemId).includes(trimmed))
+    .filter((system) => matchesSolarSystemSearch(trimmed, system.systemId, system.systemName, aliases.get(system.systemId) ?? null))
     .map((system) => ({
       type: "system" as const,
       id: system.systemId,
-      label: `${system.systemName} (${system.systemId})`,
+      label: buildSolarSystemSearchLabel(system.systemId, system.systemName, aliases.get(system.systemId) ?? null),
       constellationId: system.constellationId,
       constellationName: constellationName(system.constellationId),
       selectableState: deriveSelectableState(nodesBySystem.get(system.systemId) ?? [])

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useLobbyDiscoveryScreenController } from "@/controller/useLobbyDiscoveryScreenController";
+import type { MatchDiscoveryDetail, MatchDiscoveryItem } from "@/types/match";
 import { FuelMissionShell } from "@/view/components/FuelMissionShell";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 import { CreateMatchScreen } from "@/view/screens/CreateMatchScreen";
 import type { SolarSystemSummary } from "@/types/solarSystem";
+import { formatPaymentTokenAmount, PAYMENT_TOKEN_SYMBOL } from "@/utils/paymentToken";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -30,7 +32,197 @@ function selectableLabel(selectableState: SolarSystemSummary["selectableState"])
 }
 
 function formatEntryFee(entryFee: number) {
-  return entryFee > 0 ? `${entryFee} LUX / Pilot` : "Free Entry";
+  return entryFee > 0 ? formatPaymentTokenAmount(entryFee, { maximumFractionDigits: 0 }) : "Free";
+}
+
+function formatPool(pool: number) {
+  return formatPaymentTokenAmount(pool, { maximumFractionDigits: 0 });
+}
+
+function formatStatusLabel(status: MatchDiscoveryItem["status"]) {
+  if (status === "prestart") return "PRESTART";
+  if (status === "running") return "RUNNING";
+  if (status === "panic") return "PANIC";
+  if (status === "settling") return "SETTLING";
+  if (status === "settled") return "SETTLED";
+  return "RECRUITING";
+}
+
+function statusTone(status: MatchDiscoveryItem["status"]) {
+  if (status === "panic") return "border-eve-red/60 bg-eve-red/15 text-eve-red";
+  if (status === "running") return "border-eve-yellow/45 bg-eve-yellow/10 text-eve-yellow";
+  if (status === "settled") return "border-eve-offwhite/20 bg-[#111111] text-eve-offwhite/70";
+  return "border-eve-red/25 bg-[#111111] text-eve-offwhite/78";
+}
+
+function targetScopeLabel(match: MatchDiscoveryItem) {
+  return match.mode === "precision" ? `${match.targetNodeCount} locked nodes` : "System-wide scoring";
+}
+
+function distanceLabel(match: MatchDiscoveryItem) {
+  if (match.distanceHops === null) {
+    return match.distanceHint.toUpperCase();
+  }
+
+  if (match.distanceHops === 0) {
+    return "ON SITE";
+  }
+
+  if (match.distanceHops === 1) {
+    return "1 JUMP";
+  }
+
+  return `${match.distanceHops} JUMPS`;
+}
+
+function teamProgressPct(registeredTeams: number, maxTeams: number) {
+  if (maxTeams <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round((registeredTeams / maxTeams) * 100)));
+}
+
+function MatchMetric({
+  label,
+  value,
+  tone = "text-eve-offwhite"
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="border border-eve-red/15 bg-[#080808]/80 px-3 py-3">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-eve-offwhite/48">{label}</p>
+      <p className={`mt-2 text-sm font-black uppercase tracking-[0.08em] ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
+function MatchCard({ match, selected }: { match: MatchDiscoveryItem; selected: boolean }) {
+  const progress = teamProgressPct(match.teamProgress.registeredTeams, match.teamProgress.maxTeams);
+
+  return (
+    <div
+      className={cn(
+        "w-full border px-4 py-4 transition",
+        selected
+          ? "border-eve-red bg-eve-red/10 shadow-[0_0_0_1px_rgba(255,95,0,0.18)]"
+          : "border-eve-red/20 bg-[#101010]/90 hover:border-eve-red/45"
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="border border-eve-red/30 px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-eve-red/90">
+              {match.modeLabel}
+            </span>
+            <span className={cn("border px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em]", statusTone(match.status))}>
+              {formatStatusLabel(match.status)}
+            </span>
+            <span className="border border-eve-offwhite/15 px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-eve-offwhite/62">
+              {distanceLabel(match)}
+            </span>
+          </div>
+
+          <h3 className="mt-3 text-lg font-black uppercase tracking-[0.04em] text-eve-offwhite">
+            {match.name}
+          </h3>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/68">
+            <span className="border border-eve-red/15 bg-[#080808]/70 px-2 py-1">
+              System // {match.targetSolarSystem.systemName}
+            </span>
+            <span className="border border-eve-red/15 bg-[#080808]/70 px-2 py-1">
+              Scope // {targetScopeLabel(match)}
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-[150px] border border-eve-yellow/30 bg-[radial-gradient(circle_at_top,rgba(229,179,43,0.12),transparent_55%),#080808] px-4 py-3 text-right">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-eve-offwhite/50">Prize Pool</p>
+          <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">
+            {new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(match.grossPool)}
+          </p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/58">{PAYMENT_TOKEN_SYMBOL} gross</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <MatchMetric label="Entry" value={formatEntryFee(match.entryFee)} />
+        <div className="border border-eve-red/15 bg-[#080808]/80 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-eve-offwhite/48">Teams</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/58">{progress}% full</p>
+          </div>
+          <p className="mt-2 text-sm font-black uppercase tracking-[0.08em] text-eve-offwhite">
+            {match.teamProgress.registeredTeams}/{match.teamProgress.maxTeams}
+          </p>
+          <div className="mt-3 h-2 overflow-hidden border border-eve-red/20 bg-black/40">
+            <div className="h-full bg-gradient-to-r from-eve-red to-eve-yellow" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+        <MatchMetric label="Target" value={match.targetSolarSystem.systemName} tone="text-eve-offwhite/84" />
+      </div>
+    </div>
+  );
+}
+
+function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
+  const match = detail.match;
+  const progress = teamProgressPct(match.teamProgress.registeredTeams, match.teamProgress.maxTeams);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="border border-eve-red/30 px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-eve-red/90">
+              {match.modeLabel}
+            </span>
+            <span className={cn("border px-2 py-1 text-[10px] font-black uppercase tracking-[0.22em]", statusTone(match.status))}>
+              {formatStatusLabel(match.status)}
+            </span>
+          </div>
+          <h3 className="mt-3 text-xl font-black uppercase tracking-[0.04em] text-eve-offwhite">{match.name}</h3>
+          <p className="mt-2 text-[11px] uppercase tracking-[0.18em] text-eve-offwhite/58">
+            {match.targetSolarSystem.systemName} // {targetScopeLabel(match)}
+          </p>
+        </div>
+
+        <div className="min-w-[168px] border border-eve-yellow/35 bg-[radial-gradient(circle_at_top,rgba(229,179,43,0.14),transparent_52%),#080808] px-4 py-3 text-right">
+          <p className="text-[10px] uppercase tracking-[0.22em] text-eve-offwhite/50">Gross Pool</p>
+          <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">{formatPool(match.grossPool)}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <MatchMetric label="Entry" value={formatEntryFee(match.entryFee)} />
+        <MatchMetric label="Duration" value={`${match.durationHours}H`} />
+        <div className="border border-eve-red/15 bg-[#080808]/80 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-eve-offwhite/48">Teams</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/58">{progress}% full</p>
+          </div>
+          <p className="mt-2 text-sm font-black uppercase tracking-[0.08em] text-eve-offwhite">
+            {match.teamProgress.registeredTeams}/{match.teamProgress.maxTeams}
+          </p>
+          <div className="mt-3 h-2 overflow-hidden border border-eve-red/20 bg-black/40">
+            <div className="h-full bg-gradient-to-r from-eve-red to-eve-yellow" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-eve-red/15 bg-[#080808]/80 px-4 py-4">
+        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Battlefield Brief</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <MatchMetric label="System" value={match.targetSolarSystem.systemName} />
+          <MatchMetric label="Scoring Scope" value={targetScopeLabel(match)} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function LobbyDiscoveryScreen() {
@@ -39,7 +231,7 @@ export function LobbyDiscoveryScreen() {
 
   return (
     <FuelMissionShell
-      title="MISSION LOBBY / DISCOVERY GRID"
+      title="MATCH LOBBY"
       subtitle="Set your current system, filter live matches, inspect targets, and push pilots into the squad lobby."
       activeRoute="/lobby"
       phase="lobby"
@@ -151,33 +343,9 @@ export function LobbyDiscoveryScreen() {
                     key={match.id}
                     type="button"
                     onClick={() => void lobby.actions.openMatch(match.id)}
-                    className={cn(
-                      "w-full border px-4 py-4 text-left transition",
-                      selected
-                        ? "border-eve-red bg-eve-red/10 shadow-[0_0_0_1px_rgba(255,95,0,0.18)]"
-                        : "border-eve-red/20 bg-[#101010]/90 hover:border-eve-red/45"
-                    )}
+                    className="w-full text-left"
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-eve-red/90">{match.modeLabel}</p>
-                        <h3 className="mt-2 text-lg font-black uppercase tracking-[0.04em] text-eve-offwhite">{match.name}</h3>
-                      </div>
-                      <span className="border border-eve-red/30 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/75">
-                        {match.status}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 grid gap-2 text-xs uppercase tracking-[0.16em] text-eve-offwhite/72 md:grid-cols-2">
-                      <p>System: {match.targetSolarSystem.systemName}</p>
-                      <p>Targets: {match.targetNodeSummary}</p>
-                      <p>Prize Pool: {match.grossPool} LUX</p>
-                      <p>Entry: {formatEntryFee(match.entryFee)}</p>
-                      <p>
-                        Team Progress: {match.teamProgress.registeredTeams}/{match.teamProgress.maxTeams}
-                      </p>
-                      <p>Distance: {match.distanceHint}</p>
-                    </div>
+                    <MatchCard match={match} selected={selected} />
                   </button>
                 );
               })}
@@ -191,21 +359,7 @@ export function LobbyDiscoveryScreen() {
               <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/70">Select a match on the left to inspect its detail.</p>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-eve-red/90">{selectedMatch.match.modeLabel}</p>
-                  <h3 className="mt-2 text-xl font-black uppercase tracking-[0.04em] text-eve-offwhite">{selectedMatch.match.name}</h3>
-                </div>
-
-                <div className="grid gap-2 text-xs uppercase tracking-[0.16em] text-eve-offwhite/72">
-                  <p>Target System: {selectedMatch.match.targetSolarSystem.systemName}</p>
-                  <p>Target Summary: {selectedMatch.match.targetNodeSummary}</p>
-                  <p>Prize Pool: {selectedMatch.match.grossPool} LUX</p>
-                  <p>Entry: {formatEntryFee(selectedMatch.match.entryFee)}</p>
-                  <p>
-                    Team Progress: {selectedMatch.match.teamProgress.registeredTeams}/{selectedMatch.match.teamProgress.maxTeams}
-                  </p>
-                  <p>Distance Hint: {selectedMatch.match.distanceHint}</p>
-                </div>
+                <MatchDetailSummary detail={selectedMatch} />
 
                 {selectedMatch.match.mode === "precision" ? (
                   <div className="space-y-2">
@@ -249,22 +403,27 @@ export function LobbyDiscoveryScreen() {
                     {lobby.recommendations.map((recommendation) => (
                       <div key={recommendation.node.id} className="border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-xs uppercase tracking-[0.16em]">
                         <div className="flex items-center justify-between gap-3">
-                          <span>{recommendation.node.name}</span>
+                          <span className="font-black text-eve-offwhite">{recommendation.node.name}</span>
                           <span className={urgencyTone(recommendation.node.urgency)}>{recommendation.node.urgency}</span>
                         </div>
-                        <p className="mt-2 text-eve-offwhite/65">
-                          {recommendation.reason} // Score {recommendation.score.toFixed(2)}
-                        </p>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          <MatchMetric
+                            label="Route"
+                            value={recommendation.distanceHops === 0 ? "ON SITE" : `${recommendation.distanceHops} JUMPS`}
+                          />
+                          <MatchMetric label="Score" value={recommendation.score.toFixed(2)} tone="text-eve-yellow" />
+                        </div>
+                        <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/52">{recommendation.reason}</p>
                       </div>
                     ))}
                   </div>
                 )}
 
                 <Link
-                  href={`/planning?matchId=${encodeURIComponent(selectedMatch.match.id)}`}
+                  href="/planning"
                   className="inline-flex border border-eve-red bg-eve-red px-4 py-3 text-xs font-black uppercase tracking-[0.24em] text-black transition hover:bg-[#ffb599]"
                 >
-                  Enter Team Lobby
+                  Open Team Registry
                 </Link>
               </div>
             )}

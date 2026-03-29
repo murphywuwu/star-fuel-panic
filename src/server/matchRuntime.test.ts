@@ -13,13 +13,14 @@ import {
   approveJoinApplication,
   createTeam,
   createTestTeamSignature,
+  getMatchTeamsSnapshot,
   joinTeam,
   lockTeam,
   payTeamEntry,
   rejectJoinApplication,
   resetTeamRuntime
 } from "./teamRuntime.ts";
-import { createEmptyProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
+import { createEmptyProjectionState, readRuntimeProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
 import type { JoinTeamResponse, RoleSlots } from "../types/team.ts";
 
 function buildMessage(scope: string, walletAddress: string) {
@@ -217,6 +218,139 @@ test("locks then pays a complete team", async () => {
   assert.equal(paidBody.whitelistCount, 3);
 });
 
+test("rehydrates paid teams from persisted payment and whitelist facts", async () => {
+  const hostWallet = "0xfacthost001";
+  const createDraftMessage = buildMessage("FuelFrogPanic:create-match-draft:hosted", hostWallet);
+  const draft = createMatchDraft({
+    mode: "free",
+    solarSystemId: 30000149,
+    targetNodeIds: [],
+    sponsorshipFee: 600,
+    entryFee: 50,
+    maxTeams: 8,
+    durationHours: 2,
+    walletAddress: hostWallet,
+    signature: createTestMatchSignature(hostWallet, createDraftMessage),
+    message: createDraftMessage
+  });
+  assert.equal(draft.ok, true);
+  if (!draft.ok) {
+    return;
+  }
+
+  const publishMessage = buildMessage(`FuelFrogPanic:publish-match:${draft.data.match.id}`, hostWallet);
+  const published = await publishMatch({
+    matchId: draft.data.match.id,
+    publishTxDigest: "tx_fact_publish_001",
+    idempotencyKey: "fact-publish-1",
+    walletAddress: hostWallet,
+    signature: createTestMatchSignature(hostWallet, publishMessage),
+    message: publishMessage
+  });
+  assert.equal(published.ok, true);
+  if (!published.ok) {
+    return;
+  }
+
+  const captainWallet = "0xfactcaptain001";
+  const createTeamMessage = buildMessage(`FuelFrogPanic:create-team:${draft.data.match.id}`, captainWallet);
+  const created = await createTeam({
+    matchId: draft.data.match.id,
+    teamName: "Fact Hydration",
+    maxSize: 3,
+    roleSlots: DEFAULT_ROLE_SLOTS,
+    walletAddress: captainWallet,
+    signature: createTestTeamSignature(captainWallet, createTeamMessage),
+    message: createTeamMessage
+  });
+  const createdBody = expectSuccessBody<{ team: { id: string } }>(created);
+
+  for (const payload of [
+    { walletAddress: "0xfactjoin001", role: "hauler" as const },
+    { walletAddress: "0xfactjoin002", role: "escort" as const }
+  ]) {
+    const joinMessage = buildMessage(`FuelFrogPanic:join-team:${createdBody.team.id}`, payload.walletAddress);
+    const joined = await joinTeam({
+      teamId: createdBody.team.id,
+      role: payload.role,
+      walletAddress: payload.walletAddress,
+      signature: createTestTeamSignature(payload.walletAddress, joinMessage),
+      message: joinMessage
+    });
+    const joinedBody = expectSuccessBody<JoinTeamResponse>(joined);
+
+    const approveMessage = buildMessage(
+      `FuelFrogPanic:approve-application:${createdBody.team.id}:${joinedBody.applicationId}`,
+      captainWallet
+    );
+    const approved = await approveJoinApplication({
+      teamId: createdBody.team.id,
+      applicationId: joinedBody.applicationId,
+      walletAddress: captainWallet,
+      signature: createTestTeamSignature(captainWallet, approveMessage),
+      message: approveMessage
+    });
+    assert.equal(approved.status, 200);
+  }
+
+  const lockMessage = buildMessage(`FuelFrogPanic:lock-team:${createdBody.team.id}`, captainWallet);
+  const locked = await lockTeam({
+    teamId: createdBody.team.id,
+    walletAddress: captainWallet,
+    signature: createTestTeamSignature(captainWallet, lockMessage),
+    message: lockMessage
+  });
+  assert.equal(locked.status, 200);
+
+  const payMessage = buildMessage(`FuelFrogPanic:pay-team:${createdBody.team.id}`, captainWallet);
+  const paid = await payTeamEntry({
+    teamId: createdBody.team.id,
+    txDigest: "tx_fact_pay_001",
+    walletAddress: captainWallet,
+    signature: createTestTeamSignature(captainWallet, payMessage),
+    message: payMessage
+  });
+  assert.equal(paid.status, 200);
+
+  const projection = readRuntimeProjectionState();
+  const paymentRows = projection.teamPayments.filter((row) => row.teamId === createdBody.team.id);
+  assert.equal(paymentRows.length, 1);
+  assert.equal(paymentRows[0]?.amount, 150);
+  assert.deepEqual(
+    [...(paymentRows[0]?.memberAddresses ?? [])].sort(),
+    ["0xfactcaptain001", "0xfactjoin001", "0xfactjoin002"].sort()
+  );
+
+  const whitelistRows = projection.matchWhitelists.filter((row) => row.teamId === createdBody.team.id);
+  assert.equal(whitelistRows.length, 3);
+  assert.ok(whitelistRows.every((row) => row.sourcePaymentTx === "tx_fact_pay_001"));
+
+  projection.teams = projection.teams.map((team) =>
+    team.id === createdBody.team.id
+      ? {
+          ...team,
+          hasPaid: false,
+          payTxDigest: null,
+          status: "locked",
+          whitelistCount: 0
+        }
+      : team
+  );
+  writeRuntimeProjectionState(projection);
+
+  resetTeamRuntime();
+
+  const restored = getMatchTeamsSnapshot(draft.data.match.id);
+  assert.ok(restored);
+  const restoredTeam = restored?.items.find((team) => team.id === createdBody.team.id);
+  assert.ok(restoredTeam);
+  assert.equal(restoredTeam?.status, "paid");
+  assert.equal(restoredTeam?.hasPaid, true);
+  assert.equal(restoredTeam?.payTxDigest, "tx_fact_pay_001");
+  assert.equal(restoredTeam?.paymentTxDigest, "tx_fact_pay_001");
+  assert.equal(restoredTeam?.whitelistCount, 3);
+});
+
 test("captain can reject pending application", async () => {
   const captainWallet = "0xcaptain004";
   const createMessage = buildMessage("FuelFrogPanic:create-team:mission-ssu-7", captainWallet);
@@ -311,7 +445,7 @@ test("creates draft then publishes precision match", async () => {
     mode: "precision",
     solarSystemId: 30000149,
     targetNodeIds: ["0x9e24fb2d333f392590f430f70ab8d69150d5dc12f2f8d06fa16480348ace4c0f"],
-    sponsorshipFee: 499,
+    sponsorshipFee: 49,
     entryFee: 10,
     maxTeams: 8,
     durationHours: 2,
@@ -340,7 +474,7 @@ test("creates draft then publishes precision match", async () => {
     mode: "precision",
     solarSystemId: 30000149,
     targetNodeIds: ["0x9e24fb2d333f392590f430f70ab8d69150d5dc12f2f8d06fa16480348ace4c0f"],
-    sponsorshipFee: 600,
+    sponsorshipFee: 50,
     entryFee: 10,
     maxTeams: 8,
     durationHours: 2,
