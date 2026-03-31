@@ -49,26 +49,97 @@ EVE Frontier's economy depends on players refueling infrastructure (stargates, S
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         FRONTEND                             │
-│           Next.js 15 + React 19 + Zustand + Tailwind         │
-└────────────────────────────┬────────────────────────────────┘
-                             │ HTTP / SSE
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      BFF / RUNTIME LAYER                     │
-│  matchRuntime │ chainSyncEngine │ settlementRuntime          │
-│  nodeRuntime  │ solarSystemRuntime │ fuelConfigRuntime       │
-└──────────┬──────────────────────────────────┬───────────────┘
-           │                                  │
-           ▼                                  ▼
-┌────────────────────────┐     ┌──────────────────────────────┐
-│   Supabase/PostgreSQL  │     │       Sui Blockchain          │
-│   - matches            │     │  - FuelEvent(DEPOSITED) ← sole scoring source
-│   - teams              │     │  - NetworkNode (station fuel) │
-│   - scores             │     │  - MatchEscrow (prize pool)   │
-└────────────────────────┘     └──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                  View Layer                                  │
+│  React / Next.js UI rendering and user interaction                           │
+│  (Lobby, Planning, Match Runtime, Settlement, In-game Overlay, Wallet Entry) │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ User actions / state display
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                               Controller Layer                               │
+│  Custom hooks orchestrating use-cases and UI workflows                       │
+│  (useLobbyController, useMatchRuntimeController, useSettlementController)    │
+└───────────────────┬──────────────────────────────────┬───────────────────────┘
+                    │ Coordinate business calls         │ Read / update state
+                    ▼                                   ▼
+┌──────────────────────────────────────┐  ┌───────────────────────────────────┐
+│            Service Layer             │  │            Model Layer            │
+│  API clients + stream adapters       │  │  Zustand stores by domain         │
+│  (match/team/stream/settlement)      │  │  (auth/lobby/matchRuntime/settle) │
+└───────────────────┬──────────────────┘  └───────────────────────────────────┘
+                    │ HTTP / SSE / WebSocket
+                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         BFF / Runtime Layer (Next API)                       │
+│  Route handlers + domain runtimes                                            │
+│  (matchRuntime, teamRuntime, chainSyncEngine, settlementRuntime, etc.)       │
+└──────────────────────────┬──────────────────────────────┬────────────────────┘
+                           │ Read/write projections        │ Chain/world reads
+                           ▼                               ▼
+┌───────────────────────────────────────────┐   ┌──────────────────────────────┐
+│     Supabase / PostgreSQL / Realtime      │   │      On-chain / External     │
+│  matches, teams, scores, settlements,     │   │  Sui RPC + Event Stream      │
+│  network_nodes, fuel_events               │   │  EVE World Metadata API      │
+└───────────────────────────────────────────┘   └──────────────────────────────┘
 ```
+
+### Runtime Layer (BFF) — The Backend Brain
+
+The **Runtime Layer** is the core backend that bridges frontend, database, and blockchain. It consists of domain-specific "runtimes" — long-running or request-scoped modules that own specific business logic.
+
+| Runtime | Responsibility | Data Source | Data Sink |
+|---------|----------------|-------------|-----------|
+| `solarSystemRuntime` | Sync solar system metadata, gate links, search | EVE World API | `solar_systems_cache` |
+| `constellationRuntime` | Aggregate constellation views, system selectability | Cache + DB | `constellation_summaries` |
+| `nodeRuntime` | Maintain NetworkNode state, 5s fuel refresh | Sui RPC | `network_nodes` |
+| `nodeRecommendationRuntime` | Calculate recommended nodes by location/topology | DB projections | (in-memory) |
+| `matchRuntime` | Match lifecycle: draft → lobby → running → settled | DB + Chain | `matches`, `match_stream_events` |
+| `teamRuntime` | Team creation, join requests, approval, payment | DB + Chain | `teams`, `team_members`, `team_payments` |
+| `fuelConfigRuntime` | Cache on-chain fuel efficiency config (5min TTL) | Sui RPC | (in-memory) |
+| `chainSyncEngine` | Listen to `FuelEvent`, triple-filter, score calculation | Sui Event Stream | `fuel_events`, `match_scores` |
+| `settlementRuntime` | Freeze scores, calculate splits, execute on-chain payout | DB + Chain | `settlements` |
+
+### Deployment Topology
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              PRODUCTION DEPLOYMENT                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────┐  │
+│  │    Vercel (Web)     │    │  Railway (Workers)  │    │    Supabase     │  │
+│  │                     │    │                     │    │                 │  │
+│  │  • Next.js SSR/SSG  │    │  • chainSyncEngine  │    │  • PostgreSQL   │  │
+│  │  • API Routes (BFF) │    │  • nodeRuntime      │    │  • Realtime     │  │
+│  │  • Short-lived req  │    │  • matchRuntime     │    │  • Auth         │  │
+│  │                     │    │  • settlementRuntime│    │  • Storage      │  │
+│  └─────────┬───────────┘    │  • nodeIndexer      │    └────────┬────────┘  │
+│            │                └──────────┬──────────┘             │           │
+│            │                           │                        │           │
+│            └───────────────────────────┼────────────────────────┘           │
+│                                        │                                    │
+│                                        ▼                                    │
+│                            ┌─────────────────────┐                          │
+│                            │   Sui Blockchain    │                          │
+│                            │  • FuelEvent stream │                          │
+│                            │  • NetworkNode RPC  │                          │
+│                            │  • MatchEscrow      │                          │
+│                            └─────────────────────┘                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why this split?**
+
+| Component | Platform | Reason |
+|-----------|----------|--------|
+| Frontend + BFF Routes | Vercel | Serverless, auto-scaling, edge CDN |
+| Runtime Workers | Railway/Fly.io | Long-running processes, persistent connections to chain |
+| Node Indexer | Railway/Fly.io | Dedicated chain indexing, separate scaling |
+| Database | Supabase | Managed Postgres, built-in Realtime pub/sub |
+
+**Critical**: Vercel is serverless — it cannot run persistent event listeners or polling loops. The `chainSyncEngine` (which listens to Sui events) and `nodeRuntime` (which polls every 5s) **must** run on a container platform like Railway.
 
 ### On-Chain Trust Model
 
@@ -86,10 +157,37 @@ Player refuels station       On-chain event fires        System auto-settles
    Player action         Sole scoring source      Zero manual work
 ```
 
-**Key Points:**
-- ✅ Scoring source: Only on-chain `FuelEvent(DEPOSITED)` events
-- ✅ Prize pool: Managed by `MatchEscrow` smart contract
-- ✅ Settlement: Automated on-chain execution, no manual claims
+### Data Flow: Scoring Pipeline
+
+```
+1. Player deposits fuel into NetworkNode (in-game action)
+                    │
+                    ▼
+2. Sui emits FuelEvent(DEPOSITED) with tx_digest, sender, assembly_id, fuel_amount
+                    │
+                    ▼
+3. chainSyncEngine receives event, performs triple-filter:
+   ├─ Is sender in match whitelist?
+   ├─ Is target node in match scope (system or specific nodes)?
+   └─ Is timestamp within match window [startedAt, endedAt]?
+                    │
+                    ▼
+4. If valid, calculate score:
+   score = fuelAdded × urgencyWeight(1-3x) × panicMultiplier(1-1.5x) × fuelGradeBonus(1-1.5x)
+   Max possible: 6.75x
+                    │
+                    ▼
+5. Update match_scores table, broadcast via match_stream_events
+                    │
+                    ▼
+6. Frontend receives SSE/Realtime update, renders live leaderboard
+```
+
+**Key Principles:**
+- ✅ **Chain as truth**: Only on-chain `FuelEvent(DEPOSITED)` events count for scoring
+- ✅ **Off-chain for UX**: Database projections power fast queries, leaderboards, history
+- ✅ **Idempotent writes**: All mutations use idempotency keys to prevent double-counting
+- ✅ **Auto-settlement**: Match ends → scores frozen → on-chain payout → no manual claims
 
 ---
 
