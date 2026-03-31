@@ -51,6 +51,20 @@ function buildTargetNodeSummary(mode: "free" | "precision", targetNodes: MatchTa
   return "Any online node in the system";
 }
 
+function resolveTeamSize(match: Match) {
+  const explicit = Number(match.teamSize ?? Number.NaN);
+  if (Number.isFinite(explicit) && explicit >= 3) {
+    return Math.floor(explicit);
+  }
+
+  const legacy = Number(match.minPlayers ?? Number.NaN);
+  if (Number.isFinite(legacy) && legacy >= 3) {
+    return Math.floor(legacy);
+  }
+
+  return 3;
+}
+
 async function safeGetSolarSystemById(systemId: number) {
   if (systemId <= 0) {
     return null;
@@ -130,6 +144,8 @@ async function buildMatchDiscoveryItem(
 
   return {
     id: match.id,
+    onChainId: match.onChainId,
+    escrowId: match.escrowId ?? null,
     mode,
     modeLabel: mode === "precision" ? "Precision Mode" : "Free Mode",
     name: buildMatchName(match, mode, solarSystemName, targetNodes),
@@ -142,10 +158,12 @@ async function buildMatchDiscoveryItem(
     },
     targetNodeCount: targetNodes.length,
     targetNodeSummary: buildTargetNodeSummary(mode, targetNodes),
+    prizePool: match.prizePool,
     grossPool: match.prizePool,
     entryFee: match.entryFee,
     sponsorshipFee: match.sponsorshipFee ?? match.hostPrizePool,
     platformFeeRate: 0.05,
+    teamSize: resolveTeamSize(match),
     teamProgress: {
       registeredTeams,
       maxTeams: match.maxTeams

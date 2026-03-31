@@ -276,6 +276,7 @@ type MatchSummary = {
   platformFeeRate: 0.05;
   minTeams: 2;
   maxTeams: number;
+  teamSize: number;
   registeredTeams: number;
   durationHours: number;
   distanceHops: number | null;
@@ -348,6 +349,7 @@ type CreateMatchRequest = {
   targetNodeIds?: string[];
   sponsorshipFee: number;
   maxTeams: number;
+  teamSize: number;
   entryFee: number;
   durationHours: number;
 };
@@ -359,7 +361,6 @@ type PublishMatchRequest = {
 type CreateTeamRequest = {
   matchId: string;
   name: string;
-  maxMembers: number;
   roleSlots: RoleSlots;
 };
 
@@ -1423,9 +1424,9 @@ Response: `ApiResult<TeamDetail>`
 
 校验规则：
 
-- `3 <= maxMembers <= 8`
-- `roleSlots.collector + roleSlots.hauler + roleSlots.escort = maxMembers`
 - 比赛必须处于 `lobby`
+- `3 <= match.teamSize <= 8`
+- `roleSlots.collector + roleSlots.hauler + roleSlots.escort = match.teamSize`
 
 #### `POST /api/teams/{teamId}/join`
 
@@ -1483,7 +1484,7 @@ Response: `ApiResult<TeamDetail>`
 规则：
 
 - 仅队长可锁队。
-- 成员数必须等于 `maxMembers`。
+- 成员数必须等于比赛定义的 `teamSize`。
 - 锁队后不允许继续加入或离开。
 
 #### `POST /api/teams/{teamId}/pay`
@@ -1499,10 +1500,10 @@ Response: `ApiResult<TeamDetail>`
 规则：
 
 - 仅队长可调用。
-- `payTxDigest` 对应支付金额必须等于 `entryFee * memberCount`。
+- `payTxDigest` 对应支付金额必须等于 `entryFee * teamSize`。
 - `payTxDigest` 对应交易必须包含 `fuel_frog_panic::TeamEntryLocked` 事件。
 - `payTxDigest` 对应交易的付款钱包扣款 `coinType` 必须等于当前配置的 LUX / EVE test token 类型，且扣款金额必须精确等于当前队伍报价。
-- `TeamEntryLocked` 事件中的 `room_id`、`escrow_id`、`team_ref`、`member_count`、`quoted_amount_lux`、`locked_amount` 必须与当前比赛和战队事实完全匹配。
+- `TeamEntryLocked` 事件中的 `room_id`、`escrow_id`、`team_ref`、`member_count`、`quoted_amount_lux`、`locked_amount` 必须与当前比赛和战队事实完全匹配，其中 `member_count` 必须等于 `teamSize`。
 - 成功后写入白名单快照。
 
 ### 4.4 Settlement APIs

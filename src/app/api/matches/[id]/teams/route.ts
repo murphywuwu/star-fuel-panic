@@ -91,7 +91,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ? candidate.maxMembers
         : typeof candidate.maxSize === "number"
           ? candidate.maxSize
-          : 0,
+          : Number.NaN,
     roleSlots: parseRoleSlots(candidate.roleSlots),
     walletAddress: candidate.walletAddress ?? "",
     signature: candidate.signature ?? "",

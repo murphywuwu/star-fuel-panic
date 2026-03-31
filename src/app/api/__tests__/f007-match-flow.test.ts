@@ -196,6 +196,7 @@ async function createDraft(hostWallet = "0xhost001") {
         sponsorshipFee: 600,
         entryFee: 120,
         maxTeams: 4,
+        teamSize: 3,
         durationHours: 2,
         walletAddress: hostWallet,
         signature,
@@ -356,7 +357,6 @@ test("F-007 T-0703/T-0705 route-level E2E covers draft, publish, apply, approve/
       },
       body: JSON.stringify({
         teamName: "Frontier Crew",
-        maxSize: 3,
         roleSlots: ["collector", "hauler", "escort"],
         walletAddress: captainWallet,
         signature: createTestTeamSignature(captainWallet, createTeamMessage),

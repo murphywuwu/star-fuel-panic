@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     sponsorshipFee?: unknown;
     entryFee?: unknown;
     maxTeams?: unknown;
+    teamSize?: unknown;
     durationHours?: unknown;
     walletAddress?: unknown;
     signature?: unknown;
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
     sponsorshipFee: Number(candidate.sponsorshipFee ?? Number.NaN),
     entryFee: Number(candidate.entryFee ?? 0),
     maxTeams: Number(candidate.maxTeams ?? Number.NaN),
+    teamSize: Number(candidate.teamSize ?? Number.NaN),
     durationHours: Number(candidate.durationHours ?? Number.NaN),
     walletAddress: String(candidate.walletAddress ?? ""),
     signature: String(candidate.signature ?? ""),

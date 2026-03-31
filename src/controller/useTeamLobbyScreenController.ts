@@ -3,16 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthController, walletErrorMessage } from "@/controller/useAuthController";
 import { useTeamLobbyController } from "@/controller/useTeamLobbyController";
+import { resolveMatchTeamSize } from "@/types/match";
 import type { PlayerRole, RoleSlots, TeamApplication, TeamDetail } from "@/types/team";
 import { deriveTeamPaymentRef } from "@/utils/teamPaymentRef";
 
+function buildDefaultRoleSlots(maxMembers: number) {
+  return {
+    collectorSlots: Math.max(1, maxMembers - 2),
+    haulerSlots: maxMembers >= 2 ? 1 : 0,
+    escortSlots: maxMembers >= 3 ? 1 : 0
+  };
+}
+
+const DEFAULT_TEAM_SIZE = 3;
+const DEFAULT_ROLE_SLOTS = buildDefaultRoleSlots(DEFAULT_TEAM_SIZE);
 const DEFAULT_CREATE_TEAM_FORM = {
   teamName: "Alpha Squad",
-  maxMembers: 3,
-  collectorSlots: 1,
-  haulerSlots: 1,
-  escortSlots: 1
+  maxMembers: DEFAULT_TEAM_SIZE,
+  ...DEFAULT_ROLE_SLOTS
 };
+
+const SOLO_VERIFICATION_ENABLED = process.env.NODE_ENV !== "production";
 
 function roleLabel(role: PlayerRole) {
   if (role === "collector") return "Collector";
@@ -100,6 +111,16 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
     };
   }, [isCreateTeamModalOpen]);
 
+  const requiredTeamSize = state.match ? resolveMatchTeamSize(state.match) : DEFAULT_TEAM_SIZE;
+
+  useEffect(() => {
+    const defaults = buildDefaultRoleSlots(requiredTeamSize);
+    setMaxMembers(requiredTeamSize);
+    setCollectorSlots(defaults.collectorSlots);
+    setHaulerSlots(defaults.haulerSlots);
+    setEscortSlots(defaults.escortSlots);
+  }, [requiredTeamSize, state.matchId]);
+
   const slotCounts = useMemo<RoleSlots>(
     () => ({
       collector: collectorSlots,
@@ -110,7 +131,7 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
   );
   const slotTotal = slotCounts.collector + slotCounts.hauler + slotCounts.escort;
   const canOpenCreateModal = authState.isConnected && Boolean(state.matchId);
-  const canCreate = authState.isConnected && slotTotal === maxMembers && teamName.trim().length > 0;
+  const canCreate = authState.isConnected && slotTotal === requiredTeamSize && teamName.trim().length > 0;
   const currentPlayerTeam = selectors.currentPlayerTeam(currentWalletAddress);
 
   const getTeamUiState = (team: TeamDetail) => {
@@ -137,7 +158,6 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
     const result = await actions.createTeam({
       matchId: state.matchId ?? "",
       name: teamName.trim(),
-      maxMembers,
       roleSlots: slotCounts,
       walletAddress: authState.walletAddress ?? ""
     });
@@ -220,7 +240,7 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
       roomId,
       escrowId,
       teamRef: deriveTeamPaymentRef(team.id),
-      memberCount: team.members.length,
+      memberCount: requiredTeamSize,
       amountLux: amount
     });
     if (!payment.ok || !payment.payload?.txDigest) {
@@ -240,6 +260,61 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
     setMessage(`TEAM PAID // ${team.name} // ${payment.payload.txDigest}`);
   };
 
+  const handleSoloFillTeam = async (teamId: string) => {
+    const result = await actions.fillSoloTeam(teamId, authState.walletAddress ?? "");
+    if (!result.ok) {
+      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
+      return;
+    }
+
+    setMessage(`SOLO VERIFY // TEAM AUTO-FILLED // ${teamId}`);
+  };
+
+  const handleSoloSeedRival = async () => {
+    if (!state.matchId) {
+      setMessage("SOLO VERIFY // NO MATCH LOADED");
+      return;
+    }
+
+    const result = await actions.seedSoloRival(state.matchId, authState.walletAddress ?? "");
+    if (!result.ok) {
+      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
+      return;
+    }
+
+    setMessage(`SOLO VERIFY // RIVAL SEEDED // ${state.matchId}`);
+  };
+
+  const handleSoloStart = async () => {
+    if (!state.matchId) {
+      setMessage("SOLO VERIFY // NO MATCH LOADED");
+      return;
+    }
+
+    const result = await actions.startSoloMatch(state.matchId, authState.walletAddress ?? "");
+    if (!result.ok) {
+      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
+      return;
+    }
+
+    setMessage(`SOLO VERIFY // MATCH STARTED // ${state.matchId}`);
+  };
+
+  const handleSoloSettle = async () => {
+    if (!state.matchId) {
+      setMessage("SOLO VERIFY // NO MATCH LOADED");
+      return;
+    }
+
+    const result = await actions.settleSoloMatch(state.matchId, authState.walletAddress ?? "");
+    if (!result.ok) {
+      setMessage(`${result.errorCode ?? "UNKNOWN"} // ${result.message}`);
+      return;
+    }
+
+    setMessage(`SOLO VERIFY // MATCH SETTLED // ${state.matchId}`);
+  };
+
   return {
     state,
     authState,
@@ -249,7 +324,7 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
       isCreateTeamModalOpen,
       message,
       teamName,
-      maxMembers,
+      maxMembers: requiredTeamSize,
       collectorSlots,
       haulerSlots,
       escortSlots,
@@ -257,6 +332,7 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
       slotTotal,
       canOpenCreateModal,
       canCreate,
+      showSoloVerification: SOLO_VERIFICATION_ENABLED,
       rejectReasonByApplication
     },
     helpers: {
@@ -269,7 +345,7 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
       openCreateTeamModal: () => setIsCreateTeamModalOpen(true),
       closeCreateTeamModal: () => setIsCreateTeamModalOpen(false),
       setTeamName,
-      setMaxMembers: (value: number) => setMaxMembers(clampMaxMembers(value)),
+      setMaxMembers: (_value: number) => setMaxMembers(requiredTeamSize),
       setCollectorSlots: (value: number) => setCollectorSlots(clampSlotCount(value)),
       setHaulerSlots: (value: number) => setHaulerSlots(clampSlotCount(value)),
       setEscortSlots: (value: number) => setEscortSlots(clampSlotCount(value)),
@@ -289,7 +365,11 @@ export function useTeamLobbyScreenController(preferredMatchId: string | null = n
       handleReject,
       handleLeave,
       handleLock,
-      handlePay
+      handlePay,
+      handleSoloFillTeam,
+      handleSoloSeedRival,
+      handleSoloStart,
+      handleSoloSettle
     }
   };
 }

@@ -51,7 +51,11 @@ export function useTeamLobbyController() {
       rejectJoinApplication: teamLobbyService.rejectJoin.bind(teamLobbyService),
       leaveTeam: teamLobbyService.leaveTeam.bind(teamLobbyService),
       lockTeam: teamLobbyService.lockTeam.bind(teamLobbyService),
-      payTeam: teamLobbyService.payTeam.bind(teamLobbyService)
+      payTeam: teamLobbyService.payTeam.bind(teamLobbyService),
+      fillSoloTeam: teamLobbyService.fillSoloTeam.bind(teamLobbyService),
+      seedSoloRival: teamLobbyService.seedSoloRival.bind(teamLobbyService),
+      startSoloMatch: teamLobbyService.startSoloMatch.bind(teamLobbyService),
+      settleSoloMatch: teamLobbyService.settleSoloMatch.bind(teamLobbyService)
     }),
     []
   );

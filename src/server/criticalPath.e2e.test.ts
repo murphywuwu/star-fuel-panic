@@ -50,6 +50,7 @@ test("critical path e2e covers draft publish join pay and settlement", async () 
     sponsorshipFee: 600,
     entryFee: 50,
     maxTeams: 8,
+    teamSize: 3,
     durationHours: 2,
     walletAddress: hostWallet,
     signature: createTestMatchSignature(hostWallet, createDraftMessage),
@@ -78,7 +79,6 @@ test("critical path e2e covers draft publish join pay and settlement", async () 
   const created = await createTeam({
     matchId: draft.data.match.id,
     teamName: "E2E Squad",
-    maxSize: 3,
     roleSlots: {
       collector: 1,
       hauler: 1,

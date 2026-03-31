@@ -132,7 +132,7 @@ BFF / Runtime Layer
 |---|---|
 | `/` | 钱包接入、玩家身份建立、进入 Lobby 的前置引导。 |
 | `/lobby` | 比赛发现主入口；比赛列表、筛选、比赛详情预览、位置设置，以及创建比赛快捷入口（modal）。 |
-| `/planning` | 独立战队注册页；显示当前战队总数并支持创建战队，同时保留创建比赛的 fallback / deep-link 入口。 |
+| `/planning` | 默认是独立战队注册页；当携带 `matchId` query 时切换为该比赛的 Team Lobby，承接 match-specific 建队、审批、锁队与付费。 |
 | `/match` | 比赛进行中主视图；浏览器模式与游戏内浮窗共用同一领域状态。 |
 | `/settlement` | 结算等待页与战报页。 |
 | `/nodes-map` | 仅作为精准模式选点的内部视图或兼容入口，不再作为独立任务发现入口。 |
@@ -329,7 +329,7 @@ BFF / Runtime Layer
 
 ### 7.1 Create Match and Publish
 
-1. View 按 `mode -> economics -> target system -> target nodes(if precision)` 顺序填写创建草稿，Controller 调用 `matchService.createDraft`；`target system` 搜索层在 focus 空态优先展示 `Ready Systems` 候选，在有 query 时保留所有文本命中系统，但将 `selectable` 系统前置，`no_nodes / offline_only / not_public` 系统下沉并保留原因标签。`Target System` 区块在 `free / precision` 两种模式下都展示统一的系统详情 + 战术节点网格结构；其中 `free` 只读展示系统内 online nodes，`precision` 才允许锁定 1-5 个目标节点。
+1. View 按 `mode -> economics -> target system -> target nodes(if precision)` 顺序填写创建草稿，Controller 调用 `matchService.createDraft`；经济参数必须包含 `sponsorshipFee / maxTeams / teamSize / entryFee / durationHours`。`target system` 搜索层在 focus 空态优先展示 `Ready Systems` 候选，在有 query 时保留所有文本命中系统，但将 `selectable` 系统前置，`no_nodes / offline_only / not_public` 系统下沉并保留原因标签。`Target System` 区块在 `free / precision` 两种模式下都展示统一的系统详情 + 战术节点网格结构；其中 `free` 只读展示系统内 online nodes，`precision` 才允许锁定 1-5 个目标节点。
 2. `POST /api/matches` 只做业务校验和草稿创建，返回 `matchId`.
 3. 客户端调用 `fuel_frog_panic::publish_match_with_sponsorship<T>`，将真实赞助费（测试阶段可使用 EVE test token 代替 LUX）锁入链上 escrow，并获得 `publishTxDigest`.
 4. `POST /api/matches/{id}/publish` 校验：
@@ -355,11 +355,12 @@ BFF / Runtime Layer
 
 1. 玩家进入 `/planning`，读取独立战队总数与已创建战队列表。
 2. 队长通过 `POST /api/planning-teams` 创建独立战队；此时不要求 `matchId`。
-3. 后续当玩家进入具体比赛报名阶段时，才通过 `teamRuntime` 的 `POST /api/teams`、`/join`、`/approve`、`/reject` 处理比赛内阵容。
-4. 队长执行锁队，锁队后成员名单冻结，拒绝新申请和离队。
-5. 队长发起链上入场费支付，前端调用 `fuel_frog_panic::lock_team_entry_with_escrow<T>`，将 `entryFee * memberCount` 直接锁入比赛发布时创建的 `MatchEscrow`。
-6. `POST /api/teams/{id}/pay` 校验支付交易：必须包含 `TeamEntryLocked` 事件，且付款钱包 exact debit 与 `room/escrow/team_ref/member_count/quoted_amount_lux/locked_amount` 全匹配，然后写入 `team_payments`。
-7. `teamRuntime` 同步白名单快照，比赛可进入开赛条件判断。
+3. 后续当玩家进入具体比赛报名阶段时，`/planning?matchId=<id>` 切换为 Team Lobby，通过 `teamRuntime` 的 `POST /api/teams`、`/join`、`/approve`、`/reject` 处理比赛内阵容。
+4. 该比赛的所有战队都继承比赛创建时定义的固定编制 `teamSize`；match-specific 建队不允许自定义 `maxMembers`，只允许配置 `roleSlots`，且总和必须等于 `teamSize`。
+5. 队长执行锁队，锁队后成员名单冻结，拒绝新申请和离队；只有当成员数等于 `teamSize` 时才允许锁队。
+6. 队长发起链上入场费支付，前端调用 `fuel_frog_panic::lock_team_entry_with_escrow<T>`，将 `entryFee * teamSize` 直接锁入比赛发布时创建的 `MatchEscrow`。
+7. `POST /api/teams/{id}/pay` 校验支付交易：必须包含 `TeamEntryLocked` 事件，且付款钱包 exact debit 与 `room/escrow/team_ref/member_count/quoted_amount_lux/locked_amount` 全匹配，其中 `member_count` 必须等于 `teamSize`，然后写入 `team_payments`。
+8. `teamRuntime` 同步白名单快照，比赛可进入开赛条件判断。
 
 ### 7.4 Live Scoring
 

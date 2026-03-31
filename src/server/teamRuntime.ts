@@ -1,6 +1,12 @@
 import { verifyPersonalMessageSignature } from "@mysten/sui/verify";
 import { hydrateRuntimeProjectionFromBackendIfNeeded, persistMatchDetailToBackend } from "./matchBackendStore.ts";
-import { __setMatchDetailForTests, getMatchDetail, listMatches } from "./matchRuntime.ts";
+import {
+  __setMatchDetailForTests,
+  getMatchDetail,
+  listMatches,
+  type MatchDetail,
+  type MatchScore
+} from "./matchRuntime.ts";
 import {
   getPersistedMatchDetail,
   savePersistedTeamState,
@@ -46,6 +52,7 @@ type RuntimeMatchState = {
   prizePool: number;
   minTeams: number;
   maxTeams: number;
+  teamSize: number;
   teams: RuntimeTeam[];
   teamPayments: PersistedTeamPayment[];
   whitelists: PersistedMatchWhitelist[];
@@ -76,7 +83,7 @@ type ActionResult<T> = ApiFailure | ApiSuccess<T>;
 type CreateTeamInput = SignedPayload & {
   matchId: string;
   teamName: string;
-  maxSize: number;
+  maxSize?: number;
   roleSlots: RoleSlots;
 };
 
@@ -106,6 +113,35 @@ type PayTeamInput = SignedPayload & {
   memberAddresses?: string[];
 };
 
+type SoloVerificationInput = {
+  matchId: string;
+  walletAddress: string;
+};
+
+type SoloVerificationTeamInput = {
+  teamId: string;
+  walletAddress: string;
+};
+
+const SOLO_VERIFICATION_RIVAL_PREFIX = "SOLO VERIFY // RIVAL";
+
+function resolveTeamSize(match: {
+  teamSize?: number;
+  minPlayers?: number;
+}) {
+  const explicit = Number(match.teamSize ?? Number.NaN);
+  if (Number.isFinite(explicit) && explicit >= 3) {
+    return Math.floor(explicit);
+  }
+
+  const legacy = Number(match.minPlayers ?? Number.NaN);
+  if (Number.isFinite(legacy) && legacy >= 3) {
+    return Math.floor(legacy);
+  }
+
+  return 3;
+}
+
 export type TeamPaymentQuote = {
   amount: number;
   memberCount: number;
@@ -121,10 +157,9 @@ export function getExpectedTeamPayment(teamId: string): TeamPaymentQuote | null 
   }
 
   const { match, team } = found;
-  const memberCount = team.members.length;
   return {
-    amount: match.entryFee * memberCount,
-    memberCount,
+    amount: match.entryFee * match.teamSize,
+    memberCount: match.teamSize,
     roomId: match.roomId,
     escrowId: match.escrowId,
     teamRef: deriveTeamPaymentRef(team.id)
@@ -235,7 +270,7 @@ function mapTeamDetail(match: RuntimeMatchState, team: RuntimeTeam): TeamDetail 
     roleSlots: { ...team.roleSlots },
     members: team.members.map((member) => mapMember(member)),
     applications: team.applications.map((application) => mapApplication(application)),
-    paymentAmount: String(match.entryFee * team.members.length),
+    paymentAmount: String(match.entryFee * match.teamSize),
     paymentTxDigest: team.payTxDigest,
     whitelistCount: team.whitelistCount
   };
@@ -278,13 +313,18 @@ function mapApplication(application: TeamApplication): TeamApplication {
   };
 }
 
-function mapPersistedTeam(team: PersistedTeam, members: RuntimeMember[], applications: TeamApplication[]): RuntimeTeam {
+function mapPersistedTeam(
+  team: PersistedTeam,
+  members: RuntimeMember[],
+  applications: TeamApplication[],
+  teamSize: number
+): RuntimeTeam {
   return {
     id: team.id,
     matchId: team.matchId,
     name: team.name,
     captainAddress: team.captainAddress,
-    maxSize: team.maxSize,
+    maxSize: teamSize,
     isLocked: team.isLocked,
     hasPaid: team.hasPaid,
     payTxDigest: team.payTxDigest,
@@ -293,7 +333,7 @@ function mapPersistedTeam(team: PersistedTeam, members: RuntimeMember[], applica
     prizeAmount: team.prizeAmount,
     status: team.status,
     createdAt: team.createdAt,
-    roleSlots: Array.isArray(team.roleSlots) ? inferRoleSlots(members, team.maxSize) : { ...team.roleSlots },
+    roleSlots: Array.isArray(team.roleSlots) ? inferRoleSlots(members, teamSize) : { ...team.roleSlots },
     members,
     applications,
     whitelistCount: team.whitelistCount ?? 0
@@ -416,7 +456,7 @@ function rebuildMatchFacts(match: RuntimeMatchState) {
         teamId: team.id,
         walletAddress: normalizeWallet(team.captainAddress),
         txDigest: team.payTxDigest,
-        amount: match.entryFee * memberAddresses.length,
+        amount: match.entryFee * match.teamSize,
         memberAddresses,
         createdAt: team.createdAt
       };
@@ -499,28 +539,158 @@ function persistMatchState(match: RuntimeMatchState) {
       prizePool: match.prizePool,
       minTeams: match.minTeams,
       maxTeams: match.maxTeams,
+      teamSize: match.teamSize,
+      minPlayers: match.teamSize,
       registeredTeams: match.teams.length,
       paidTeams: match.teamPayments.length
     });
   }
 
+  syncMatchDetailOverlay(match);
+}
+
+function syncMatchDetailOverlay(
+  match: RuntimeMatchState,
+  options: {
+    startedAt?: string | null;
+    endedAt?: string | null;
+    scores?: MatchScore[];
+  } = {}
+) {
   const detail = getMatchDetail(match.id);
-  if (detail) {
-    __setMatchDetailForTests({
-      match: {
-        ...detail.match,
-        status: match.status === "cancelled" ? "settled" : match.status,
-        entryFee: match.entryFee,
-        prizePool: match.prizePool,
-        minTeams: match.minTeams,
-        maxTeams: match.maxTeams,
-        registeredTeams: match.teams.length,
-        paidTeams: match.teamPayments.length
-      },
-      teams: match.teams.map((team) => mapTeam(team)),
-      members
-    });
+  if (!detail) {
+    return;
   }
+
+  const nextMatch = {
+    ...detail.match,
+    status: match.status === "cancelled" ? "settled" : match.status,
+    entryFee: match.entryFee,
+    prizePool: match.prizePool,
+    minTeams: match.minTeams,
+    maxTeams: match.maxTeams,
+    teamSize: match.teamSize,
+    minPlayers: match.teamSize,
+    registeredTeams: match.teams.length,
+    paidTeams: match.teamPayments.length,
+    ...(options.startedAt !== undefined ? { startedAt: options.startedAt } : {}),
+    ...(options.endedAt !== undefined ? { endedAt: options.endedAt } : {})
+  };
+
+  const nextDetail: MatchDetail = {
+    match: nextMatch,
+    teams: match.teams.map((team) => mapTeam(team)),
+    members: match.teams.flatMap((team) => team.members.map((member) => mapMember(member))),
+    ...(options.scores ? { scores: options.scores } : detail.scores ? { scores: detail.scores } : {})
+  };
+
+  __setMatchDetailForTests(nextDetail);
+}
+
+function buildSoloVerificationWallet() {
+  return normalizeWallet(`0x${crypto.randomUUID().replaceAll("-", "")}`);
+}
+
+function createSoloVerificationMember(team: RuntimeTeam, role: PlayerRole): RuntimeMember {
+  return createMember(team.id, buildSoloVerificationWallet(), role, team.status);
+}
+
+function findCaptainTeam(match: RuntimeMatchState, walletAddress: string) {
+  const normalized = normalizeWallet(walletAddress);
+  return match.teams.find((team) => normalizeWallet(team.captainAddress) === normalized) ?? null;
+}
+
+function nextSoloRivalIndex(match: RuntimeMatchState) {
+  return match.teams.filter((team) => team.name.startsWith(SOLO_VERIFICATION_RIVAL_PREFIX)).length + 1;
+}
+
+function buildSoloRivalTeam(match: RuntimeMatchState) {
+  const teamId = crypto.randomUUID();
+  const createdAt = nowIso();
+  const teamSize = match.teamSize;
+  const team: RuntimeTeam = {
+    id: teamId,
+    matchId: match.id,
+    name: `${SOLO_VERIFICATION_RIVAL_PREFIX} ${nextSoloRivalIndex(match)}`,
+    captainAddress: buildSoloVerificationWallet(),
+    maxSize: teamSize,
+    isLocked: true,
+    hasPaid: true,
+    payTxDigest: `solo_pay_${teamId.replaceAll("-", "")}`,
+    totalScore: 0,
+    rank: null,
+    prizeAmount: null,
+    status: "paid",
+    createdAt,
+    roleSlots: {
+      collector: Math.max(1, teamSize - 2),
+      hauler: teamSize >= 2 ? 1 : 0,
+      escort: teamSize >= 3 ? 1 : 0
+    },
+    members: [],
+    applications: [],
+    whitelistCount: teamSize
+  };
+
+  const seededRoles: PlayerRole[] = [
+    "collector",
+    ...(teamSize >= 2 ? (["hauler"] as const) : []),
+    ...(teamSize >= 3 ? (["escort"] as const) : []),
+    ...Array(Math.max(0, teamSize - 3)).fill("collector")
+  ];
+  team.members = seededRoles.map((role) => createSoloVerificationMember(team, role));
+  touchMemberStatuses(team);
+  return team;
+}
+
+function buildSoloSettlementScores(match: RuntimeMatchState, walletAddress: string) {
+  const normalized = normalizeWallet(walletAddress);
+  const captainTeam = findCaptainTeam(match, normalized);
+  const preferredTeamId = captainTeam?.id ?? match.teams[0]?.id ?? null;
+
+  const templatesByRank = [
+    [240, 150, 110],
+    [170, 110, 80],
+    [120, 80, 40]
+  ];
+
+  const rankedTeams = [...match.teams].sort((left, right) => {
+    if (left.id === preferredTeamId && right.id !== preferredTeamId) {
+      return -1;
+    }
+    if (right.id === preferredTeamId && left.id !== preferredTeamId) {
+      return 1;
+    }
+    return left.createdAt.localeCompare(right.createdAt);
+  });
+
+  const scoreRows: MatchScore[] = [];
+  for (const [teamIndex, team] of rankedTeams.entries()) {
+    const template = templatesByRank[teamIndex] ?? [90, 60, 30];
+    const members = [...team.members].sort((left, right) => left.joinedAt.localeCompare(right.joinedAt));
+    let teamTotal = 0;
+
+    members.forEach((member, memberIndex) => {
+      const totalScore = template[memberIndex] ?? Math.max(10, template[template.length - 1] - memberIndex * 10);
+      member.personalScore = totalScore;
+      member.prizeAmount = null;
+      teamTotal += totalScore;
+      scoreRows.push({
+        matchId: match.id,
+        teamId: team.id,
+        walletAddress: member.walletAddress,
+        totalScore,
+        fuelDeposited: Math.max(1, Math.round(totalScore / 2)),
+        updatedAt: nowIso()
+      });
+    });
+
+    team.totalScore = teamTotal;
+    team.rank = teamIndex + 1;
+    team.prizeAmount = null;
+  }
+
+  return scoreRows;
 }
 
 function walletInTeam(team: RuntimeTeam, walletAddress: string) {
@@ -554,11 +724,14 @@ function hydrateTeam(matchId: string, team: Team, members: TeamMember[]): Runtim
   const teamMembers = members
     .filter((member) => member.teamId === team.id)
     .map((member) => mapMember(member));
+  const match = listMatches().find((candidate) => candidate.id === matchId);
+  const teamSize = match ? resolveTeamSize(match) : team.maxSize;
 
   return {
     ...team,
     matchId,
-    roleSlots: inferRoleSlots(teamMembers, team.maxSize),
+    maxSize: teamSize,
+    roleSlots: inferRoleSlots(teamMembers, teamSize),
     members: teamMembers,
     applications: [],
     whitelistCount: team.hasPaid ? teamMembers.length : 0
@@ -588,6 +761,7 @@ function getMatchState(matchId: string) {
     existing.prizePool = baseMatch.prizePool;
     existing.minTeams = baseMatch.minTeams;
     existing.maxTeams = baseMatch.maxTeams;
+    existing.teamSize = resolveTeamSize(baseMatch);
     return existing;
   }
 
@@ -615,8 +789,14 @@ function getMatchState(matchId: string) {
       prizePool: projection.match.prizePool,
       minTeams: projection.match.minTeams,
       maxTeams: projection.match.maxTeams,
+      teamSize: resolveTeamSize(projection.match),
       teams: projection.teams.map((team) =>
-        mapPersistedTeam(team, membersByTeam.get(team.id) ?? [], applicationsByTeam.get(team.id) ?? [])
+        mapPersistedTeam(
+          team,
+          membersByTeam.get(team.id) ?? [],
+          applicationsByTeam.get(team.id) ?? [],
+          resolveTeamSize(projection.match)
+        )
       ),
       teamPayments: projection.teamPayments,
       whitelists: projection.whitelists
@@ -635,6 +815,7 @@ function getMatchState(matchId: string) {
     prizePool: baseMatch.prizePool,
     minTeams: baseMatch.minTeams,
     maxTeams: baseMatch.maxTeams,
+    teamSize: resolveTeamSize(baseMatch),
     teams: detail
       ? detail.teams.map((team) => hydrateTeam(baseMatch.id, team, detail.members))
       : [],
@@ -739,16 +920,10 @@ export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{
 
   const matchId = input.matchId.trim();
   const teamName = input.teamName.trim();
-  const maxSize = Math.floor(input.maxSize);
   const walletAddress = normalizeWallet(input.walletAddress);
 
-  if (!matchId || !teamName || !walletAddress || !Number.isInteger(maxSize) || maxSize < 3 || maxSize > 8) {
+  if (!matchId || !teamName || !walletAddress) {
     return failure(400, "INVALID_INPUT", "Invalid team payload");
-  }
-
-  const roleSlots = buildRoleSlots(input.roleSlots, maxSize);
-  if (!roleSlots) {
-    return failure(400, "INVALID_INPUT", "Role slots are invalid");
   }
 
   const match = getMatchState(matchId);
@@ -764,6 +939,10 @@ export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{
   if (walletInMatch(match, walletAddress)) {
     return failure(409, "ROOM_NOT_JOINABLE", "Wallet is already registered in this match");
   }
+  const roleSlots = buildRoleSlots(input.roleSlots, match.teamSize);
+  if (!roleSlots) {
+    return failure(400, "INVALID_INPUT", `Role slots must sum to fixed team size ${match.teamSize}`);
+  }
 
   const captainRole = ROLE_ORDER.find((role) => roleSlots[role] > 0) ?? "collector";
   const createdAt = new Date().toISOString();
@@ -775,7 +954,7 @@ export async function createTeam(input: CreateTeamInput): Promise<ActionResult<{
     matchId,
     name: teamName,
     captainAddress: walletAddress,
-    maxSize,
+    maxSize: match.teamSize,
     isLocked: false,
     hasPaid: false,
     payTxDigest: null,
@@ -1128,8 +1307,11 @@ export async function payTeamEntry(
   if (!validateTxDigest(txDigest)) {
     return failure(400, "TX_REJECTED", "Transaction digest is invalid");
   }
+  if (team.members.length !== match.teamSize) {
+    return failure(409, "TEAM_NOT_LOCKED", "Team member count does not match the fixed roster size");
+  }
 
-  const expectedAmount = match.entryFee * team.members.length;
+  const expectedAmount = match.entryFee * match.teamSize;
   const txAmount = parseTxAmount(input.txAmount);
   if (txAmount !== null && txAmount < expectedAmount) {
     return failure(400, "INVALID_INPUT", "Paid amount is lower than expected");
@@ -1141,6 +1323,9 @@ export async function payTeamEntry(
       : uniqueWallets(team.members.map((member) => normalizeWallet(member.walletAddress)));
 
   const actualAddresses = uniqueWallets(team.members.map((member) => normalizeWallet(member.walletAddress)));
+  if (actualAddresses.length !== match.teamSize) {
+    return failure(409, "INVALID_INPUT", "Team roster is incomplete for payment");
+  }
   if (
     memberAddresses.length !== actualAddresses.length ||
     actualAddresses.some((address) => !memberAddresses.includes(address))
@@ -1181,6 +1366,200 @@ export async function payTeamEntry(
     body: {
       team: mapTeamDetail(match, team),
       whitelistCount: team.whitelistCount
+    }
+  };
+}
+
+export async function fillSoloVerificationTeam(
+  input: SoloVerificationTeamInput
+): Promise<ActionResult<{ team: TeamDetail; addedMembers: number }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded();
+
+  const found = findTeam(input.teamId.trim());
+  if (!found) {
+    return failure(404, "NOT_FOUND", "Team not found");
+  }
+
+  const { match, team } = found;
+  const walletAddress = normalizeWallet(input.walletAddress);
+  if (!walletAddress) {
+    return failure(400, "INVALID_INPUT", "Wallet address is required");
+  }
+  if (normalizeWallet(team.captainAddress) !== walletAddress) {
+    return failure(403, "FORBIDDEN", "Only the captain can auto-fill this team");
+  }
+  if (match.status !== "lobby") {
+    return failure(409, "ROOM_NOT_JOINABLE", "Solo verification fill only works while the match is in lobby");
+  }
+  if (team.status !== "forming") {
+    return failure(409, "TEAM_LOCKED", "Only forming teams can be auto-filled");
+  }
+
+  const beforeCount = team.members.length;
+  for (const role of ROLE_ORDER) {
+    while (roleFilled(team, role) < roleCapacity(team, role)) {
+      team.members.push(createSoloVerificationMember(team, role));
+    }
+  }
+
+  const addedMembers = team.members.length - beforeCount;
+  persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
+
+  return {
+    status: 200,
+    body: {
+      team: mapTeamDetail(match, team),
+      addedMembers
+    }
+  };
+}
+
+export async function seedSoloVerificationRivalTeam(
+  input: SoloVerificationInput
+): Promise<ActionResult<{ team: TeamDetail; matchStatus: RuntimeMatchState["status"] }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: input.matchId });
+
+  const match = getMatchState(input.matchId.trim());
+  if (!match) {
+    return failure(404, "NOT_FOUND", "Match not found");
+  }
+  if (match.status !== "lobby" && match.status !== "prestart") {
+    return failure(409, "ROOM_NOT_JOINABLE", "Solo verification rival seeding is only available before the match starts");
+  }
+
+  const walletAddress = normalizeWallet(input.walletAddress);
+  const captainTeam = findCaptainTeam(match, walletAddress);
+  if (!captainTeam) {
+    return failure(409, "CONFLICT", "Create your own team first before seeding a rival");
+  }
+
+  const existingRival = match.teams.find((team) => team.name.startsWith(SOLO_VERIFICATION_RIVAL_PREFIX));
+  const rival = existingRival ?? buildSoloRivalTeam(match);
+  if (!existingRival) {
+    if (match.teams.length >= match.maxTeams) {
+      return failure(409, "CONFLICT", "Match already reached max teams");
+    }
+    match.teams.push(rival);
+  }
+
+  rebuildMatchFacts(match);
+  if (match.teamPayments.length >= match.minTeams) {
+    match.status = "prestart";
+  }
+  persistMatchState(match);
+  await persistMatchDetailToBackend(match.id);
+
+  return {
+    status: 200,
+    body: {
+      team: mapTeamDetail(match, rival),
+      matchStatus: match.status
+    }
+  };
+}
+
+export async function startSoloVerificationMatch(
+  input: SoloVerificationInput
+): Promise<ActionResult<{ matchId: string; status: RuntimeMatchState["status"]; startedAt: string }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: input.matchId });
+
+  const match = getMatchState(input.matchId.trim());
+  if (!match) {
+    return failure(404, "NOT_FOUND", "Match not found");
+  }
+  if (match.status === "running" || match.status === "panic") {
+    const detail = getMatchDetail(match.id);
+    return {
+      status: 200,
+      body: {
+        matchId: match.id,
+        status: match.status,
+        startedAt: detail?.match.startedAt ?? nowIso()
+      }
+    };
+  }
+  if (match.status !== "prestart" && match.status !== "lobby") {
+    return failure(409, "CONFLICT", "Solo verification start is only available before the match is running");
+  }
+  if (match.teamPayments.length < match.minTeams) {
+    return failure(409, "CONFLICT", "At least the minimum number of paid teams is required before starting");
+  }
+
+  const startedAt = nowIso();
+  match.status = "running";
+  persistMatchState(match);
+  syncMatchDetailOverlay(match, {
+    startedAt,
+    endedAt: null
+  });
+  await persistMatchDetailToBackend(match.id);
+
+  return {
+    status: 200,
+    body: {
+      matchId: match.id,
+      status: match.status,
+      startedAt
+    }
+  };
+}
+
+export async function settleSoloVerificationMatch(
+  input: SoloVerificationInput
+): Promise<ActionResult<{ matchId: string; status: RuntimeMatchState["status"]; settledAt: string }>> {
+  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId: input.matchId });
+
+  const match = getMatchState(input.matchId.trim());
+  if (!match) {
+    return failure(404, "NOT_FOUND", "Match not found");
+  }
+  if (match.teamPayments.length < match.minTeams) {
+    return failure(409, "CONFLICT", "Solo verification settlement requires the minimum number of paid teams");
+  }
+  if (match.status === "settled") {
+    const detail = getMatchDetail(match.id);
+    return {
+      status: 200,
+      body: {
+        matchId: match.id,
+        status: "settled",
+        settledAt: detail?.match.endedAt ?? nowIso()
+      }
+    };
+  }
+  if (match.status === "draft" || match.status === "lobby") {
+    return failure(409, "CONFLICT", "Start the match before forcing settlement");
+  }
+
+  const detail = getMatchDetail(match.id);
+  const startedAt = detail?.match.startedAt ?? nowIso();
+  const settledAt = nowIso();
+  const scores = buildSoloSettlementScores(match, input.walletAddress);
+
+  match.status = "settling";
+  persistMatchState(match);
+  syncMatchDetailOverlay(match, {
+    startedAt,
+    endedAt: settledAt,
+    scores
+  });
+
+  match.status = "settled";
+  persistMatchState(match);
+  syncMatchDetailOverlay(match, {
+    startedAt,
+    endedAt: settledAt,
+    scores
+  });
+  await persistMatchDetailToBackend(match.id);
+
+  return {
+    status: 200,
+    body: {
+      matchId: match.id,
+      status: match.status,
+      settledAt
     }
   };
 }

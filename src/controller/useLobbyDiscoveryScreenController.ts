@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAuthController } from "@/controller/useAuthController";
 import { useLobbyController } from "@/controller/useLobbyController";
 import { useLocationController } from "@/controller/useLocationController";
+import { useTeamDossierController } from "@/controller/useTeamDossierController";
+import type { MatchDiscoveryItem } from "@/types/match";
+import type { ActiveTeamDeployment } from "@/types/player";
 import type { ConstellationSummary, RegionSummary, SearchHit, SolarSystemSummary } from "@/types/solarSystem";
+
+type LobbyJoinCta = {
+  href: string;
+  label: string;
+  disabled: boolean;
+  blocker: string | null;
+};
 
 function sortConstellations(constellations: ConstellationSummary[]) {
   return [...constellations].sort(
@@ -11,7 +22,51 @@ function sortConstellations(constellations: ConstellationSummary[]) {
   );
 }
 
+function buildPlanningHref(matchId: string) {
+  return `/planning?matchId=${encodeURIComponent(matchId)}`;
+}
+
+function buildJoinBlocker(input: {
+  match: MatchDiscoveryItem;
+  isWalletConnected: boolean;
+  dossierLoading: boolean;
+  dossierError: string | null;
+  currentDeployment: ActiveTeamDeployment | null;
+}) {
+  if (!input.isWalletConnected) {
+    return "Connect wallet before joining";
+  }
+
+  if (input.dossierLoading) {
+    return "Syncing current squad status";
+  }
+
+  if (input.dossierError) {
+    return "Unable to verify current squad status";
+  }
+
+  if (input.match.status !== "lobby" && input.match.status !== "prestart") {
+    return "Match is not accepting squads right now";
+  }
+
+  if (!input.currentDeployment) {
+    return "Create or join a squad in Team Registry first";
+  }
+
+  if (input.currentDeployment.match.matchId !== input.match.id) {
+    return "Current squad is assigned to another match";
+  }
+
+  if (input.currentDeployment.team.memberCount < input.currentDeployment.team.maxSize) {
+    return `Current squad is incomplete (${input.currentDeployment.team.memberCount}/${input.currentDeployment.team.maxSize} pilots)`;
+  }
+
+  return null;
+}
+
 export function useLobbyDiscoveryScreenController() {
+  const auth = useAuthController();
+  const teamDossier = useTeamDossierController();
   const location = useLocationController();
   const lobby = useLobbyController({
     currentSystemId: location.location?.systemId ?? null,
@@ -45,6 +100,15 @@ export function useLobbyDiscoveryScreenController() {
   ]);
 
   useEffect(() => {
+    if (!auth.state.isConnected || !auth.state.walletAddress) {
+      teamDossier.actions.clear();
+      return;
+    }
+
+    void teamDossier.actions.load(auth.state.walletAddress);
+  }, [auth.state.isConnected, auth.state.walletAddress, teamDossier.actions]);
+
+  useEffect(() => {
     if (!pickerOpen) {
       return;
     }
@@ -69,6 +133,7 @@ export function useLobbyDiscoveryScreenController() {
     () => [...location.regions].sort((left, right) => right.sortScore - left.sortScore || left.regionId - right.regionId),
     [location.regions]
   );
+  const currentDeployment = teamDossier.selectors.currentDeployment;
 
   const handleSystemSelect = async (system: SolarSystemSummary) => {
     location.setLocation(system);
@@ -147,6 +212,24 @@ export function useLobbyDiscoveryScreenController() {
       toggleRegion,
       toggleConstellation,
       handleMatchPublished
+    },
+    helpers: {
+      getJoinCta: (match: MatchDiscoveryItem): LobbyJoinCta => {
+        const blocker = buildJoinBlocker({
+          match,
+          isWalletConnected: auth.state.isConnected,
+          dossierLoading: teamDossier.state.isLoading,
+          dossierError: teamDossier.state.error,
+          currentDeployment
+        });
+
+        return {
+          href: buildPlanningHref(match.id),
+          label: "JOIN MATCH",
+          disabled: Boolean(blocker),
+          blocker
+        };
+      }
     }
   };
 }

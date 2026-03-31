@@ -83,6 +83,19 @@ function teamProgressPct(registeredTeams: number, maxTeams: number) {
   return Math.max(0, Math.min(100, Math.round((registeredTeams / maxTeams) * 100)));
 }
 
+function lobbyProjectedPool(match: MatchDiscoveryItem) {
+  const projectedEntryFlow = match.entryFee * match.teamProgress.maxTeams * match.teamSize;
+  return Math.max(match.grossPool, match.sponsorshipFee + projectedEntryFlow);
+}
+
+function actionLinkClass(tone: "primary" | "ghost" = "primary") {
+  if (tone === "ghost") {
+    return "inline-flex items-center justify-center gap-2 border border-eve-offwhite/20 bg-transparent px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-eve-offwhite transition duration-150 hover:border-eve-offwhite/40 hover:bg-eve-offwhite/5";
+  }
+
+  return "inline-flex items-center justify-center gap-2 border border-eve-red bg-eve-red px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-black transition duration-150 hover:border-[#ffb599] hover:bg-[#ffb599]";
+}
+
 function MatchMetric({
   label,
   value,
@@ -100,13 +113,78 @@ function MatchMetric({
   );
 }
 
-function MatchCard({ match, selected }: { match: MatchDiscoveryItem; selected: boolean }) {
-  const progress = teamProgressPct(match.teamProgress.registeredTeams, match.teamProgress.maxTeams);
+function JoinMatchAction({
+  joinCta
+}: {
+  joinCta: {
+    href: string;
+    label: string;
+    disabled: boolean;
+    blocker: string | null;
+  };
+}) {
+  if (!joinCta.disabled) {
+    return (
+      <Link
+        href={joinCta.href}
+        className={actionLinkClass()}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {joinCta.label}
+      </Link>
+    );
+  }
 
   return (
     <div
+      className="group relative inline-flex"
+      tabIndex={0}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+      aria-label={joinCta.blocker ? `${joinCta.label}. ${joinCta.blocker}` : joinCta.label}
+    >
+      <TacticalButton disabled>{joinCta.label}</TacticalButton>
+      {joinCta.blocker ? (
+        <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 w-64 -translate-x-1/2 border border-eve-red/30 bg-[#080808]/96 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/85 opacity-0 shadow-[0_18px_32px_rgba(0,0,0,0.45)] transition duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+          {joinCta.blocker}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MatchCard({
+  match,
+  selected,
+  onSelect,
+  joinCta
+}: {
+  match: MatchDiscoveryItem;
+  selected: boolean;
+  onSelect: () => void;
+  joinCta: {
+    href: string;
+    label: string;
+    disabled: boolean;
+    blocker: string | null;
+  };
+}) {
+  const progress = teamProgressPct(match.teamProgress.registeredTeams, match.teamProgress.maxTeams);
+  const projectedPool = lobbyProjectedPool(match);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       className={cn(
-        "w-full border px-4 py-4 transition",
+        "w-full cursor-pointer border px-4 py-4 text-left transition",
         selected
           ? "border-eve-red bg-eve-red/10 shadow-[0_0_0_1px_rgba(255,95,0,0.18)]"
           : "border-eve-red/20 bg-[#101010]/90 hover:border-eve-red/45"
@@ -143,7 +221,7 @@ function MatchCard({ match, selected }: { match: MatchDiscoveryItem; selected: b
         <div className="min-w-[150px] border border-eve-yellow/30 bg-[radial-gradient(circle_at_top,rgba(229,179,43,0.12),transparent_55%),#080808] px-4 py-3 text-right">
           <p className="text-[10px] uppercase tracking-[0.22em] text-eve-offwhite/50">Prize Pool</p>
           <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">
-            {new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(match.grossPool)}
+            {new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(projectedPool)}
           </p>
           <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/58">{PAYMENT_TOKEN_SYMBOL} gross</p>
         </div>
@@ -163,7 +241,14 @@ function MatchCard({ match, selected }: { match: MatchDiscoveryItem; selected: b
             <div className="h-full bg-gradient-to-r from-eve-red to-eve-yellow" style={{ width: `${progress}%` }} />
           </div>
         </div>
-        <MatchMetric label="Target" value={match.targetSolarSystem.systemName} tone="text-eve-offwhite/84" />
+        <MatchMetric label="Roster" value={`${match.teamSize} pilots`} tone="text-eve-offwhite/84" />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+        <TacticalButton tone="ghost" onClick={onSelect}>
+          View Detail
+        </TacticalButton>
+        <JoinMatchAction joinCta={joinCta} />
       </div>
     </div>
   );
@@ -172,6 +257,7 @@ function MatchCard({ match, selected }: { match: MatchDiscoveryItem; selected: b
 function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
   const match = detail.match;
   const progress = teamProgressPct(match.teamProgress.registeredTeams, match.teamProgress.maxTeams);
+  const projectedPool = lobbyProjectedPool(match);
 
   return (
     <div className="space-y-4">
@@ -193,7 +279,7 @@ function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
 
         <div className="min-w-[168px] border border-eve-yellow/35 bg-[radial-gradient(circle_at_top,rgba(229,179,43,0.14),transparent_52%),#080808] px-4 py-3 text-right">
           <p className="text-[10px] uppercase tracking-[0.22em] text-eve-offwhite/50">Gross Pool</p>
-          <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">{formatPool(match.grossPool)}</p>
+          <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">{formatPool(projectedPool)}</p>
         </div>
       </div>
 
@@ -212,6 +298,7 @@ function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
             <div className="h-full bg-gradient-to-r from-eve-red to-eve-yellow" style={{ width: `${progress}%` }} />
           </div>
         </div>
+        <MatchMetric label="Roster" value={`${match.teamSize} pilots`} />
       </div>
 
       <div className="border border-eve-red/15 bg-[#080808]/80 px-4 py-4">
@@ -227,7 +314,7 @@ function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
 
 export function LobbyDiscoveryScreen() {
   const controller = useLobbyDiscoveryScreenController();
-  const { location, lobby, selectedMatch, ui, actions } = controller;
+  const { location, lobby, selectedMatch, ui, actions, helpers } = controller;
 
   return (
     <FuelMissionShell
@@ -334,16 +421,16 @@ export function LobbyDiscoveryScreen() {
 
               {lobby.matches.map((match) => {
                 const selected = selectedMatch?.match.id === match.id;
+                const joinCta = helpers.getJoinCta(match);
 
                 return (
-                  <button
+                  <MatchCard
                     key={match.id}
-                    type="button"
-                    onClick={() => void lobby.actions.openMatch(match.id)}
-                    className="w-full text-left"
-                  >
-                    <MatchCard match={match} selected={selected} />
-                  </button>
+                    match={match}
+                    selected={selected}
+                    onSelect={() => void lobby.actions.openMatch(match.id)}
+                    joinCta={joinCta}
+                  />
                 );
               })}
             </div>
@@ -357,6 +444,30 @@ export function LobbyDiscoveryScreen() {
             ) : (
               <div className="space-y-4">
                 <MatchDetailSummary detail={selectedMatch} />
+                {(() => {
+                  const joinCta = helpers.getJoinCta(selectedMatch.match);
+
+                  return (
+                    <div className="space-y-3 border border-eve-red/15 bg-[#080808]/80 px-4 py-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Join Access</p>
+                      <div className="flex flex-wrap gap-2">
+                        <JoinMatchAction joinCta={joinCta} />
+                        <Link href="/planning" className={actionLinkClass("ghost")}>
+                          Open Team Registry
+                        </Link>
+                      </div>
+                      {joinCta.blocker ? (
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+                          Hover the disabled join button to inspect the blocker.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+                          Squad verified. Continue into Team Lobby to finish lock and payment.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {selectedMatch.match.mode === "precision" ? (
                   <div className="space-y-2">
@@ -415,13 +526,6 @@ export function LobbyDiscoveryScreen() {
                     ))}
                   </div>
                 )}
-
-                <Link
-                  href="/planning"
-                  className="inline-flex border border-eve-red bg-eve-red px-4 py-3 text-xs font-black uppercase tracking-[0.24em] text-black transition hover:bg-[#ffb599]"
-                >
-                  Open Team Registry
-                </Link>
               </div>
             )}
           </TacticalPanel>

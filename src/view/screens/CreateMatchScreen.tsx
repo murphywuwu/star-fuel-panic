@@ -95,6 +95,7 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
     plottedNodes,
     selectedNodes,
     estimatedMaxGrossPool,
+    teamSize,
     guaranteedPool,
     projectedEntryFlow,
     projectedPlatformFee,
@@ -145,7 +146,7 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
       </TacticalPanel>
 
       <TacticalPanel title="Match Economics" eyebrow="Player Commitment">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-offwhite/70">
             Sponsorship Stake
             <input
@@ -174,6 +175,22 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
               ))}
             </select>
             {helpText("Set the squad cap first so you can judge pool scale before picking the battlefield.")}
+          </label>
+
+          <label className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-offwhite/70">
+            Team Size
+            <select
+              value={teamSize}
+              onChange={(event) => actions.setTeamSize(Number(event.target.value))}
+              className={numberInputClass()}
+            >
+              {[3, 4, 5, 6, 7, 8].map((value) => (
+                <option key={value} value={value}>
+                  {value} pilots
+                </option>
+              ))}
+            </select>
+            {helpText("Every squad in this match must use the same fixed roster size. Team entry cost is entry fee multiplied by this value.")}
           </label>
 
           <label className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-offwhite/70">
@@ -617,6 +634,12 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
                             {formatDurationLabel(state.durationHours)}
                           </p>
                         </div>
+                        <div className="border border-eve-red/18 bg-black/22 px-3 py-3 md:col-span-2">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/52">Fixed Roster Rule</p>
+                          <p className="mt-1 text-sm font-black uppercase tracking-[0.06em] text-eve-offwhite">
+                            {teamSize} pilots per squad
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <div className="border border-eve-red bg-eve-red/10 px-4 py-3 shadow-[0_0_0_1px_rgba(255,95,0,0.14),0_0_28px_rgba(255,95,0,0.12)]">
@@ -642,7 +665,9 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
                       <p className="mt-2 text-2xl font-black uppercase tracking-[-0.04em] text-eve-yellow">
                         {formatLux(projectedEntryFlow)}
                       </p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/56">If every squad fills and pays</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/56">
+                        If all {state.maxTeams} squads fill {teamSize} pilots and pay
+                      </p>
                     </div>
                   </div>
 
@@ -677,7 +702,7 @@ export function CreateMatchScreen({ onClose, onPublished }: CreateMatchScreenPro
               </div>
 
               <p className="text-[11px] leading-5 text-eve-offwhite/58">
-                Full-pool estimate assumes every available squad registers with three paid pilots.
+                Full-pool estimate assumes every available squad registers with the fixed roster size of {teamSize} paid pilots.
               </p>
             </div>
           </div>

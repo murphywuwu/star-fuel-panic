@@ -30,6 +30,7 @@ import type {
   TriggerMode
 } from "../types/match.ts";
 import type { PlayerRole, Team, TeamMember } from "../types/team.ts";
+import { resolveMatchTeamSize } from "../types/match.ts";
 import { hydrateFuelGradeInfo } from "../utils/fuelGrade.ts";
 
 export type MatchScore = {
@@ -75,6 +76,7 @@ type CreateDraftInput = {
   targetNodeIds?: string[];
   sponsorshipFee: number;
   maxTeams: number;
+  teamSize?: number;
   entryFee: number;
   durationHours: number;
   walletAddress: string;
@@ -360,6 +362,8 @@ function buildMatchFromMission(mission: Mission): Match {
     entryFee: mission.entryFee,
     minTeams: mission.minTeams,
     maxTeams: mission.maxTeams,
+    teamSize: mission.minPlayers,
+    minPlayers: mission.minPlayers,
     durationMinutes: 10,
     scoringMode: "weighted",
     challengeMode: "normal",
@@ -383,7 +387,7 @@ function buildSeedDetail(mission: Mission): MatchDetail {
     matchId: match.id,
     name,
     captainAddress: seedWallet(match.id, teamIndex + 1, 1),
-    maxSize: mission.minPlayers,
+    maxSize: resolveMatchTeamSize(match),
     isLocked: true,
     hasPaid: teamIndex < mission.paidTeams,
     payTxDigest: teamIndex < mission.paidTeams ? `tx_${match.id}_${teamIndex + 1}` : null,
@@ -940,6 +944,7 @@ export function createHostedMatch(input: {
     entryFee?: number;
     minTeams: number;
     maxTeams: number;
+    teamSize?: number;
     durationMinutes?: number;
     scoringMode?: "weighted" | "volume";
     creationMode?: MatchCreationMode;
@@ -959,9 +964,10 @@ export function createHostedMatch(input: {
   const entryFee = Number(input.config.entryFee ?? 0);
   const minTeams = Math.floor(Number(input.config.minTeams));
   const maxTeams = Math.floor(Number(input.config.maxTeams));
+  const teamSize = Math.floor(Number(input.config.teamSize ?? 3));
   const durationMinutes = Math.floor(Number(input.config.durationMinutes ?? 10));
   const scoringMode = input.config.scoringMode ?? "weighted";
-  if (!Number.isFinite(hostPrizePool) || hostPrizePool < 100 || entryFee < 0 || minTeams < 1 || minTeams > 4 || maxTeams < 2 || maxTeams > 16 || minTeams > maxTeams || ![5, 10, 15].includes(durationMinutes) || !["weighted", "volume"].includes(scoringMode)) {
+  if (!Number.isFinite(hostPrizePool) || hostPrizePool < 100 || entryFee < 0 || minTeams < 1 || minTeams > 4 || maxTeams < 2 || maxTeams > 16 || minTeams > maxTeams || teamSize < 3 || teamSize > 8 || ![5, 10, 15].includes(durationMinutes) || !["weighted", "volume"].includes(scoringMode)) {
     return fail(400, "INVALID_INPUT", "Hosted match config is invalid");
   }
 
@@ -981,6 +987,8 @@ export function createHostedMatch(input: {
     entryFee,
     minTeams,
     maxTeams,
+    teamSize,
+    minPlayers: teamSize,
     durationMinutes,
     scoringMode,
     challengeMode,
@@ -1008,6 +1016,7 @@ export function createMatchDraft(input: CreateDraftInput): ApiResult<{ match: Ma
   const solarSystemId = Math.floor(Number(input.solarSystemId));
   const sponsorshipFee = Math.floor(Number(input.sponsorshipFee));
   const maxTeams = Math.floor(Number(input.maxTeams));
+  const teamSize = Math.floor(Number(input.teamSize ?? 3));
   const entryFee = Math.floor(Number(input.entryFee));
   const durationHours = Math.floor(Number(input.durationHours));
   const targetNodeIds = (input.targetNodeIds ?? []).filter((value) => typeof value === "string").slice(0, 5);
@@ -1023,6 +1032,9 @@ export function createMatchDraft(input: CreateDraftInput): ApiResult<{ match: Ma
   }
   if (!Number.isFinite(maxTeams) || maxTeams < 2 || maxTeams > 16) {
     return fail(400, "INVALID_INPUT", "maxTeams must be between 2 and 16");
+  }
+  if (!Number.isFinite(teamSize) || teamSize < 3 || teamSize > 8) {
+    return fail(400, "INVALID_INPUT", "teamSize must be between 3 and 8");
   }
   if (!Number.isFinite(entryFee) || entryFee < 0 || entryFee > 1000) {
     return fail(400, "INVALID_INPUT", "entryFee must be between 0 and 1000");
@@ -1047,6 +1059,8 @@ export function createMatchDraft(input: CreateDraftInput): ApiResult<{ match: Ma
     entryFee,
     minTeams: 2,
     maxTeams,
+    teamSize,
+    minPlayers: teamSize,
     durationMinutes: durationHours * 60,
     scoringMode: "weighted",
     challengeMode: "normal",

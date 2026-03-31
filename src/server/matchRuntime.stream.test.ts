@@ -40,6 +40,7 @@ test("scoreboard snapshot exposes target node contract for runtime API", async (
     sponsorshipFee: 900,
     entryFee: 75,
     maxTeams: 4,
+    teamSize: 3,
     durationHours: 1,
     walletAddress,
     signature: createTestMatchSignature(walletAddress, message),

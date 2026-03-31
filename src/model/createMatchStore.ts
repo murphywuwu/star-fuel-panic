@@ -10,6 +10,7 @@ type EditableCreateMatchField =
   | "targetNodeIds"
   | "sponsorshipFee"
   | "maxTeams"
+  | "teamSize"
   | "entryFee"
   | "durationHours";
 
@@ -19,6 +20,7 @@ export type CreateMatchState = {
   targetNodeIds: string[];
   sponsorshipFee: number;
   maxTeams: number;
+  teamSize: number;
   entryFee: number;
   durationHours: number;
   searchHits: SearchHit[];
@@ -53,6 +55,7 @@ const initialState: CreateMatchState = {
   targetNodeIds: [],
   sponsorshipFee: 50,
   maxTeams: 8,
+  teamSize: 3,
   entryFee: 50,
   durationHours: 2,
   searchHits: [],

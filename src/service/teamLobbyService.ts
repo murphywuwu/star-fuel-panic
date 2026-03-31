@@ -177,7 +177,6 @@ class TeamLobbyService {
   async createTeam(input: {
     matchId: string;
     name: string;
-    maxMembers: number;
     roleSlots: RoleSlots;
     walletAddress: string;
   }): Promise<ControllerResult<void>> {
@@ -192,7 +191,6 @@ class TeamLobbyService {
           body: JSON.stringify({
             matchId: input.matchId,
             name: input.name,
-            maxMembers: input.maxMembers,
             roleSlots: input.roleSlots,
             ...signed
           })
@@ -313,6 +311,82 @@ class TeamLobbyService {
         })
       );
     }, "TEAM_PAID");
+  }
+
+  async fillSoloTeam(teamId: string, walletAddress: string): Promise<ControllerResult<void>> {
+    return this.runMutation(async () => {
+      await parseJson<unknown>(
+        await fetch(`/api/teams/${encodeURIComponent(teamId)}/solo-fill`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            walletAddress
+          })
+        })
+      );
+    }, "SOLO_TEAM_FILLED");
+  }
+
+  async seedSoloRival(matchId: string, walletAddress: string): Promise<ControllerResult<void>> {
+    return this.runMutation(
+      async () => {
+        await parseJson<unknown>(
+          await fetch(`/api/matches/${encodeURIComponent(matchId)}/solo-seed-rival`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              walletAddress
+            })
+          })
+        );
+      },
+      "SOLO_RIVAL_SEEDED",
+      matchId
+    );
+  }
+
+  async startSoloMatch(matchId: string, walletAddress: string): Promise<ControllerResult<void>> {
+    return this.runMutation(
+      async () => {
+        await parseJson<unknown>(
+          await fetch(`/api/matches/${encodeURIComponent(matchId)}/solo-start`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              walletAddress
+            })
+          })
+        );
+      },
+      "SOLO_MATCH_STARTED",
+      matchId
+    );
+  }
+
+  async settleSoloMatch(matchId: string, walletAddress: string): Promise<ControllerResult<void>> {
+    return this.runMutation(
+      async () => {
+        await parseJson<unknown>(
+          await fetch(`/api/matches/${encodeURIComponent(matchId)}/solo-settle`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              walletAddress
+            })
+          })
+        );
+      },
+      "SOLO_MATCH_SETTLED",
+      matchId
+    );
   }
 
   private async fetchSnapshot(matchId: string): Promise<TeamLobbySnapshot> {

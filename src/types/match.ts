@@ -30,6 +30,7 @@ export type Match = {
   platformSubsidy?: number;
   minTeams: number;
   maxTeams: number;
+  teamSize?: number;
   minPlayers?: number;
   registeredTeams?: number;
   paidTeams?: number;
@@ -146,6 +147,8 @@ export type MatchTargetNodeSnapshot = {
 
 export type MatchDiscoveryItem = {
   id: string;
+  onChainId: string | null;
+  escrowId?: string | null;
   mode: MatchDiscoveryMode;
   modeLabel: string;
   name: string;
@@ -158,10 +161,12 @@ export type MatchDiscoveryItem = {
   };
   targetNodeCount: number;
   targetNodeSummary: string;
+  prizePool: number;
   grossPool: number;
   entryFee: number;
   sponsorshipFee: number;
   platformFeeRate: number;
+  teamSize: number;
   teamProgress: {
     registeredTeams: number;
     maxTeams: number;
@@ -179,3 +184,17 @@ export type MatchDiscoveryDetail = {
   teams: Team[];
   members: TeamMember[];
 };
+
+export function resolveMatchTeamSize(match: Pick<Match, "teamSize" | "minPlayers">): number {
+  const explicit = Number(match.teamSize ?? Number.NaN);
+  if (Number.isFinite(explicit) && explicit >= 3) {
+    return Math.floor(explicit);
+  }
+
+  const legacy = Number(match.minPlayers ?? Number.NaN);
+  if (Number.isFinite(legacy) && legacy >= 3) {
+    return Math.floor(legacy);
+  }
+
+  return 3;
+}

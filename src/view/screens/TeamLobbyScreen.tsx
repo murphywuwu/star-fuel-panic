@@ -38,6 +38,7 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
                 <p>STATUS: {state.match.status}</p>
                 <p>ENTRY FEE: {state.match.entryFee} {PAYMENT_TOKEN_SYMBOL}</p>
                 <p>PRIZE POOL: {state.match.prizePool} {PAYMENT_TOKEN_SYMBOL}</p>
+                <p>TEAM SIZE: {state.match.teamSize ?? state.match.minPlayers ?? 3} PILOTS</p>
                 <p>REGISTERED TEAMS: {state.teams.length}</p>
                 <p>MAX TEAMS: {state.match.maxTeams}</p>
               </div>
@@ -73,6 +74,51 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
               ) : null}
             </div>
           </TacticalPanel>
+
+          {ui.showSoloVerification ? (
+            <TacticalPanel title="Solo Verification" eyebrow="Local Only">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-eve-offwhite/72">
+                  Local helper actions for single-account hosted match verification. These buttons auto-fill missing pilots,
+                  seed one paid rival team, and let you push the match into running / settlement without extra wallets.
+                </p>
+                <div className="grid gap-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-2">
+                  <p>CURRENT TEAM: {ui.currentPlayerTeamId ? "ONLINE" : "MISSING"}</p>
+                  <p>MATCH STATUS: {state.match?.status ?? "UNAVAILABLE"}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <TacticalButton
+                    tone="ghost"
+                    onClick={() => ui.currentPlayerTeamId && void actions.handleSoloFillTeam(ui.currentPlayerTeamId)}
+                    disabled={!ui.currentPlayerTeamId || state.isMutating}
+                  >
+                    Auto Fill My Team
+                  </TacticalButton>
+                  <TacticalButton
+                    tone="ghost"
+                    onClick={() => void actions.handleSoloSeedRival()}
+                    disabled={!state.matchId || state.isMutating}
+                  >
+                    Seed Rival Team
+                  </TacticalButton>
+                  <TacticalButton
+                    tone="ghost"
+                    onClick={() => void actions.handleSoloStart()}
+                    disabled={!state.matchId || state.isMutating}
+                  >
+                    Start Match
+                  </TacticalButton>
+                  <TacticalButton
+                    tone="danger"
+                    onClick={() => void actions.handleSoloSettle()}
+                    disabled={!state.matchId || state.isMutating}
+                  >
+                    Force Settle
+                  </TacticalButton>
+                </div>
+              </div>
+            </TacticalPanel>
+          ) : null}
         </div>
 
         <div className="space-y-4">
@@ -105,8 +151,8 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
                     </div>
 
                     <div className="mt-3 grid gap-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-3">
-                      <p>MEMBERS: {team.memberCount}/{team.maxSize}</p>
-                      <p>PAYMENT: {team.paymentAmount} {PAYMENT_TOKEN_SYMBOL}</p>
+                        <p>MEMBERS: {team.memberCount}/{team.maxSize}</p>
+                      <p>TEAM ENTRY: {team.paymentAmount} {PAYMENT_TOKEN_SYMBOL}</p>
                       <p>WL: {team.whitelistCount}</p>
                     </div>
 
@@ -197,6 +243,15 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
 
                       {captain ? (
                         <>
+                          {ui.showSoloVerification && team.status === "forming" ? (
+                            <TacticalButton
+                              tone="ghost"
+                              onClick={() => void actions.handleSoloFillTeam(team.id)}
+                              disabled={state.isMutating}
+                            >
+                              Auto Fill Bots
+                            </TacticalButton>
+                          ) : null}
                           <TacticalButton tone="ghost" onClick={() => void actions.handleLock(team.id)} disabled={state.isMutating}>
                             Lock Team
                           </TacticalButton>
@@ -239,7 +294,7 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
                 <p className="text-[10px] font-black uppercase tracking-[0.32em] text-eve-red/90">Captain</p>
                 <h2 className="mt-1 text-sm font-black uppercase tracking-[0.18em] text-eve-offwhite">Create Team</h2>
                 <p className="mt-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/70">
-                  Configure squad size and role slots, then submit a fresh team into the current match lobby.
+                  This match has a fixed roster size. Configure role slots only, then submit a fresh team into the current match lobby.
                 </p>
               </div>
               <TacticalButton tone="ghost" onClick={actions.closeCreateTeamModal}>
@@ -264,8 +319,8 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
                   min={3}
                   max={8}
                   value={ui.maxMembers}
-                  onChange={(event) => actions.setMaxMembers(Number(event.target.value))}
-                  className="w-full border border-eve-yellow/50 bg-eve-black/80 px-3 py-2 text-sm text-eve-offwhite outline-none focus:border-eve-yellow"
+                  disabled
+                  className="w-full border border-eve-yellow/30 bg-eve-black/55 px-3 py-2 text-sm text-eve-offwhite/75 outline-none"
                 />
               </label>
             </div>
@@ -309,6 +364,7 @@ export function TeamLobbyScreen({ preferredMatchId = null }: TeamLobbyScreenProp
             <div className="mt-4 grid gap-2 border border-eve-red/20 bg-black/20 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/75 md:grid-cols-3">
               <p>SLOT TOTAL: {ui.slotTotal} / {ui.maxMembers}</p>
               <p>MATCH: {state.matchId ?? "UNAVAILABLE"}</p>
+              <p>TEAM ENTRY: {(state.match?.entryFee ?? 0) * ui.maxMembers} {PAYMENT_TOKEN_SYMBOL}</p>
               <p>CAPTAIN: {authState.walletAddress ?? "NOT CONNECTED"}</p>
             </div>
 

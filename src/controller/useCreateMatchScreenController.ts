@@ -198,9 +198,8 @@ export function useCreateMatchScreenController({
     [state.systemNodes]
   );
   const estimatedMaxGrossPool = useMemo(() => {
-    const assumedPilotsPerTeam = 3;
-    return state.sponsorshipFee + state.entryFee * state.maxTeams * assumedPilotsPerTeam;
-  }, [state.entryFee, state.maxTeams, state.sponsorshipFee]);
+    return state.sponsorshipFee + state.entryFee * state.maxTeams * state.teamSize;
+  }, [state.entryFee, state.maxTeams, state.sponsorshipFee, state.teamSize]);
   const selectedNodes = useMemo(
     () => state.systemNodes.filter((node) => state.targetNodeIds.includes(node.objectId)),
     [state.systemNodes, state.targetNodeIds]
@@ -377,6 +376,7 @@ export function useCreateMatchScreenController({
       plottedNodes,
       selectedNodes,
       estimatedMaxGrossPool,
+      teamSize: state.teamSize,
       guaranteedPool,
       projectedEntryFlow,
       projectedPlatformFee,
@@ -411,6 +411,7 @@ export function useCreateMatchScreenController({
       setMode: (mode: "free" | "precision") => handleModeChange(mode),
       setSponsorshipFee: (value: number) => actions.setField("sponsorshipFee", Math.max(50, value || 50)),
       setMaxTeams: (value: number) => actions.setField("maxTeams", clampNumber(value, 2, 16, state.maxTeams)),
+      setTeamSize: (value: number) => actions.setField("teamSize", clampNumber(value, 3, 8, state.teamSize)),
       setEntryFee: (value: number) => actions.setField("entryFee", Math.max(0, value || 0)),
       setDurationHours: (value: number) =>
         actions.setField("durationHours", clampNumber(value, 1, 72, state.durationHours))

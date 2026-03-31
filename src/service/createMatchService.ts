@@ -70,7 +70,7 @@ class CreateMatchService {
 
   getSnapshot = () => this.store.getState();
 
-  setField<K extends "mode" | "solarSystemId" | "targetNodeIds" | "sponsorshipFee" | "maxTeams" | "entryFee" | "durationHours">(
+  setField<K extends "mode" | "solarSystemId" | "targetNodeIds" | "sponsorshipFee" | "maxTeams" | "teamSize" | "entryFee" | "durationHours">(
     key: K,
     value: CreateMatchState[K]
   ) {
@@ -196,6 +196,7 @@ class CreateMatchService {
         targetNodeIds: snapshot.targetNodeIds,
         sponsorshipFee: snapshot.sponsorshipFee,
         maxTeams: snapshot.maxTeams,
+        teamSize: snapshot.teamSize,
         entryFee: snapshot.entryFee,
         durationHours: snapshot.durationHours,
         walletAddress
@@ -290,7 +291,7 @@ class CreateMatchService {
           tx.pure.u64(snapshot.entryFee),
           tx.pure.u64(snapshot.durationHours),
           tx.pure.u64(0),
-          tx.pure.vector("u8", Array.from(new TextEncoder().encode(`draft:${snapshot.draftId}`))),
+          tx.pure.vector("u8", Array.from(new TextEncoder().encode(`draft:${snapshot.draftId}:teamSize=${snapshot.teamSize}`))),
           sponsorshipCoin
         ]
       });
@@ -323,6 +324,7 @@ async function createMatchDraftRequest(payload: {
   targetNodeIds: string[];
   sponsorshipFee: number;
   maxTeams: number;
+  teamSize: number;
   entryFee: number;
   durationHours: number;
   walletAddress: string;

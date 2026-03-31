@@ -6,7 +6,7 @@
 - Related PRD: `docs/PRD.md` v2.7.0
 - Related SPEC: `docs/SPEC.md` v6.5
 - Related TODO: `docs/TODO.md` v2.7.0
-- Version: v1.9
+- Version: v1.10
 - Status: In Progress
 - Owner (Testing Agent): Codex
 - Last Updated: 2026-03-31
@@ -47,6 +47,10 @@
   - F-007 `T-0729`: upgrade old node-index snapshots and backfill `solarSystem` from connected assemblies when direct node location is absent
   - F-007 `T-0730`: create-match system search supports canonical/legacy aliases when live world-api system names are coded
   - F-007 `T-0734`: mirror match/team lifecycle data into backend tables and hydrate local runtime projection from backend on restart
+  - F-019 `T-1900`: create-match flow persists fixed `teamSize` through store, API, runtime, and discovery DTOs
+  - F-019 `T-1901`: match-specific Team Lobby inherits match `teamSize`, enforces fixed role-slot total, and charges `entryFee × teamSize`
+  - F-019 `T-1902`: `/planning?matchId=` routes into Team Lobby and surfaces fixed roster + team entry fee
+  - F-019 `T-1903`: fixed team-size pricing model passes targeted runtime/API/build/layer verification
   - F-008 `T-0800`: `fuelConfigRuntime` loads `FuelConfig.fuel_efficiency` and keeps stale fallback on failure
   - F-008 `T-0801`: accepted score events persist into `fuel_events` runtime fact with v2.7 grade fields and legacy fallback
   - F-008 `T-0802`: `chainSyncEngine` applies `fuelGradeBonus` in the score formula
@@ -111,6 +115,8 @@
 | TC-0704-DEVNET | 4.4 / 4.5 | Contract / Devnet | T-0704 | P0 |
 | TC-0705-ERR | 4.1 / 4.3 / 4.5 | 6.1, 6.2 | T-0705 | P0 |
 | TC-0708-TOOL | 4.x / 6.1 | QA / Tooling | T-0708 | P1 |
+| TC-1900-MATCH-TEAMSIZE | 4.1 / 4.3 | 2.4, 3.1, 7.1 | T-1900 / T-1901 | P0 |
+| TC-1902-TEAMLOBBY-ROUTE | 4.3 | 3.3, Architecture 4.1, 7.3 | T-1902 | P0 |
 
 ## 4. Test Strategy
 

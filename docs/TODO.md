@@ -133,6 +133,31 @@ Maintainer: Todo Agent
 |---|---|---|---|---|---|---|---|---|---|
 | T-1700 | F-017 | 3.2, 5.5, 6.1 | Runtime / Data / API | Runtime + Data | 修复 `/api/matches -> matchDiscoveryRuntime -> matchBackendStore` 的冷启动 hydrate：即使本地已有历史/测试 `matches` projection，也必须继续从 backend merge 新的真实比赛，避免 Lobby 漏掉已创建/已发布比赛 | 当前本地 projection 只要非空就会短路 hydrate，导致 backend 中真实存在的 lobby match 无法进入 Discovery 列表 | - | `src/server/matchBackendStore.test.ts` 已新增“已有本地 projection 时仍能 merge backend matches”回归，并通过 `pnpm test src/server/matchBackendStore.test.ts`、`pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs` | Done |
 
+### F-018 Solo Lifecycle Verification
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1800 | F-018 | Architecture 4.1, 4.5 | Frontend Route | View + Controller | 补通 `/planning?matchId=` 到 match-specific `TeamLobbyScreen`，让 Lobby 的 `JOIN MATCH` deep-link 进入真正的比赛战队页而不是继续停留在独立 registry | 当前完整 hosted match 流程少了“比赛战队页”这一段，创建比赛后无法在 UI 内继续完成组队、锁队、支付 | - | `/planning?matchId=<id>` 已渲染比赛战队页，并保持独立 `/planning` registry 默认路径不变 | Done |
+| T-1801 | F-018 | 3.3, 5.5, 6.1 | Runtime / API | Runtime + Data | 为单账号本地验证补 `solo verification` helper：自动补齐本队 bot 成员、注入对手队、推进 `running` 与 `settled`，避免 hosted match 验证被多账号/多队规则卡死 | 当前 hosted match 真实规则要求 `minTeams=2` 且 `maxSize>=3`，单账号无法完成完整生命周期验证 | T-1800 | 已新增 solo-fill / solo-seed-rival / solo-start / solo-settle runtime+API，`src/server/teamRuntime.solo.test.ts` 覆盖 auto-fill / rival seeding / start / settle / settlement bill | Done |
+| T-1802 | F-018 | Architecture 4.4 | View / Controller / Service | View + Controller | 在比赛战队页接入 local-only solo verification 操作入口，并复用 service/controller 刷新快照，保证不破坏正式 team pay / lock 流程 | 只有 runtime helper 还不够，用户需要在当前 UI 里直接触发这些本地验证动作 | T-1801 | 比赛战队页已显示 local-only helper，并通过 `pnpm test src/server/teamRuntime.solo.test.ts src/server/matchBackendStore.test.ts`、`pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs` | Done |
+
+### F-018 Lobby Join CTA Visibility
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1800 | F-018 | 3.2, 3.3, Architecture 4.4 | View / Controller | View + Controller | 修复 `/lobby` 比赛列表与详情的 `JOIN MATCH` CTA：按钮必须始终可见；当当前钱包未建队、队伍不在该比赛、或当前队伍人数不足/未编满时，按钮显示为禁用态并明确提示 blocker，而不是直接不展示 | 当前 Lobby 缺少稳定的 join CTA，玩家在队伍尚未满足参赛条件时看不到入口和失败原因，导致“为什么不能加入”不可解释 | - | `/lobby` 每个比赛卡片和详情侧栏都渲染 `JOIN MATCH` CTA；不满足条件时展示 disabled + blocker 文案；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+| T-1801 | F-018 | 3.2, 3.3, Architecture 4.4 | View | View only | 修复 `/lobby` 交互回归：比赛卡片本体必须可选中；disabled `JOIN MATCH` 的 blocker 改为 hover/focus tooltip 提示，避免常驻挤占卡片空间 | 当前版本把卡片选择入口收窄成 `VIEW DETAIL`，且 blocker 常驻展示，导致比赛难以选中、禁用原因呈现过重 | T-1800 | 点击或键盘聚焦比赛卡片即可选中；disabled `JOIN MATCH` 在 hover/focus 时显示 blocker tooltip；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+| T-1802 | F-018 | 3.2, Architecture 4.4 | View | View only | 修复 `/lobby` 奖池读数口径：比赛卡片 `Prize Pool` 与详情 `Gross Pool` 统一改为与创建页相同的“满编 projected full pool”显示，而不是直接回显当前已入账 `grossPool` | 当前 Lobby 显示的奖池值与 Create Match 的 prize poster 口径不一致，用户会认为比赛奖池显示错误 | T-1801 | `/lobby` 卡片与详情都显示 `sponsorshipFee + entryFee × maxTeams × 3` 的 projected pool，且 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+
+### F-019 Fixed Match Team Size
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1900 | F-019 | 2.4, 3.1, Architecture 7.1 | View / Controller / Service / Runtime | View + Controller + Service + Runtime | 为比赛创建链路新增 `teamSize`：create-match store、controller、service、`POST /api/matches`、`Match` DTO、runtime/backend projection 都必须持久化固定编制，并让 Lobby/Team Dossier/Team Lobby 读模型返回该字段 | 如果比赛没有固定编制，`entryFee / 人` 无法在创建时推导单队成本与满编奖池，也无法在 Team Lobby 做确定性校验 | - | 创建比赛必须填写 `teamSize`，match DTO 含 `teamSize`，`pnpm build` 与相关测试通过 | Done |
+| T-1901 | F-019 | 3.3, 4.3, Architecture 7.3 | View / Controller / Service / Runtime | View + Controller + Service + Runtime | 将 match-specific Team Lobby 改为继承比赛 `teamSize`：创建战队不再自定义 `maxMembers`，只允许配置 `roleSlots` 且总和必须等于 `teamSize`；锁队与支付都按 `teamSize` 校验 | 固定编制如果只存在于 create-match 而不收口到 Team Lobby，规则会在真实报名阶段失效 | T-1900 | `POST /api/teams` / `/api/matches/{id}/teams` 创建战队继承 `teamSize`；锁队要求成员数等于 `teamSize`；支付金额等于 `entryFee × teamSize` | Done |
+| T-1902 | F-019 | 3.3, Architecture 4.1, 7.3 | View / Routing | View + Controller | 让 `/planning?matchId=<id>` 实际渲染 `TeamLobbyScreen`，并在页面上明确显示该比赛固定编制与单队报名费，保证 Lobby 的 `JOIN MATCH` deep-link 真正进入 match-specific Team Lobby | 当前 `/planning` 默认只显示独立战队注册页，无法承接比赛固定编制与报名支付规则 | T-1901 | `/planning?matchId=...` 打开 Team Lobby；页面显示 `teamSize` 和固定 `teamEntryFee`；独立 `/planning` 行为不变 | Done |
+| T-1903 | F-019 | 6.1 | QA | QA only | 为固定编制收费模型补测试与门禁：create-match 请求包含 `teamSize`、Team Lobby 创建/锁队/支付校验、`/planning?matchId=` 路由切换、build/layer check | 这是业务规则变更，必须有契约回归，否则极易出现 UI/运行时收费口径分裂 | T-1900, T-1901, T-1902 | 定向测试、`pnpm build`、`node ./scripts/check-layer-imports.mjs` 通过，并回填 `docs/test-plan.md` | Done |
+
 ## 3. Ordered Execution Plan (Critical Path)
 
 1. [x] `T-0800` - 先建立 `fuelConfigRuntime`，锁定品级来源和降级策略。
@@ -158,6 +183,16 @@ Maintainer: Todo Agent
 21. [x] `T-1401` - 修复 `/match` page 的 `Suspense` 缺失，恢复 `pnpm build` 门禁。
 22. [x] `T-1600` - 恢复钱包 provider persisted session 的自动重连，避免刷新后掉线。
 23. [x] `T-1700` - 修复 Lobby match backend hydrate 在本地 projection 非空时被短路的问题。
+24. [x] `T-1800` - 补通 `/planning?matchId=` 到真正的比赛战队页。
+25. [x] `T-1801` - 为 hosted match 增加单账号本地生命周期 helper。
+26. [x] `T-1802` - 在比赛战队页接入 local-only solo verification 操作。
+24. [x] `T-1800` - 修复 `/lobby` 的 `JOIN MATCH` CTA 可见性与 blocker 提示。
+25. [x] `T-1801` - 修复 `/lobby` 比赛卡片选择交互与 disabled `JOIN MATCH` tooltip。
+26. [x] `T-1802` - 统一 `/lobby` 奖池显示为 projected full pool 口径。
+27. [x] `T-1900` - 为比赛创建链路新增固定 `teamSize` 并同步读模型。
+28. [x] `T-1901` - 让 match-specific Team Lobby 继承比赛固定编制与固定单队报名费。
+29. [x] `T-1902` - 让 `/planning?matchId=` 实际进入 Team Lobby。
+30. [x] `T-1903` - 为固定编制收费模型补测试与门禁。
 
 ## 4. Definition of Done
 
@@ -195,3 +230,13 @@ Maintainer: Todo Agent
 - 2026-03-31: 完成 `T-1600`。`src/service/suiDappKit.ts` 已启用 persisted wallet session 的 `autoConnect`，`src/controller/useAuthController.ts` 不再手动清空 dAppKit 的连接存储；新增 `src/service/suiDappKit.test.ts`，并通过定向测试、`pnpm typecheck`、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs`。
 - 2026-03-31: 新增 `T-1700`，修复 Lobby 发现链路在本地已有历史/测试 match projection 时无法继续从 backend merge 真实比赛的问题。
 - 2026-03-31: 完成 `T-1700`。`src/server/matchBackendStore.ts` 不再因本地 `matches` 非空而整体跳过 backend hydrate，`/api/matches` 可继续 merge 真实 lobby match；新增 `src/server/matchBackendStore.test.ts` 回归并通过 `pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs`。
+- 2026-03-31: 新增 `T-1800 / T-1801 / T-1802`，补通 `/planning?matchId=` 到比赛战队页，并为 hosted match 增加单账号本地生命周期验证 helper。
+- 2026-03-31: 完成 `T-1800 / T-1801 / T-1802`。`/planning?matchId=` 已切到 `TeamLobbyScreen`；新增 local-only solo verification API/runtime (`solo-fill / solo-seed-rival / solo-start / solo-settle`) 与页面操作入口，单账号可完成 hosted match 的建队、补位、锁队、支付、开赛、结算验证；并通过定向测试、`pnpm typecheck`、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs`。
+- 2026-03-31: 新增 `T-1800`，修复 `/lobby` 比赛卡片和详情侧栏缺少稳定 `JOIN MATCH` CTA 的问题，并要求在队伍未就绪时显示禁用态与 blocker 原因。
+- 2026-03-31: 完成 `T-1800`。`/lobby` 比赛卡片新增显式 `VIEW DETAIL + JOIN MATCH` 操作区；详情侧栏补齐同一套 `JOIN MATCH` CTA；按钮会基于当前钱包的 active squad 状态显示 disabled blocker（未连钱包、未建队、队伍属于其他比赛、队伍未编满）；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-03-31: 新增 `T-1801`，修复 `/lobby` 比赛卡片无法直接选中，以及 disabled `JOIN MATCH` blocker 常驻展示过重的问题，改为 hover/focus tooltip 呈现。
+- 2026-03-31: 完成 `T-1801`。比赛卡片本体已恢复 click / Enter / Space 选中；disabled `JOIN MATCH` 改为 wrapper tooltip，在 hover 或 focus 时显示 blocker；详情侧栏同步改为提示用户 hover disabled 按钮查看原因；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-03-31: 新增 `T-1802`，修复 `/lobby` 的 `Prize Pool / Gross Pool` 与 Create Match prize poster 口径不一致的问题，统一按满编 projected pool 显示。
+- 2026-03-31: 完成 `T-1802`。`/lobby` 比赛卡片 `Prize Pool` 与详情 `Gross Pool` 改为使用 `sponsorshipFee + entryFee × maxTeams × 3` 的 projected full pool，并对已入账 `grossPool` 取上限保护；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-03-31: 新增 `T-1900 / T-1901 / T-1902 / T-1903`，将“报名费按人收”正式收口为“比赛创建时必须定义固定 `teamSize`”，并要求 Team Lobby、支付金额、deep-link 路由与测试门禁同步升级。
+- 2026-03-31: 完成 `T-1900 / T-1901 / T-1902 / T-1903`。create-match 已新增固定 `teamSize` 字段并驱动 projected pool；`/api/matches`、`matchRuntime`、backend projection 与 discovery DTO 已持久化 `teamSize`；match-specific Team Lobby 创建战队改为继承比赛编制、支付金额改为 `entryFee × teamSize`；`/planning?matchId=` 已实际切换到 `TeamLobbyScreen`；定向测试、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
