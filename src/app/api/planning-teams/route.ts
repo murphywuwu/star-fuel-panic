@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
+import {
+  buildPlanningTeamBackendMissingMessage,
+  hydratePlanningTeamsFromBackendIfNeeded,
+  isBackendRelationMissing,
+  persistPlanningTeamToBackend
+} from "@/server/matchBackendStore";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
 import { createPlanningTeam, getPlanningTeamsSnapshot } from "@/server/planningTeamRuntime";
 import type { PlayerRole, RoleSlots } from "@/types/team";
@@ -30,6 +36,23 @@ function parseRoleSlots(value: unknown): RoleSlots {
 }
 
 export async function GET() {
+  try {
+    await hydratePlanningTeamsFromBackendIfNeeded();
+  } catch (error) {
+    if (isBackendRelationMissing(error, "planning_teams")) {
+      return NextResponse.json(
+        buildErrorRecord(
+          crypto.randomUUID(),
+          503,
+          "CHAIN_SYNC_ERROR",
+          buildPlanningTeamBackendMissingMessage()
+        ).body,
+        { status: 503 }
+      );
+    }
+
+    throw error;
+  }
   const snapshot = getPlanningTeamsSnapshot();
   return NextResponse.json({
     ok: true,
@@ -39,6 +62,23 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  try {
+    await hydratePlanningTeamsFromBackendIfNeeded();
+  } catch (error) {
+    if (isBackendRelationMissing(error, "planning_teams")) {
+      return NextResponse.json(
+        buildErrorRecord(
+          crypto.randomUUID(),
+          503,
+          "CHAIN_SYNC_ERROR",
+          buildPlanningTeamBackendMissingMessage()
+        ).body,
+        { status: 503 }
+      );
+    }
+
+    throw error;
+  }
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) {
     return NextResponse.json(
@@ -86,12 +126,34 @@ export async function POST(request: Request) {
     });
   }
 
+  const successBody = result.body as {
+    team: import("@/types/planningTeam").PlanningTeam;
+    totalTeams: number;
+  };
+  try {
+    await persistPlanningTeamToBackend(successBody.team.id);
+  } catch (error) {
+    if (isBackendRelationMissing(error, "planning_teams") || isBackendRelationMissing(error, "planning_team_members")) {
+      return finalizeMutation("POST:/api/planning-teams", mutation.mutation, {
+        status: 503,
+        body: buildErrorRecord(
+          mutation.mutation.requestId,
+          503,
+          "CHAIN_SYNC_ERROR",
+          buildPlanningTeamBackendMissingMessage()
+        ).body
+      });
+    }
+
+    throw error;
+  }
+
   return finalizeMutation("POST:/api/planning-teams", mutation.mutation, {
     status: result.status,
     body: {
       ok: true,
       requestId: mutation.mutation.requestId,
-      data: result.body
+      data: successBody
     }
   });
 }

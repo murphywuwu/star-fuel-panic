@@ -1,4 +1,10 @@
 import type { ChainFuelEvent, FilterRejectReason, MatchWindow, ScoreEvent, ScoreRejectAuditLog } from "../types/fuelMission";
+import type { FuelGradeInfo, FuelGrade } from "@/types/fuelGrade";
+import type { ChallengeMode, PrimaryFuelGrade } from "@/types/match";
+import { resolveFuelGradeInfo } from "@/utils/fuelGrade";
+
+export const PRIMARY_GRADE_MULTIPLIER = 2.0;
+export const ALL_GRADES_BONUS = 1.2;
 
 export interface ChainSyncContext {
   matchId: string;
@@ -6,12 +12,16 @@ export interface ChainSyncContext {
   targetAssemblies: Set<string>;
   window: MatchWindow;
   memberTeamMap: Map<string, string>;
+  resolveFuelGradeInfo?: (fuelTypeId: number, event: ChainFuelEvent) => FuelGradeInfo;
+  challengeMode?: ChallengeMode;
+  primaryFuelGrade?: PrimaryFuelGrade;
 }
 
 export interface ChainSyncTables {
   scoreEvents: ScoreEvent[];
   auditLogs: ScoreRejectAuditLog[];
   txIndexByMatch: Map<string, Set<string>>;
+  gradeCollectionByMatch: Map<string, Map<string, Set<FuelGrade>>>;
 }
 
 export type ChainSyncResult =
@@ -34,6 +44,19 @@ function computeUrgencyWeight(fillRatioAt: number) {
     return 1.5;
   }
   return 1.0;
+}
+
+function computePrimaryGradeMultiplier(
+  context: ChainSyncContext,
+  fuelGrade: FuelGrade
+): number {
+  if (context.challengeMode !== "fuel_grade_challenge") {
+    return 1.0;
+  }
+  if (!context.primaryFuelGrade) {
+    return 1.0;
+  }
+  return fuelGrade === context.primaryFuelGrade ? PRIMARY_GRADE_MULTIPLIER : 1.0;
 }
 
 function getTxIndex(tables: ChainSyncTables, matchId: string) {
@@ -72,7 +95,8 @@ export function createChainSyncTables(): ChainSyncTables {
   return {
     scoreEvents: [],
     auditLogs: [],
-    txIndexByMatch: new Map()
+    txIndexByMatch: new Map(),
+    gradeCollectionByMatch: new Map()
   };
 }
 
@@ -81,6 +105,7 @@ export function clearChainSyncTables(tables: ChainSyncTables, matchId?: string) 
     tables.scoreEvents.splice(0, tables.scoreEvents.length);
     tables.auditLogs.splice(0, tables.auditLogs.length);
     tables.txIndexByMatch.clear();
+    tables.gradeCollectionByMatch.clear();
     return;
   }
 
@@ -90,6 +115,7 @@ export function clearChainSyncTables(tables: ChainSyncTables, matchId?: string) 
   tables.scoreEvents.splice(0, tables.scoreEvents.length, ...remainingScoreEvents);
   tables.auditLogs.splice(0, tables.auditLogs.length, ...remainingAudits);
   tables.txIndexByMatch.delete(matchId);
+  tables.gradeCollectionByMatch.delete(matchId);
 }
 
 export function listScoreEventsForMatch(tables: ChainSyncTables, matchId: string) {
@@ -149,7 +175,12 @@ export function processFuelEvent(
   const fillRatioAt = Math.max(0, Math.min(1, event.oldQuantity / Math.max(1, event.maxCapacity)));
   const urgencyWeight = computeUrgencyWeight(fillRatioAt);
   const panicMultiplier = event.chainTs >= context.window.panicTs ? 1.5 : 1.0;
-  const score = Number((fuelDelta * urgencyWeight * panicMultiplier).toFixed(2));
+  const fuelGrade =
+    context.resolveFuelGradeInfo?.(event.fuelTypeId, event) ??
+    resolveFuelGradeInfo(event.fuelTypeId, event.fuelEfficiency);
+  const fuelGradeBonus = fuelGrade.bonus;
+  const primaryGradeMultiplier = computePrimaryGradeMultiplier(context, fuelGrade.grade);
+  const score = Number((fuelDelta * urgencyWeight * panicMultiplier * fuelGradeBonus * primaryGradeMultiplier).toFixed(2));
   const teamId = context.memberTeamMap.get(event.senderWallet) ?? "unknown-team";
 
   const scoreEvent: ScoreEvent = {
@@ -164,9 +195,13 @@ export function processFuelEvent(
     newQuantity: event.newQuantity,
     maxCapacity: event.maxCapacity,
     fuelDelta,
+    fuelTypeId: event.fuelTypeId,
+    fuelGrade,
     fillRatioAt: Number(fillRatioAt.toFixed(4)),
     urgencyWeight,
     panicMultiplier,
+    fuelGradeBonus,
+    primaryGradeMultiplier,
     score,
     chainTs: event.chainTs,
     createdAt: now()
@@ -175,8 +210,73 @@ export function processFuelEvent(
   tables.scoreEvents.push(scoreEvent);
   txIndex.add(event.txDigest);
 
+  // Track grade collection for fuel grade challenge mode
+  if (context.challengeMode === "fuel_grade_challenge") {
+    trackGradeCollection(tables, context.matchId, event.senderWallet, fuelGrade.grade);
+  }
+
   return {
     accepted: true,
     scoreEvent
   };
+}
+
+function getGradeCollectionMap(tables: ChainSyncTables, matchId: string) {
+  const existing = tables.gradeCollectionByMatch.get(matchId);
+  if (existing) {
+    return existing;
+  }
+  const next = new Map<string, Set<FuelGrade>>();
+  tables.gradeCollectionByMatch.set(matchId, next);
+  return next;
+}
+
+function trackGradeCollection(
+  tables: ChainSyncTables,
+  matchId: string,
+  memberWallet: string,
+  grade: FuelGrade
+) {
+  const matchGrades = getGradeCollectionMap(tables, matchId);
+  const playerGrades = matchGrades.get(memberWallet);
+  if (playerGrades) {
+    playerGrades.add(grade);
+  } else {
+    matchGrades.set(memberWallet, new Set([grade]));
+  }
+}
+
+export function getPlayerGradeCollection(
+  tables: ChainSyncTables,
+  matchId: string,
+  memberWallet: string
+): { collectedGrades: FuelGrade[]; hasAllGrades: boolean } {
+  const matchGrades = tables.gradeCollectionByMatch.get(matchId);
+  if (!matchGrades) {
+    return { collectedGrades: [], hasAllGrades: false };
+  }
+  const playerGrades = matchGrades.get(memberWallet);
+  if (!playerGrades) {
+    return { collectedGrades: [], hasAllGrades: false };
+  }
+  const collectedGrades = Array.from(playerGrades);
+  const hasAllGrades = playerGrades.has("standard") && playerGrades.has("premium") && playerGrades.has("refined");
+  return { collectedGrades, hasAllGrades };
+}
+
+export function getAllPlayerGradeCollections(
+  tables: ChainSyncTables,
+  matchId: string
+): Map<string, { collectedGrades: FuelGrade[]; hasAllGrades: boolean }> {
+  const result = new Map<string, { collectedGrades: FuelGrade[]; hasAllGrades: boolean }>();
+  const matchGrades = tables.gradeCollectionByMatch.get(matchId);
+  if (!matchGrades) {
+    return result;
+  }
+  for (const [wallet, grades] of matchGrades) {
+    const collectedGrades = Array.from(grades);
+    const hasAllGrades = grades.has("standard") && grades.has("premium") && grades.has("refined");
+    result.set(wallet, { collectedGrades, hasAllGrades });
+  }
+  return result;
 }

@@ -3,17 +3,26 @@
 ## 1. Document Control
 
 - Project/App: `Fuel Frog Panic`
-- Related PRD: `docs/PRD.md` v2.6
-- Related SPEC: `docs/SPEC.md` v6.3
-- Related TODO: `docs/TODO.md` v2.6.6
-- Version: v1.7
+- Related PRD: `docs/PRD.md` v2.7.0
+- Related SPEC: `docs/SPEC.md` v6.5
+- Related TODO: `docs/TODO.md` v2.7.0
+- Version: v1.9
 - Status: In Progress
 - Owner (Testing Agent): Codex
-- Last Updated: 2026-03-28
+- Last Updated: 2026-03-31
 
 ## 2. Scope
 
 - Features in scope:
+  - F-013 `T-1300`: local simulated FuelEvent injection updates live match scoreboard and stream without game client
+  - F-013 `T-1301`: one-shot script drives a reusable `/match` live verification scenario
+  - F-011 `T-1100`: planning team registry persists into backend `planning_teams / planning_team_members` and hydrates after restart
+  - F-011 `T-1101`: create -> reset local projection -> GET `/api/planning-teams` recovers correct team count through backend hydrate
+  - F-012 `T-1200`: planning team join becomes captain-approved application flow
+  - F-012 `T-1201`: planning team member leave and captain disband are available
+  - F-012 `T-1202`: planning team controller/service/store own approval and lifecycle actions
+  - F-012 `T-1203`: `/planning` UI shows pending requests, captain review, leave, and disband controls
+  - F-012 `T-1204`: planning team lifecycle path passes runtime/API/UI regression plus build/layer checks
   - F-000 `T-0005`: wallet connect modal auto-dismiss after provider login
   - F-000 `T-0006`: wallet balance decimals resolution and non-zero balance formatting
   - F-000 `T-0007`: correct LUX coin type for StateService/GetBalance and entry payment
@@ -38,6 +47,14 @@
   - F-007 `T-0729`: upgrade old node-index snapshots and backfill `solarSystem` from connected assemblies when direct node location is absent
   - F-007 `T-0730`: create-match system search supports canonical/legacy aliases when live world-api system names are coded
   - F-007 `T-0734`: mirror match/team lifecycle data into backend tables and hydrate local runtime projection from backend on restart
+  - F-008 `T-0800`: `fuelConfigRuntime` loads `FuelConfig.fuel_efficiency` and keeps stale fallback on failure
+  - F-008 `T-0801`: accepted score events persist into `fuel_events` runtime fact with v2.7 grade fields and legacy fallback
+  - F-008 `T-0802`: `chainSyncEngine` applies `fuelGradeBonus` in the score formula
+  - F-008 `T-0803`: public `FuelDepositEvent / MatchStreamEvent` contracts carry fuel-grade payload
+  - F-009 `T-0900`: public stream events hydrate into a shared runtime/feed model with grade-aware dedupe
+  - F-009 `T-0901`: `/match` live overlay feed renders fuel-grade badge plus multiplier breakdown
+  - F-009 `T-0902`: demo replay feed includes Tier 1/2/3 scripted fuel-grade callouts
+  - F-010 `T-1000`: fuel-grade regression batch covers cache fallback, scoring formula, stream payload, and demo feed copy
   - F-007 `T-0702`: v2.6 discovery and recommendation API coverage
   - F-007 `T-0703`: draft -> publish -> join/apply -> approve/reject -> pay -> stream -> settlement E2E
   - F-007 `T-0704`: CLI-first Move/devnet verification
@@ -60,6 +77,11 @@
 | TC-0007-COIN | 4.0 | 3.1 | T-0007 | P0 |
 | TC-0008-RECONNECT | 4.0 | 3.1 | T-0008 | P0 |
 | TC-0009-FALLBACK | 4.0 | 3.1 | T-0009 | P0 |
+| TC-1100-PLANNING-BACKEND | 4.2 | 3.3, 5.10 | T-1100 | P0 |
+| TC-1101-PLANNING-HYDRATE | 4.2 | 3.3, 5.10, 6.1 | T-1101 | P0 |
+| TC-1200-PLANNING-APPLY | 4.2 | 3.3, 4.5, 5.10 | T-1200 | P0 |
+| TC-1201-PLANNING-LIFECYCLE | 4.2 | 3.3, 5.10 | T-1201 | P0 |
+| TC-1300-MATCH-SIM | 4.4 | 3.4, 5.5, 5.8 | T-1300 / T-1301 | P1 |
 | TC-0107-SPONSOR | 4.1 | 3.1, 4.2 | T-0107 | P0 |
 | TC-0108-PUBLISH | 4.1 | 4.2, 6.1 | T-0108 | P0 |
 | TC-0308-TEAMPAY | 4.3 | 4.3, 6.1 | T-0308 | P0 |
@@ -77,6 +99,12 @@
 | TC-0729-NODE-BACKFILL | 4.1 | 5.3 | T-0729 | P0 |
 | TC-0730-SEARCH-ALIAS | 4.1 | 3.1, 4.1 | T-0730 | P0 |
 | TC-0734-BACKEND-PERSIST | 4.1 / 4.2 / 4.5 | 5.5, 6.2, 7.1 | T-0734 | P0 |
+| TC-0800-FUELCONFIG | 0.8 / 4.4 | 2.6, 5.7 | T-0800 | P0 |
+| TC-0801-FUEL-FACT | 4.4 | 5.8, Architecture 6 | T-0801 | P0 |
+| TC-0802-GRADE-SCORE | 4.4 | 2.6, 5.8 | T-0802 | P0 |
+| TC-0803-STREAM-PAYLOAD | 4.4 | 2.3, 4.2 | T-0803 | P0 |
+| TC-0901-LIVE-GRADE-FEED | 4.4 | 3.4 | T-0900 / T-0901 | P1 |
+| TC-0902-DEMO-GRADE-FEED | 4.4 | 3.4 | T-0902 | P1 |
 | TC-0702-API | 4.1 / 4.3 | 2.3, 4.1, 4.2 | T-0702 | P0 |
 | TC-0702-LOC | 4.3 | 3.2 | T-0702 | P1 |
 | TC-0703-E2E | 4.1 / 4.2 / 4.4 / 4.5 | 3.1, 3.3, 4.2, 4.3, 4.4 | T-0703 | P0 |
@@ -89,6 +117,19 @@
 ### Functional
 
 - Main flow validation:
+  - Local simulated FuelEvent injection can drive live `/match` scoreboard and feed without EVE client input
+  - Standalone planning teams are mirrored to backend `planning_teams / planning_team_members` instead of remaining local-only
+  - After local projection reset or process restart, `GET /api/planning-teams` hydrates the correct `items/totalTeams` from backend
+  - Standalone planning team join creates a pending application instead of immediately writing a member
+  - Captains can approve or reject pending standalone planning team applications
+  - Non-captain members can leave standalone planning teams
+  - Captains can disband standalone planning teams
+  - `fuelConfigRuntime` can read `FuelConfig` table entries, preserve stale cache on RPC failure, and degrade to Tier 1 when config is missing
+  - Accepted score events persist into `fuel_events` runtime facts with `fuelTypeId / fuelGrade / fuelGradeBonus`, and legacy rows remain readable with Tier 1 defaults
+  - `chainSyncEngine` score formula includes `fuelGradeBonus` from `FuelEvent.type_id`
+  - Persisted/public stream `score_update` payload can carry `fuelDeposit.fuelGrade`
+  - `/match` live overlay feed renders grade badge plus `urgency × panic × grade` breakdown from shared score events
+  - Demo replay feed contains visible Tier 1 / Tier 2 / Tier 3 scripted grade callouts
   - Wallet connect modal closes as soon as provider/auth state reaches connected
   - Wallet balance formatting preserves correct value for both integer-decimal and fractional coin scenarios
   - Wallet entry payment transaction accepts the configured LUX coin type instead of rejecting all non-SUI coins
@@ -147,6 +188,59 @@ node ./scripts/check-layer-imports.mjs
 sui client faucet --json
 bash ./scripts/devnet-verify.sh
 ```
+
+### 2026-03-31 Fuel Grade Regression Batch
+
+- Executed:
+```bash
+node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/service/chainSyncEngine.test.ts src/server/fuelConfigRuntime.test.ts src/service/matchDemoReplayService.test.ts src/server/matchRuntime.stream.test.ts
+node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/runtimeProjectionStore.fuelEvents.test.ts src/app/api/__tests__/fuel-events-route.test.ts
+pnpm typecheck
+node ./scripts/check-layer-imports.mjs
+pnpm build
+```
+- Result:
+  - Pass
+  - `FuelConfig` cache read, `fuel_events` fact persistence, stale fallback, grade-aware scoring, persisted stream hydration, demo feed grade callouts, architecture lint, typecheck, and production build all passed on 2026-03-31.
+
+### 2026-03-31 FuelConfig Chain Verification
+
+- Executed:
+```bash
+sui client envs
+sui client active-env
+sui client active-address
+sui client --client.env devnet object 0xd12a70c74c1e759445d6f209b01d43d860e97fcf2ef72ccbbd00afd828043f75 --json
+curl "$SUI_RPC_URL" ... sui_getObject(package) on testnet
+curl "$SUI_RPC_URL" ... sui_getTransactionBlock(AzBhmMFd9UTbr4m4hnSjSbBLkmVW3VESUDG15DGnCT8)
+curl "$SUI_RPC_URL" ... sui_getObject(0x0f354c803af170ac0d1ac9068625c6321996b3013dc67bdaf14d06f93fa1671f)
+curl "$SUI_RPC_URL" ... suix_getDynamicFields(0x1beb08d47745a0925bce48175b69b6d683f663371f51413072f6ff3bd9f72167)
+curl "$SUI_RPC_URL" ... sui_getObject(<dynamic-field-object>)
+curl "$SUI_RPC_URL" ... suix_queryEvents(MoveEventType(::fuel::FuelEvent))
+curl "$SUI_RPC_URL" ... sui_getObject(0x722286493f1fdf9f70a8f55352bb64a7370ec231f6d5ee393493257b04cf7a8b)
+```
+- Result:
+  - Pass with justified network fallback
+  - `devnet` query returned `Object ... not found` for configured `EVE_FRONTIER_PACKAGE_ID`, so the package required for `FuelConfig` verification is not deployed there.
+  - `testnet` read-only fallback succeeded and located:
+    - `EVE_FRONTIER_PACKAGE_ID`: `0xd12a70c74c1e759445d6f209b01d43d860e97fcf2ef72ccbbd00afd828043f75`
+    - `FuelConfig` object id: `0x0f354c803af170ac0d1ac9068625c6321996b3013dc67bdaf14d06f93fa1671f`
+    - `fuel_efficiency` table id: `0x1beb08d47745a0925bce48175b69b6d683f663371f51413072f6ff3bd9f72167`
+  - Real on-chain mapping extracted from the table:
+    - `78437 -> 90` (`Tier 3 / Refined / 1.5x`)
+    - `78515 -> 80` (`Tier 3 / Refined / 1.5x`)
+    - `78516 -> 40` (`Tier 1 / Standard / 1.0x`)
+    - `84868 -> 40` (`Tier 1 / Standard / 1.0x`)
+    - `88319 -> 15` (`Tier 1 / Standard / 1.0x`)
+    - `88335 -> 10` (`Tier 1 / Standard / 1.0x`)
+  - Real `DEPOSITED` sample used for score verification:
+    - tx digest: `9EofS8iLTFF2rZ8ZueiX5C7Ty1c5eKzA1FzdzdjJTeJo`
+    - node id: `0x722286493f1fdf9f70a8f55352bb64a7370ec231f6d5ee393493257b04cf7a8b`
+    - `old_quantity=0`, `new_quantity=100`, `fuel_added=100`, `type_id=88335`
+    - node `max_capacity=100000`, so `fillRatioAt=0/100000=0`, `urgencyWeight=3.0`
+    - `type_id=88335 -> efficiency 10 -> Tier 1 -> fuelGradeBonus=1.0`
+    - Normal-mode sample score: `100 × 3.0 × 1.0 × 1.0 = 300`
+  - `.env` and `.env.example` were updated with `EVE_FRONTIER_FUEL_CONFIG_ID=0x0f354c803af170ac0d1ac9068625c6321996b3013dc67bdaf14d06f93fa1671f`
 
 ## 5. Test Cases
 
@@ -770,6 +864,106 @@ bash ./scripts/devnet-verify.sh
   - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --env-file=.env ./scripts/supabase/verify-local-backend.mjs`
   - `pnpm build`
 
+### TC-1100-PLANNING-BACKEND Standalone Planning Team Backend Mirror
+
+- Preconditions:
+  - Backend adapter is configured with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+  - `planning_teams / planning_team_members` tables exist
+- Steps:
+1. Run `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamBackendStore.test.ts`
+2. Verify persisting one standalone planning team issues backend writes for `planning_teams` and `planning_team_members`
+3. Verify backend rows can hydrate local `runtimeProjectionStore.planningTeams`
+- Expected Result:
+  - Standalone planning teams no longer remain local-only
+  - Cold-start hydration can reconstruct independent team registry state from backend tables
+- Actual Result:
+  - Pass
+- Status: Pass
+- Evidence (logs/screenshots/tx id):
+  - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamBackendStore.test.ts`
+
+### TC-1101-PLANNING-HYDRATE Planning Page Team Count Recovery After Reset
+
+- Preconditions:
+  - Planning team backend mirror is enabled
+  - Local projection file path is isolated for the test process
+- Steps:
+1. Run `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/app/api/__tests__/planning-teams-route.test.ts`
+2. Create a standalone planning team through `POST /api/planning-teams`
+3. Reset local projection to empty
+4. Call `GET /api/planning-teams`
+- Expected Result:
+  - API rehydrates standalone team data from backend
+  - `totalTeams` remains correct after reset/restart
+  - Returned `items[0].name` matches the created team
+- Actual Result:
+  - Pass
+- Status: Pass
+- Evidence (logs/screenshots/tx id):
+  - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/app/api/__tests__/planning-teams-route.test.ts`
+
+### TC-1200-PLANNING-APPLY Standalone Planning Team Apply + Captain Review
+
+- Preconditions:
+  - Planning team registry backend mirror is available
+  - Captain and applicant wallets can sign planning-team commands
+- Steps:
+1. Run `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamRuntime.test.ts src/app/api/__tests__/planning-teams-route.test.ts`
+2. Create a planning team
+3. Submit `POST /api/planning-teams/{teamId}/join` as a non-member wallet
+4. Verify response is `pending` and member count does not immediately increase
+5. Approve and reject separate requests through captain-only routes
+- Expected Result:
+  - Join creates a `pending` application instead of directly adding a member
+  - Captain approval adds the member
+  - Captain rejection keeps the applicant out of the roster
+- Actual Result:
+  - Pass
+- Status: Pass
+- Evidence (logs/screenshots/tx id):
+  - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamRuntime.test.ts src/app/api/__tests__/planning-teams-route.test.ts`
+
+### TC-1201-PLANNING-LIFECYCLE Standalone Member Leave + Captain Disband
+
+- Preconditions:
+  - Planning team registry backend mirror is available
+  - Team has at least one approved non-captain member
+- Steps:
+1. Run `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamRuntime.test.ts src/app/api/__tests__/planning-teams-route.test.ts`
+2. Create a planning team and approve one applicant
+3. Call `POST /api/planning-teams/{teamId}/leave` as the approved non-captain member
+4. Call `POST /api/planning-teams/{teamId}/disband` as captain
+- Expected Result:
+  - Member leave removes only that member from roster
+  - Captain disband removes the entire team from registry
+  - Registry count and item list stay correct after the operations
+- Actual Result:
+  - Pass
+- Status: Pass
+- Evidence (logs/screenshots/tx id):
+  - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/planningTeamRuntime.test.ts src/app/api/__tests__/planning-teams-route.test.ts`
+
+### TC-1300-MATCH-SIM Local Match Live Simulation Without Game Client
+
+- Preconditions:
+  - Running local app is reachable
+  - `ENABLE_LOCAL_MATCH_SIMULATION=true`
+  - Match has at least 2 teams and at least 1 member in each team
+- Steps:
+1. Run `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/matchSimulationRuntime.test.ts`
+2. Execute `scripts/test-match-live.mjs --match-id <matchId>` against the running app
+3. Verify score updates, fuel-grade badges, and live feed changes after each injected step
+- Expected Result:
+  - Simulated fuel events can update live match scores without the EVE client
+  - Scenario includes standard, premium, refined, and panic-weighted steps
+  - `/api/matches/{id}/simulate-fuel` updates persisted fuel events and stream payloads
+- Actual Result:
+  - Pass
+- Status: Pass
+- Evidence (logs/screenshots/tx id):
+  - `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/matchSimulationRuntime.test.ts`
+  - Real local API lifecycle run on `http://127.0.0.1:3010/api/matches/{id}/simulate-fuel`
+
 ## 6. Defect Management
 
 When a defect is found:
@@ -796,6 +990,16 @@ Detected during this pass:
   - 症状：创建/发布过的比赛只落本地 `runtime-projections.json`，不是后端规范表事实
   - 当前结论：在配置 Supabase service-role 后，当前代码可将 match/team 主数据镜像到后端表，并在冷启动时回填本地投影；本地 Supabase 实例已完成真实写表与 hydrate 验证
   - 当前状态：代码、迁移、真实本地联调与编译回归已完成；剩余仅为远程环境发布/部署验证
+- `T-1100 / T-1101` 已完成
+  - 症状：独立战队在创建后重启服务，再进入 `/planning` 时 `Current Team Count = 0`
+  - 根因：独立战队 registry 只写本地 `runtimeProjectionStore.planningTeams`，没有镜像到后端，也没有冷启动 hydrate
+  - 当前结论：独立战队应使用独立的 `planning_teams / planning_team_members` backend mirror，而不是复用比赛内 `teams` 表
+  - 当前状态：后端镜像、冷启动 hydrate、migration 与 route/runtime 回归均已完成
+- `T-1200 / T-1201 / T-1202 / T-1203 / T-1204` 已完成
+  - 症状：独立战队只能直接加入，不支持队长审批、成员退出和队长解散
+  - 根因：planning team registry 只有 create/join 两个动作，没有独立申请事实层，也没有对应 API/UI 控制
+  - 当前结论：独立战队需要独立的 `planning_team_applications` 事实层，并在 `/planning` 首屏直接提供 captain approval / member leave / captain disband
+  - 当前状态：runtime、backend mirror、API、UI 和定向回归均已完成
 
 ## 7. Exit Criteria
 

@@ -1,4 +1,5 @@
 import type { UrgencyLevel } from "../types/mission.ts";
+import type { FuelGradeInfo } from "../types/fuelGrade.ts";
 import type { SettlementBill } from "../types/settlement.ts";
 import type { Team, TeamMember } from "../types/team.ts";
 
@@ -9,6 +10,10 @@ export type TriggerMode = "dynamic" | "min_threshold";
 export type MatchCreationMode = "free" | "precision";
 
 export type ScoringMode = "weighted" | "volume";
+
+export type ChallengeMode = "normal" | "fuel_grade_challenge";
+
+export type PrimaryFuelGrade = "standard" | "premium" | "refined";
 
 export type Match = {
   id: string;
@@ -31,6 +36,8 @@ export type Match = {
   startThresholdText?: string;
   durationMinutes: number;
   scoringMode: ScoringMode;
+  challengeMode: ChallengeMode;
+  primaryFuelGrade?: PrimaryFuelGrade;
   triggerMode: TriggerMode;
   triggerNodeId?: string;
   triggerNodeName?: string;
@@ -74,11 +81,27 @@ export type MatchScoreboardSnapshot = {
   updatedAt: string;
 };
 
+export type FuelDepositEvent = {
+  txDigest: string;
+  sender: string;
+  teamId: string;
+  nodeId: string;
+  nodeName: string;
+  fuelAdded: number;
+  fuelTypeId: number;
+  fuelGrade: FuelGradeInfo;
+  urgencyWeight: number;
+  panicMultiplier: number;
+  scoreDelta: number;
+  timestamp: string;
+};
+
 export type MatchStreamEvent =
   | {
       type: "score_update";
       matchId: string;
       scoreboard: MatchScoreboardSnapshot;
+      fuelDeposit?: FuelDepositEvent;
     }
   | {
       type: "phase_change" | "panic_mode";

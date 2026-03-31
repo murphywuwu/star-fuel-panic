@@ -1,16 +1,26 @@
 # Fuel Frog Panic — Architecture Baseline
 
-Version: v6.2
-Last Updated: 2026-03-28
-Source: `docs/PRD.md` v2.6.1
+Version: v6.3
+Last Updated: 2026-03-31
+Source: `docs/PRD.md` v2.7.0
 
 ---
 
-## 1. v2.6 Baseline Changes
+## 1. v2.7 Baseline Changes
 
-本次架构基线以 PRD v2.6 为准，替换旧文档中已经过期的玩法和契约：
+本次架构基线以 PRD v2.7.0 为准，在 v2.6 基础上新增燃料品级计分加成机制：
 
-- 比赛模式以 `free`（自由模式）和 `precision`（精准模式）为唯一对外模式，不再以“主办方定制赛 / official match / host prize pool”作为主模型。
+### 1.1 v2.7 新增：燃料品级计分加成
+
+- **燃料品级体系**：基于链上 `FuelConfig.fuel_efficiency` 表，将燃料划分为三个品级（Tier 1/2/3），分别给予 1.0x / 1.25x / 1.5x 的计分加成。
+- **新增 `fuelConfigRuntime`**：负责缓存链上燃料效率配置，5 分钟刷新周期，为计分引擎提供品级查询服务。
+- **计分公式更新**：`score = fuelAdded × urgencyWeight × panicMultiplier × fuelGradeBonus`，最高系数从 4.5x 提升到 **6.75x**。
+- **`fuel_events` 表扩展**：新增 `fuel_type_id`、`fuel_grade`、`fuel_grade_bonus` 字段，支持品级审计和弹幕展示。
+- **浮窗弹幕增强**：每条加油弹幕展示燃料品级图标（⚪/🟡/🟣）和乘数明细。
+
+### 1.2 v2.6 基线（保留）
+
+- 比赛模式以 `free`（自由模式）和 `precision`（精准模式）为唯一对外模式，不再以"主办方定制赛 / official match / host prize pool"作为主模型。
 - 创建比赛时，`solarSystemId` 必填；`sponsorshipFee >= 50 LUX` 必填；`targetNodeIds` 仅在精准模式下必填，数量为 1-5。
 - 星系选择成为前置流程，系统可选性由 `isOnline && isPublic` 的节点存在性决定。
 - Lobby 是任务发现主入口；位置设置、比赛筛选、推荐节点都收敛到 Lobby，不再以独立节点地图页作为默认入口。
@@ -134,7 +144,7 @@ BFF / Runtime Layer
 | Entry / Auth | 钱包接入、身份状态条 | `useAuthController` | `authService`, `walletService` | `authStore` |
 | Match Creation | 模式切换、星系选择器、精准模式节点地图、奖池预览 | `useCreateMatchController` | `matchService`, `solarSystemService`, `networkNodeService` | `createMatchStore` |
 | Lobby Discovery | 比赛卡片、筛选器、比赛详情预览、位置选择器 | `useLobbyController`, `useLocationController` | `matchService`, `solarSystemService`, `nodeRecommendationService` | `lobbyStore`, `locationStore` |
-| Planning Team Registry | 总战队数、创建战队 modal | `usePlanningTeamController` | `planningTeamService` | `planningTeamStore` |
+| Planning Team Registry | 总战队数、创建战队 modal、申请加入、队长审批、成员退出、队长解散 | `usePlanningTeamController` | `planningTeamService` | `planningTeamStore` |
 | Match Team Lobby | 比赛内战队列表、角色槽、锁队、付费 | `useTeamLobbyController` | `teamService` | `teamLobbyStore` |
 | Match Runtime / Overlay | 倒计时、得分板、目标节点面板、弹幕、Panic 横幅，以及 hackathon demo replay 编排 | `useMatchRuntimeController`, `useFuelFrogMatchScreenController` | `matchStreamService`, `scoreService`, `matchDemoReplayService` | `matchRuntimeStore`, `matchDemoReplayStore` |
 | Settlement | 结算等待页、队伍分账、个人分账、MVP，以及 hackathon settlement demo 编排 | `useSettlementController`, `useFuelFrogSettlementScreenController` | `settlementService`, `settlementDemoService` | `settlementStore`, `settlementDemoStore` |
@@ -147,7 +157,7 @@ BFF / Runtime Layer
 | `createMatchStore` | 创建比赛草稿、选中星系、选中节点、校验错误 | Memory | 仅服务创建流程；发布成功后重置。 |
 | `lobbyStore` | 比赛列表、筛选条件、选中比赛、分页状态 | Memory | 所有比赛发现逻辑的唯一前端状态源。 |
 | `locationStore` | 玩家当前位置、位置选择器状态、距离缓存 | Local + Memory | 仅保存玩家主动设置的位置，不保存链上位置推断。 |
-| `planningTeamStore` | 独立战队列表、总数、创建中状态 | Memory | 仅服务 `/planning` 首屏；不绑定比赛上下文。 |
+| `planningTeamStore` | 独立战队列表、总数、申请列表、创建/审批/退出中状态 | Memory | 仅服务 `/planning` 首屏；不绑定比赛上下文。 |
 | `teamLobbyStore` | 战队列表、成员槽位、锁定状态、支付状态 | Memory | 和比赛详情解耦，避免跨页面脏状态。 |
 | `matchRuntimeStore` | 当前阶段、剩余时间、得分板、目标节点状态、弹幕、流健康度 | Memory | 只来自 `/status` 快照和 WS/Realtime 事件。 |
 | `matchDemoReplayStore` | demo replay 当前秒数、播放状态、脚本帧快照 | Memory | 仅用于 `/match` 路演演示模式；不写后端，不反向覆盖真实比赛状态。 |
@@ -171,7 +181,7 @@ BFF / Runtime Layer
 |---|---|---|
 | `LobbyDiscoveryScreen` | `useLobbyDiscoveryScreenController` | 管理 create-match modal、location picker、search/browse 展开态和推荐加载编排。 |
 | `CreateMatchScreen` | `useCreateMatchScreenController` | 管理 economics-first create flow、system search debounce、统一 target-system node grid 展示、precision-only target locking、publish feedback 和关闭重置流程。 |
-| `PlanningTeamScreen` | `usePlanningTeamScreenController` | 管理独立战队总数加载、创建 modal 和页面级 mutation message。 |
+| `PlanningTeamScreen` | `usePlanningTeamScreenController` | 管理独立战队总数加载、创建 modal、申请加入、队长审批、成员退出、队长解散和页面级 mutation message。 |
 | `TeamLobbyScreen` | `useTeamLobbyScreenController` | 管理创建战队 modal、审批/拒绝输入、支付提示和页面级 mutation message。 |
 | `FuelFrogMatchScreen` | `useFuelFrogMatchScreenController` | 管理 live/demo 模式切换、stream boot、replay playback、排行榜派生、目标节点视图模型和 event feed 裁剪。 |
 | `FuelFrogSettlementScreen` | `useFuelFrogSettlementScreenController` | 管理 live/demo 模式切换、settlement demo playback、MVP/收益 hero 派生、真实结算 fallback 和页面级 message。 |
@@ -191,10 +201,11 @@ BFF / Runtime Layer
 | `constellationRuntime` | 维护星座视图、推荐星系、系统可选性聚合 | `solar_systems_cache`, `network_nodes` | `constellation_summaries` | 聚合刷新，无链上写入 |
 | `nodeRuntime` | 维护 `NetworkNode` 读模型、5 秒刷新燃料比和紧急度，并在节点自身无位置时回退到 connected assembly 的公开位置 | Sui objects + events | `network_nodes` | 批量 RPC 轮询、节点投影 |
 | `nodeRecommendationRuntime` | 基于位置和拓扑计算推荐节点 | `network_nodes`, `solar_systems_cache`, `matches` | 无持久写入或可选缓存 | 推荐算法执行 |
-| `planningTeamRuntime` | 维护独立战队注册表与总数 | `planning_teams` projection | `planning_teams` projection | 独立建队校验、队长钱包归属、计数统计 |
+| `planningTeamRuntime` | 维护独立战队注册表、申请队列与总数 | `planning_teams`, `planning_team_applications` projection | `planning_teams`, `planning_team_members`, `planning_team_applications` projection | 独立建队校验、队长钱包归属、申请审批、退出/解散编排、计数统计 |
 | `matchRuntime` | 创建草稿、发布比赛、比赛列表、状态机、开赛条件校验 | `matches`, `teams`, `team_payments`, `network_nodes` | `matches`, `match_target_nodes`, `match_stream_events` | 比赛状态迁移、发布幂等；进入 `settling/settled` 时负责触发 settlement fact materialization 与对应流事件；核心 live frame 事件按变更快照写入 `match_stream_events` |
 | `teamRuntime` | 创建战队、入队申请、队长审批、锁队、报名支付确认、白名单快照写入 | `matches`, `teams`, `team_members`, `team_join_applications` | `teams`, `team_members`, `team_join_applications`, `team_payments`, `match_whitelists` | 申请审批编排、钱包支付校验、白名单编排；队伍报名费必须进入 publish 阶段创建的 `MatchEscrow`，并以 `TeamEntryLocked` commitment 驱动 `team_payments / match_whitelists` 规范事实 |
-| `chainSyncEngine` | 监听 `FuelEvent(DEPOSITED)`、交易溯源、三重过滤、记分广播 | Sui event stream, tx blocks, `match_whitelists`, `matches` | `fuel_events`, `match_scores`, `match_stream_events` | 链上订阅、事件去重 |
+| `fuelConfigRuntime` | 缓存链上 `FuelConfig.fuel_efficiency` 表，提供燃料品级查询服务 | Sui RPC (`FuelConfig` object) | `fuel_config_cache` (内存) | 5 分钟刷新周期，降级时全部返回 Tier 1 |
+| `chainSyncEngine` | 监听 `FuelEvent(DEPOSITED)`、交易溯源、三重过滤、**燃料品级加成计算**、记分广播 | Sui event stream, tx blocks, `match_whitelists`, `matches`, `fuelConfigRuntime` | `fuel_events`, `match_scores`, `match_stream_events` | 链上订阅、事件去重、品级加成 |
 | `settlementRuntime` | 冻结分数、计算平台费与分账、执行链上发奖、生成账单 | `match_scores`, `team_payments`, `matches`, `teams` | `settlements`, `matches`, `match_stream_events` | 结算单飞锁、链上转账；`settlements` 是 running/succeeded 结算事实的规范持久层 |
 
 ### 5.2 Route Handler Ownership
@@ -305,7 +316,7 @@ BFF / Runtime Layer
 | `team_join_applications` | `teamRuntime` | `id`, `team_id`, `applicant_address`, `role`, `status(pending/approved/rejected)`, `reason`, `reviewed_at`, `reviewed_by` |
 | `team_payments` | `teamRuntime` | `team_id`, `tx_digest`, `amount`, `confirmed_at` |
 | `match_whitelists` | `teamRuntime` | `match_id`, `wallet_address`, `team_id`, `source_payment_tx` |
-| `fuel_events` | `chainSyncEngine` | `tx_digest`, `event_seq`, `match_id`, `sender`, `assembly_id`, `fuel_added`, `score_delta` |
+| `fuel_events` | `chainSyncEngine` | `tx_digest`, `event_seq`, `match_id`, `sender`, `assembly_id`, `fuel_added`, `fuel_type_id`, `fuel_grade`, `fuel_grade_bonus`, `score_delta` |
 | `match_scores` | `chainSyncEngine` | `match_id`, `team_id`, `wallet_address`, `total_score`, `last_event_at` |
 | `settlements` | `settlementRuntime` | `match_id`, `status`, `bill`, `payout_tx_digest`, `updated_at` |
 | `match_stream_events` | `matchRuntime` family | `match_id`, `event_type`, `payload`, `created_at` |
@@ -353,14 +364,19 @@ BFF / Runtime Layer
 ### 7.4 Live Scoring
 
 1. `chainSyncEngine` 订阅 `FuelEvent(DEPOSITED)`.
-2. 对每个事件执行交易溯源，获取 `sender` 与 `timestamp`.
+2. 对每个事件执行交易溯源，获取 `sender`、`timestamp` 与 `fuel_type_id`.
 3. 执行三重过滤：
    - `sender` 在本局白名单
    - 自由模式下节点属于目标星系；精准模式下节点在目标节点集
    - 时间戳位于 `[startedAt, endedAt]`
-4. 计算 `fuelAdded * urgencyWeight * panicMultiplier`.
-5. 更新 `match_scores`，并通过 `match_stream_events` 广播 `score_update`.
-6. 前端只消费流，不自行计算最终得分。
+4. **查询燃料品级**：通过 `fuelConfigRuntime` 获取 `fuel_type_id` 对应的 `efficiency`，映射为品级加成：
+   - Tier 1 (efficiency 10-40%): `fuelGradeBonus = 1.0`
+   - Tier 2 (efficiency 41-70%): `fuelGradeBonus = 1.25`
+   - Tier 3 (efficiency 71-100%): `fuelGradeBonus = 1.5`
+   - 未知燃料类型：降级为 `fuelGradeBonus = 1.0`，记录告警日志
+5. 计算 `fuelAdded * urgencyWeight * panicMultiplier * fuelGradeBonus`.
+6. 更新 `match_scores`，并通过 `match_stream_events` 广播 `score_update`（含品级信息）.
+7. 前端只消费流，不自行计算最终得分。
 
 ### 7.5 Settlement
 

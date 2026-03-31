@@ -61,6 +61,7 @@ function mapMissionToMatch(mission: Mission, nodeId: string): Match {
     maxTeams: mission.maxTeams,
     durationMinutes: 10,
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: mission.startRuleMode === "full_paid" ? "dynamic" : "min_threshold",
     startedAt: null,
     endedAt: null,

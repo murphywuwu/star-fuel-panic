@@ -33,7 +33,11 @@ export function usePlanningTeamController() {
     () => ({
       load: planningTeamService.load.bind(planningTeamService),
       createTeam: planningTeamService.createTeam.bind(planningTeamService),
-      joinTeam: planningTeamService.joinTeam.bind(planningTeamService)
+      joinTeam: planningTeamService.joinTeam.bind(planningTeamService),
+      approveApplication: planningTeamService.approveApplication.bind(planningTeamService),
+      rejectApplication: planningTeamService.rejectApplication.bind(planningTeamService),
+      leaveTeam: planningTeamService.leaveTeam.bind(planningTeamService),
+      disbandTeam: planningTeamService.disbandTeam.bind(planningTeamService)
     }),
     []
   );

@@ -1,3 +1,5 @@
+import type { FuelGradeInfo } from "@/types/fuelGrade";
+
 export type MatchStatus = "lobby" | "pre_start" | "running" | "panic" | "settling" | "settled";
 
 export type MissionPhase =
@@ -262,6 +264,8 @@ export interface ChainFuelEvent {
   playerName: string;
   txDigest: string;
   assemblyId: string;
+  fuelTypeId: number;
+  fuelEfficiency?: number | null;
   oldQuantity: number;
   newQuantity: number;
   maxCapacity: number;
@@ -280,9 +284,13 @@ export interface ScoreEvent {
   newQuantity: number;
   maxCapacity: number;
   fuelDelta: number;
+  fuelTypeId: number;
+  fuelGrade: FuelGradeInfo;
   fillRatioAt: number;
   urgencyWeight: number;
   panicMultiplier: number;
+  fuelGradeBonus: number;
+  primaryGradeMultiplier: number;
   score: number;
   chainTs: number;
   createdAt: number;
@@ -318,4 +326,16 @@ export interface ScoreBoard {
   matchId: string;
   teams: TeamScoreLine[];
   lastUpdated: number;
+}
+
+export interface PlayerGradeCollection {
+  matchId: string;
+  memberWallet: string;
+  collectedGrades: ("standard" | "premium" | "refined")[];
+  hasAllGrades: boolean;
+}
+
+export interface FuelGradeChallengeBonus {
+  primaryGradeMultiplier: number;
+  allGradesBonus: number;
 }

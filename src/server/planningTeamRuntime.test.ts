@@ -4,7 +4,15 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { createPlanningTeam, getPlanningTeamsSnapshot, joinPlanningTeam } from "./planningTeamRuntime.ts";
+import {
+  approvePlanningTeamApplication,
+  createPlanningTeam,
+  disbandPlanningTeam,
+  getPlanningTeamsSnapshot,
+  joinPlanningTeam,
+  leavePlanningTeam,
+  rejectPlanningTeamApplication
+} from "./planningTeamRuntime.ts";
 import { createEmptyProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
 
 const originalProjectionStorePath = process.env.RUNTIME_PROJECTION_STORE_PATH;
@@ -54,6 +62,7 @@ test("createPlanningTeam persists a standalone team and updates total count", ()
   assert.equal(created.body.team.captainAddress, "0xcaptain001");
   assert.equal(created.body.totalTeams, 1);
   assert.equal(created.body.team.members.length, 1);
+  assert.equal(created.body.team.applications.length, 0);
   assert.equal(created.body.team.members[0]?.walletAddress, "0xcaptain001");
 
   const snapshot = getPlanningTeamsSnapshot();
@@ -79,7 +88,7 @@ test("createPlanningTeam rejects invalid role slot totals", () => {
   assert.equal(created.body.error.code, "INVALID_INPUT");
 });
 
-test("joinPlanningTeam appends a member when role slot is open", () => {
+test("joinPlanningTeam creates a pending application instead of directly appending a member", () => {
   const created = createPlanningTeam({
     teamName: "Open Slots",
     maxMembers: 3,
@@ -100,11 +109,12 @@ test("joinPlanningTeam appends a member when role slot is open", () => {
     walletAddress: "0xJoin001"
   });
 
-  assert.equal(joined.status, 200);
+  assert.equal(joined.status, 202);
   assert.ok(!("ok" in joined.body));
-  assert.equal(joined.body.team.memberCount, 2);
-  assert.equal(joined.body.team.members[1]?.walletAddress, "0xjoin001");
-  assert.equal(joined.body.team.members[1]?.role, "hauler");
+  assert.equal(joined.body.team.memberCount, 1);
+  assert.equal(joined.body.application.status, "pending");
+  assert.equal(joined.body.team.applications[0]?.applicantWalletAddress, "0xjoin001");
+  assert.equal(joined.body.team.applications[0]?.role, "hauler");
 });
 
 test("joinPlanningTeam rejects wallets that already belong to another planning team", () => {
@@ -136,4 +146,106 @@ test("joinPlanningTeam rejects wallets that already belong to another planning t
   assert.equal(duplicateCreate.status, 409);
   assert.ok("ok" in duplicateCreate.body && duplicateCreate.body.ok === false);
   assert.equal(duplicateCreate.body.error.code, "CONFLICT");
+});
+
+test("captain can approve and reject planning team applications", () => {
+  const created = createPlanningTeam({
+    teamName: "Approval Squad",
+    maxMembers: 3,
+    roleSlots: {
+      collector: 1,
+      hauler: 1,
+      escort: 1
+    },
+    walletAddress: "0xCaptain005"
+  });
+  assert.equal(created.status, 201);
+  assert.ok(!("ok" in created.body));
+
+  const joined = joinPlanningTeam({
+    teamId: created.body.team.id,
+    role: "hauler",
+    walletAddress: "0xJoinApprove"
+  });
+  assert.equal(joined.status, 202);
+  assert.ok(!("ok" in joined.body));
+
+  const approved = approvePlanningTeamApplication({
+    teamId: created.body.team.id,
+    applicationId: joined.body.application.id,
+    walletAddress: "0xCaptain005"
+  });
+
+  assert.equal(approved.status, 200);
+  assert.ok(!("ok" in approved.body));
+  assert.equal(approved.body.team.memberCount, 2);
+  assert.equal(approved.body.team.members[1]?.walletAddress, "0xjoinapprove");
+  assert.equal(approved.body.team.applications[0]?.status, "approved");
+
+  const joinedReject = joinPlanningTeam({
+    teamId: created.body.team.id,
+    role: "escort",
+    walletAddress: "0xJoinReject"
+  });
+  assert.equal(joinedReject.status, 202);
+  assert.ok(!("ok" in joinedReject.body));
+  const joinedRejectBody = joinedReject.body;
+
+  const rejected = rejectPlanningTeamApplication({
+    teamId: created.body.team.id,
+    applicationId: joinedRejectBody.application.id,
+    walletAddress: "0xCaptain005",
+    reason: "Role not needed"
+  });
+
+  assert.equal(rejected.status, 200);
+  assert.ok(!("ok" in rejected.body));
+  assert.equal(rejected.body.team.applications.find((item) => item.id === joinedRejectBody.application.id)?.status, "rejected");
+});
+
+test("member can leave and captain can disband planning team", () => {
+  const created = createPlanningTeam({
+    teamName: "Lifecycle Squad",
+    maxMembers: 3,
+    roleSlots: {
+      collector: 1,
+      hauler: 1,
+      escort: 1
+    },
+    walletAddress: "0xCaptain006"
+  });
+  assert.equal(created.status, 201);
+  assert.ok(!("ok" in created.body));
+
+  const joined = joinPlanningTeam({
+    teamId: created.body.team.id,
+    role: "hauler",
+    walletAddress: "0xJoinLeave"
+  });
+  assert.equal(joined.status, 202);
+  assert.ok(!("ok" in joined.body));
+
+  const approved = approvePlanningTeamApplication({
+    teamId: created.body.team.id,
+    applicationId: joined.body.application.id,
+    walletAddress: "0xCaptain006"
+  });
+  assert.equal(approved.status, 200);
+  assert.ok(!("ok" in approved.body));
+
+  const left = leavePlanningTeam({
+    teamId: created.body.team.id,
+    walletAddress: "0xJoinLeave"
+  });
+  assert.equal(left.status, 200);
+  assert.ok(!("ok" in left.body));
+  assert.equal(left.body.team?.memberCount, 1);
+
+  const disbanded = disbandPlanningTeam({
+    teamId: created.body.team.id,
+    walletAddress: "0xCaptain006"
+  });
+  assert.equal(disbanded.status, 200);
+  assert.ok(!("ok" in disbanded.body));
+  assert.equal(disbanded.body.totalTeams, 0);
 });

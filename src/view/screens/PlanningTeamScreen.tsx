@@ -92,6 +92,8 @@ function joinLabel(input: {
   canJoin: boolean;
   isConnected: boolean;
   currentPlayerTeamId: string | null;
+  currentPendingApplicationTeamId: string | null;
+  teamId: string;
   selectedRole: "collector" | "hauler" | "escort";
 }) {
   if (!input.hasJoinCapacity) {
@@ -103,10 +105,16 @@ function joinLabel(input: {
   if (input.currentPlayerTeamId) {
     return "Already In A Team";
   }
+  if (input.currentPendingApplicationTeamId === input.teamId) {
+    return "Application Pending";
+  }
+  if (input.currentPendingApplicationTeamId) {
+    return "Pending In Another Team";
+  }
   if (!input.canJoin) {
     return "Join Locked";
   }
-  return `Join Team As ${input.selectedRole.charAt(0).toUpperCase()}${input.selectedRole.slice(1)}`;
+  return `Request Join As ${input.selectedRole.charAt(0).toUpperCase()}${input.selectedRole.slice(1)}`;
 }
 
 export function PlanningTeamScreen() {
@@ -149,7 +157,12 @@ export function PlanningTeamScreen() {
 
             {ui.currentPlayerTeamId ? (
               <p className="border border-eve-yellow/25 bg-eve-yellow/10 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/82">
-                YOU ALREADY BELONG TO A REGISTERED TEAM // JOIN ACTIONS ARE LOCKED UNTIL A FUTURE LEAVE FLOW IS ADDED
+                YOU ALREADY BELONG TO A REGISTERED TEAM // USE THE TEAM CARD TO LEAVE OR MANAGE IT
+              </p>
+            ) : null}
+            {ui.currentPendingApplicationTeamId ? (
+              <p className="border border-eve-yellow/25 bg-eve-yellow/10 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/82">
+                YOU HAVE A PENDING JOIN REQUEST // WAIT FOR CAPTAIN REVIEW BEFORE APPLYING ELSEWHERE
               </p>
             ) : null}
 
@@ -165,7 +178,9 @@ export function PlanningTeamScreen() {
             {!ui.canOpenCreateModal ? (
               <p className="border border-eve-red/20 bg-black/20 px-3 py-3 text-xs uppercase tracking-[0.12em] text-eve-offwhite/72">
                 {authState.isConnected
-                  ? "YOU ARE ALREADY IN A REGISTERED TEAM // CREATE IS LOCKED"
+                  ? ui.currentPendingApplicationTeamId
+                    ? "YOU ALREADY HAVE A PENDING APPLICATION // CREATE IS LOCKED"
+                    : "YOU ARE ALREADY IN A REGISTERED TEAM // CREATE IS LOCKED"
                   : "CONNECT A WALLET BEFORE REGISTERING A TEAM."}
               </p>
             ) : null}
@@ -184,17 +199,25 @@ export function PlanningTeamScreen() {
               const openRoles = helpers.getOpenRoles(team.id);
               const isMember = helpers.isMember(team.id);
               const isCaptain = helpers.isCaptain(team.id);
+              const pendingApplication = helpers.getPendingApplication(team.id);
+              const pendingApplicationsForCaptain = helpers.getPendingApplicationsForCaptain(team.id);
               const fillPercent = teamFillPercent(team.memberCount, team.maxMembers);
               const selectedRole = ui.joinRoleByTeam[team.id] ?? openRoles[0] ?? "hauler";
               const code = unitCode(team.name, team.id);
               const stateLabel = squadState(team.memberCount, team.maxMembers);
               const hasJoinCapacity = openRoles.length > 0 && team.memberCount < team.maxMembers;
-              const canJoin = authState.isConnected && !ui.currentPlayerTeamId && hasJoinCapacity;
+              const canJoin =
+                authState.isConnected &&
+                !ui.currentPlayerTeamId &&
+                !ui.currentPendingApplicationTeamId &&
+                hasJoinCapacity;
               const joinButtonLabel = joinLabel({
                 hasJoinCapacity,
                 canJoin,
                 isConnected: authState.isConnected,
                 currentPlayerTeamId: ui.currentPlayerTeamId,
+                currentPendingApplicationTeamId: ui.currentPendingApplicationTeamId,
+                teamId: team.id,
                 selectedRole
               });
 
@@ -350,7 +373,11 @@ export function PlanningTeamScreen() {
                       <div className="border border-eve-red/15 bg-[linear-gradient(180deg,rgba(204,51,0,0.1)_0%,rgba(8,8,8,0.94)_100%)] px-3 py-3 shadow-[0_0_0_1px_rgba(204,51,0,0.08)]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Join Console</p>
-                          {hasJoinCapacity ? (
+                          {pendingApplication ? (
+                            <span className="border border-eve-yellow/35 bg-eve-yellow/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-eve-yellow">
+                              Pending
+                            </span>
+                          ) : hasJoinCapacity ? (
                             <span className="border border-eve-yellow/35 bg-eve-yellow/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-eve-yellow">
                               Join Open
                             </span>
@@ -358,12 +385,16 @@ export function PlanningTeamScreen() {
                         </div>
                         <div className="mt-3 space-y-3">
                           <div className="border border-eve-yellow/15 bg-black/30 px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-eve-offwhite/72">
-                            {hasJoinCapacity
+                            {pendingApplication
+                              ? "JOIN REQUEST ALREADY PENDING // WAIT FOR CAPTAIN REVIEW."
+                              : hasJoinCapacity
                               ? canJoin
-                                ? "SELECT YOUR ROLE, THEN LOCK IN TO THIS SQUAD."
+                                ? "SELECT YOUR ROLE, THEN SEND A JOIN REQUEST TO THE CAPTAIN."
                                 : !authState.isConnected
                                   ? "CONNECT WALLET, THEN JOIN THIS SQUAD."
-                                  : "YOU ALREADY BELONG TO ANOTHER TEAM."
+                                  : ui.currentPendingApplicationTeamId
+                                    ? "YOU ALREADY HAVE A PENDING REQUEST."
+                                    : "YOU ALREADY BELONG TO ANOTHER TEAM."
                               : "THIS TEAM HAS NO OPEN ROLE SLOTS."}
                           </div>
                           {hasJoinCapacity ? (
@@ -403,11 +434,69 @@ export function PlanningTeamScreen() {
                           <TacticalButton
                             fullWidth
                             onClick={() => void actions.handleJoinTeam(team.id)}
-                            disabled={state.isMutating || !canJoin}
+                            disabled={state.isMutating || !canJoin || Boolean(pendingApplication)}
                             className="py-3 text-sm tracking-[0.2em] shadow-[0_0_18px_rgba(229,179,43,0.18)] border-b-4 border-r-4 border-black"
                           >
                             {joinButtonLabel}
                           </TacticalButton>
+
+                          {isCaptain && pendingApplicationsForCaptain.length > 0 ? (
+                            <div className="space-y-2 border border-eve-yellow/15 bg-black/25 px-3 py-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-yellow">Pending Applications</p>
+                              {pendingApplicationsForCaptain.map((application) => (
+                                <div
+                                  key={application.id}
+                                  className="border border-eve-yellow/15 bg-black/40 px-3 py-3"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/75">
+                                      {shortAddress(application.applicantWalletAddress)} // {helpers.roleLabel(application.role)}
+                                    </p>
+                                    <span className="border border-eve-yellow/35 bg-eve-yellow/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-eve-yellow">
+                                      Pending
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <TacticalButton
+                                      onClick={() => void actions.handleApproveApplication(team.id, application.id)}
+                                      disabled={state.isMutating}
+                                    >
+                                      Approve
+                                    </TacticalButton>
+                                    <TacticalButton
+                                      tone="ghost"
+                                      onClick={() => void actions.handleRejectApplication(team.id, application.id)}
+                                      disabled={state.isMutating}
+                                    >
+                                      Reject
+                                    </TacticalButton>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {isMember && !isCaptain ? (
+                            <TacticalButton
+                              tone="ghost"
+                              fullWidth
+                              onClick={() => void actions.handleLeaveTeam(team.id)}
+                              disabled={state.isMutating}
+                            >
+                              Leave Team
+                            </TacticalButton>
+                          ) : null}
+
+                          {isCaptain ? (
+                            <TacticalButton
+                              tone="ghost"
+                              fullWidth
+                              onClick={() => void actions.handleDisbandTeam(team.id)}
+                              disabled={state.isMutating}
+                            >
+                              Disband Team
+                            </TacticalButton>
+                          ) : null}
                         </div>
                       </div>
 

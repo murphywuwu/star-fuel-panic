@@ -32,3 +32,15 @@ test("matchDemoReplayService replay resets playback to the scripted opening fram
   assert.equal(state.frame.teams[0]?.teamName, "IRON FROGS");
   assert.equal(state.frame.teams[0]?.score, 1180);
 });
+
+test("matchDemoReplayService exposes fuel grade callouts in scripted score bursts", () => {
+  matchDemoReplayService.jumpToPanic();
+  matchDemoReplayService.pause();
+
+  const state = matchDemoReplayService.getSnapshot();
+  const scoreBursts = state.frame.feed.filter((entry) => entry.kind === "score");
+
+  assert.ok(scoreBursts.some((entry) => entry.message.includes("⚪ STANDARD x1.0")));
+  assert.ok(scoreBursts.some((entry) => entry.message.includes("🟡 PREMIUM x1.25")));
+  assert.ok(scoreBursts.some((entry) => entry.message.includes("🟣 REFINED x1.5")));
+});

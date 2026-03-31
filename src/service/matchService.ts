@@ -340,9 +340,11 @@ class MatchServiceImpl {
     state.addAuditLog({
       id: this.mkId("audit"),
       action: "score_event",
-      detail: `tx=${scoreEvent.txDigest};wallet=${scoreEvent.memberWallet};score=${scoreEvent.score.toFixed(2)}`,
+      detail: `tx=${scoreEvent.txDigest};wallet=${scoreEvent.memberWallet};score=${scoreEvent.score.toFixed(2)};fuelType=${scoreEvent.fuelTypeId};grade=${scoreEvent.fuelGrade.grade}`,
       timestamp: Date.now()
     });
+
+    void this.persistAcceptedFuelEvent(scoreEvent);
   }
 
   private toAuditLog(rejectAudit: ScoreRejectAuditLog): AuditLog {
@@ -408,6 +410,22 @@ class MatchServiceImpl {
 
   private mkId(prefix: string): string {
     return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 10_000)}`;
+  }
+
+  private async persistAcceptedFuelEvent(scoreEvent: ScoreEvent) {
+    try {
+      await fetch(`/api/matches/${encodeURIComponent(scoreEvent.matchId)}/fuel-events`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          scoreEvent
+        })
+      });
+    } catch {
+      // Keep live scoring independent from projection persistence.
+    }
   }
 }
 

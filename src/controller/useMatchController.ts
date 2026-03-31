@@ -3,8 +3,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { matchService } from "@/service/matchService";
 import { matchStreamService, type MatchStreamHealth } from "@/service/matchStreamService";
-import type { MatchScoreboardSnapshot, MatchStreamEvent } from "@/types/match";
-import type { MemberScoreLine, ScoreBoard } from "@/types/fuelMission";
+import type { FuelDepositEvent, MatchScoreboardSnapshot, MatchStreamEvent } from "@/types/match";
+import type { MemberScoreLine, ScoreBoard, ScoreEvent } from "@/types/fuelMission";
+
+function buildStreamScoreEvent(matchId: string, fuelDeposit: FuelDepositEvent): ScoreEvent {
+  return {
+    id: `${fuelDeposit.txDigest}:${fuelDeposit.timestamp}`,
+    matchId,
+    teamId: fuelDeposit.teamId,
+    memberWallet: fuelDeposit.sender,
+    memberName: fuelDeposit.sender,
+    txDigest: fuelDeposit.txDigest,
+    assemblyId: fuelDeposit.nodeId,
+    oldQuantity: 0,
+    newQuantity: fuelDeposit.fuelAdded,
+    maxCapacity: 1,
+    fuelDelta: fuelDeposit.fuelAdded,
+    fuelTypeId: fuelDeposit.fuelTypeId,
+    fuelGrade: fuelDeposit.fuelGrade,
+    fillRatioAt: 0,
+    urgencyWeight: fuelDeposit.urgencyWeight,
+    panicMultiplier: fuelDeposit.panicMultiplier,
+    fuelGradeBonus: fuelDeposit.fuelGrade.bonus,
+    primaryGradeMultiplier: 1.0,
+    score: fuelDeposit.scoreDelta,
+    chainTs: Date.parse(fuelDeposit.timestamp) || Date.now(),
+    createdAt: Date.parse(fuelDeposit.timestamp) || Date.now()
+  };
+}
 
 function mergeMatchScoreboard(
   scoreboard: MatchScoreboardSnapshot,
@@ -41,6 +67,7 @@ export function useMatchController() {
   const legacyUnsubscribeRef = useRef<(() => void) | null>(null);
   const publicStreamUnsubscribeRef = useRef<(() => void) | null>(null);
   const activeMatchIdRef = useRef<string | null>(null);
+  const seenFuelDepositsRef = useRef<Set<string>>(new Set());
   const [streamHealth, setStreamHealth] = useState<MatchStreamHealth>("disconnected");
   const [matchScoreboard, setMatchScoreboard] = useState<MatchScoreboardSnapshot | null>(null);
 
@@ -52,8 +79,17 @@ export function useMatchController() {
 
   const handleStreamEvent = useCallback(
     (event: MatchStreamEvent) => {
+      matchService.getMatchRuntimeSnapshot().applyStreamEvent(event);
+
       if (event.type === "score_update") {
         applyScoreboard(event.scoreboard);
+        if (event.fuelDeposit) {
+          const key = `${event.fuelDeposit.txDigest}:${event.fuelDeposit.timestamp}`;
+          if (!seenFuelDepositsRef.current.has(key)) {
+            seenFuelDepositsRef.current.add(key);
+            matchService.getScoreSnapshot().appendEvent(buildStreamScoreEvent(event.matchId, event.fuelDeposit));
+          }
+        }
         return;
       }
 
@@ -88,6 +124,7 @@ export function useMatchController() {
       legacyUnsubscribeRef.current?.();
       legacyUnsubscribeRef.current = null;
       activeMatchIdRef.current = matchId;
+      seenFuelDepositsRef.current.clear();
       setMatchScoreboard(null);
       setStreamHealth("connecting");
 
@@ -139,6 +176,7 @@ export function useMatchController() {
     legacyUnsubscribeRef.current?.();
     legacyUnsubscribeRef.current = null;
     activeMatchIdRef.current = null;
+    seenFuelDepositsRef.current.clear();
     setMatchScoreboard(null);
     setStreamHealth("disconnected");
   }, []);

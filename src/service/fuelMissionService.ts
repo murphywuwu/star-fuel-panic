@@ -51,6 +51,16 @@ const URGENCY_TREND_WINDOW_SEC = 30;
 const URGENCY_HISTORY_CAP = 10;
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
 const NODE_MAX_CAPACITY = 1_000;
+const SIMULATED_FUEL_PROFILES = [
+  { fuelTypeId: 11, fuelEfficiency: 25 },
+  { fuelTypeId: 22, fuelEfficiency: 55 },
+  { fuelTypeId: 33, fuelEfficiency: 85 }
+] as const;
+
+function selectSimulatedFuelProfile(seed: string) {
+  const hash = [...seed].reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0);
+  return SIMULATED_FUEL_PROFILES[hash % SIMULATED_FUEL_PROFILES.length] ?? SIMULATED_FUEL_PROFILES[0];
+}
 
 const FILTER_REJECTION_SEVERITY: Record<FilterRejectionReason, AlertSeverity> = {
   INVALID_PHASE: "warning",
@@ -1084,6 +1094,7 @@ export const fuelMissionService = {
     );
     const txDigest = `tx_${event.eventId}`;
     const chainTs = event.chainTimestampMs ?? now();
+    const fuelProfile = selectSimulatedFuelProfile(event.eventId);
     const window = state.matchWindowStartMs != null && state.matchWindowEndMs != null
       ? { startTs: state.matchWindowStartMs, endTs: state.matchWindowEndMs }
       : null;
@@ -1108,6 +1119,8 @@ export const fuelMissionService = {
       playerName: event.playerName,
       txDigest,
       assemblyId: event.nodeId,
+      fuelTypeId: fuelProfile.fuelTypeId,
+      fuelEfficiency: fuelProfile.fuelEfficiency,
       oldQuantity,
       newQuantity: nextQuantity,
       maxCapacity: NODE_MAX_CAPACITY,

@@ -1,4 +1,5 @@
 import { createStore } from "zustand/vanilla";
+import type { MatchStreamEvent as PublicMatchStreamEvent, MatchStatus as PublicMatchStatus } from "@/types/match";
 import type {
   AuditLog,
   FundingSources,
@@ -90,6 +91,7 @@ interface FuelMissionActions {
   addWsLatencySample: (ms: number) => void;
   markSettlementAttempt: (success: boolean) => void;
   setObservability: (metrics: ObservabilityMetrics) => void;
+  applyStreamEvent: (event: PublicMatchStreamEvent) => void;
 }
 
 export type FuelMissionStore = FuelMissionState & FuelMissionActions;
@@ -295,6 +297,14 @@ function normalizeStatus(status: MissionPhase) {
   };
 }
 
+function mapPublicMatchStatus(status: PublicMatchStatus): MatchStatus {
+  if (status === "prestart") {
+    return "pre_start";
+  }
+
+  return status as MatchStatus;
+}
+
 export const fuelMissionStore = createStore<FuelMissionStore>()((set) => ({
   ...initialState,
   resetAll: () => set({ ...initialState }),
@@ -421,5 +431,50 @@ export const fuelMissionStore = createStore<FuelMissionStore>()((set) => ({
         }
       };
     }),
-  setObservability: (observability) => set({ observability })
+  setObservability: (observability) => set({ observability }),
+  applyStreamEvent: (event) =>
+    set((state) => {
+      if (event.type === "phase_change" || event.type === "panic_mode") {
+        const mappedStatus = mapPublicMatchStatus(event.status.status);
+        return {
+          ...normalizeStatus(mappedStatus),
+          remainingSec: Math.max(0, event.status.remainingSeconds),
+          countdownSec: Math.max(0, event.status.remainingSeconds),
+          isPanic: event.status.panicMode
+        };
+      }
+
+      if (event.type === "node_status") {
+        return {
+          nodes: state.nodes.map((node) => {
+            const targetNode = event.targetNodes.find((candidate) => candidate.objectId === node.nodeId);
+            if (!targetNode) {
+              return node;
+            }
+
+            return {
+              ...node,
+              fillRatio: targetNode.fillRatio,
+              completed: targetNode.fillRatio >= 1
+            };
+          })
+        };
+      }
+
+      if (event.type === "settlement_start") {
+        return {
+          ...normalizeStatus("settling")
+        };
+      }
+
+      if (event.type === "settlement_complete") {
+        return {
+          ...normalizeStatus("settled"),
+          remainingSec: 0,
+          countdownSec: 0
+        };
+      }
+
+      return state;
+    })
 }));

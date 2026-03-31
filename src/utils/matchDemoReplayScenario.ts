@@ -228,8 +228,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-04",
           atSec: 4,
           teamId: "iron-frogs",
-          message: "IRON FROGS // MIRA injected Gate-Alpha +140 pts",
-          summary: "MIRA / GATE-ALPHA +140",
+          message: "IRON FROGS // ⚪ STANDARD x1.0 // MIRA injected Gate-Alpha +140 pts",
+          summary: "⚪ MIRA / GATE-ALPHA +140",
           kind: "score",
           scoreDelta: 140
         },
@@ -237,8 +237,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-08",
           atSec: 8,
           teamId: "relay-crew",
-          message: "RELAY CREW // ORIN secured relay route +70 pts",
-          summary: "ORIN / RELAY ROUTE +70",
+          message: "RELAY CREW // ⚪ STANDARD x1.0 // ORIN secured relay route +70 pts",
+          summary: "⚪ ORIN / RELAY ROUTE +70",
           kind: "score",
           scoreDelta: 70
         }
@@ -263,8 +263,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-13",
           atSec: 13,
           teamId: "void-hoppers",
-          message: "VOID HOPPERS // SETH stabilized SSU-Beta +180 pts",
-          summary: "SETH / SSU-BETA +180",
+          message: "VOID HOPPERS // 🟡 PREMIUM x1.25 // SETH stabilized SSU-Beta +180 pts",
+          summary: "🟡 SETH / SSU-BETA +180",
           kind: "score",
           scoreDelta: 180
         },
@@ -272,8 +272,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-18",
           atSec: 18,
           teamId: "iron-frogs",
-          message: "IRON FROGS // HOLT secured convoy lane +120 pts",
-          summary: "HOLT / CONVOY LANE +120",
+          message: "IRON FROGS // ⚪ STANDARD x1.0 // HOLT secured convoy lane +120 pts",
+          summary: "⚪ HOLT / CONVOY LANE +120",
           kind: "score",
           scoreDelta: 120
         },
@@ -281,8 +281,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-22",
           atSec: 22,
           teamId: "void-hoppers",
-          message: "VOID HOPPERS // SETH stabilized SSU-Beta +150 pts",
-          summary: "SETH / STABILIZE +150",
+          message: "VOID HOPPERS // 🟡 PREMIUM x1.25 // SETH stabilized SSU-Beta +150 pts",
+          summary: "🟡 SETH / STABILIZE +150",
           kind: "score",
           scoreDelta: 150
         }
@@ -315,8 +315,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-31",
           atSec: 31,
           teamId: "ember-toads",
-          message: "EMBER TOADS // KIRO triggered critical refill +210 pts",
-          summary: "KIRO / CRITICAL REFILL +210",
+          message: "EMBER TOADS // 🟣 REFINED x1.5 // KIRO triggered critical refill +210 pts",
+          summary: "🟣 KIRO / CRITICAL REFILL +210",
           kind: "score",
           scoreDelta: 210
         }
@@ -341,8 +341,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-36",
           atSec: 36,
           teamId: "ember-toads",
-          message: "EMBER TOADS // KIRO triggered critical refill +320 pts",
-          summary: "KIRO / GAMMA +320",
+          message: "EMBER TOADS // 🟣 REFINED x1.5 // KIRO triggered critical refill +320 pts",
+          summary: "🟣 KIRO / GAMMA +320",
           kind: "score",
           scoreDelta: 320
         }
@@ -375,8 +375,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-44",
           atSec: 44,
           teamId: "void-hoppers",
-          message: "VOID HOPPERS // SETH pushed convoy delta +170 pts",
-          summary: "SETH / CONVOY DELTA +170",
+          message: "VOID HOPPERS // 🟡 PREMIUM x1.25 // SETH pushed convoy delta +170 pts",
+          summary: "🟡 SETH / CONVOY DELTA +170",
           kind: "score",
           scoreDelta: 170
         },
@@ -384,8 +384,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-47",
           atSec: 47,
           teamId: "ember-toads",
-          message: "EMBER TOADS // KIRO panic siphon +330 pts",
-          summary: "KIRO / PANIC SIPHON +330",
+          message: "EMBER TOADS // 🟣 REFINED x1.5 // KIRO panic siphon +330 pts",
+          summary: "🟣 KIRO / PANIC SIPHON +330",
           kind: "score",
           scoreDelta: 330
         }
@@ -410,8 +410,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-53",
           atSec: 53,
           teamId: "iron-frogs",
-          message: "IRON FROGS // HOLT stabilized formation +190 pts",
-          summary: "HOLT / FORMATION +190",
+          message: "IRON FROGS // ⚪ STANDARD x1.0 // HOLT stabilized formation +190 pts",
+          summary: "⚪ HOLT / FORMATION +190",
           kind: "score",
           scoreDelta: 190
         },
@@ -419,8 +419,8 @@ export const DEFAULT_MATCH_DEMO_REPLAY_SCENARIO: DemoReplayScenario = {
           id: "burst-58",
           atSec: 58,
           teamId: "iron-frogs",
-          message: "IRON FROGS // FINAL PUSH +280 pts",
-          summary: "FINAL PUSH +280",
+          message: "IRON FROGS // 🟡 PREMIUM x1.25 // FINAL PUSH +280 pts",
+          summary: "🟡 FINAL PUSH +280",
           kind: "score",
           scoreDelta: 280
         }

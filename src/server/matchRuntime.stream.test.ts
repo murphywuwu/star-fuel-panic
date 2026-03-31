@@ -6,10 +6,16 @@ import {
   createTestMatchSignature,
   createMatchDraft,
   getMatchScoreboardSnapshot,
+  listMaterializedMatchStreamEvents,
   resetMatchRuntime,
   type MatchDetail
 } from "./matchRuntime.ts";
-import { createEmptyProjectionState, readRuntimeProjectionState, writeRuntimeProjectionState } from "./runtimeProjectionStore.ts";
+import {
+  appendPersistedMatchStreamEvents,
+  createEmptyProjectionState,
+  readRuntimeProjectionState,
+  writeRuntimeProjectionState
+} from "./runtimeProjectionStore.ts";
 
 function nowIso() {
   return new Date().toISOString();
@@ -351,4 +357,61 @@ test("rebuilding the same frame does not duplicate persisted live snapshot event
     .filter((event) => event.matchId === matchId)
     .map((event) => event.eventType);
   assert.deepEqual(eventTypes, ["score_update", "node_status", "panic_mode"]);
+});
+
+test("materialized stream events preserve fuelDeposit payload on score_update", () => {
+  const matchId = `fuel-deposit-${Date.now()}`;
+
+  appendPersistedMatchStreamEvents([
+    {
+      matchId,
+      eventType: "score_update",
+      createdAt: nowIso(),
+      payload: {
+        scoreboard: {
+          matchId,
+          status: "running",
+          remainingSeconds: 120,
+          panicMode: false,
+          teams: [],
+          targetNodes: [],
+          updatedAt: nowIso()
+        },
+        fuelDeposit: {
+          txDigest: "tx-fuel-grade",
+          sender: "0xpilot",
+          teamId: "team-alpha",
+          nodeId: "0xnode",
+          nodeName: "Gate-Alpha",
+          fuelAdded: 100,
+          fuelTypeId: 33,
+          fuelGrade: {
+            typeId: 33,
+            efficiency: 85,
+            tier: 3,
+            grade: "refined",
+            bonus: 1.5,
+            label: "Refined",
+            icon: "🟣"
+          },
+          urgencyWeight: 3,
+          panicMultiplier: 1.5,
+          scoreDelta: 675,
+          timestamp: nowIso()
+        }
+      }
+    }
+  ]);
+
+  const events = listMaterializedMatchStreamEvents(matchId);
+  assert.equal(events.length, 1);
+
+  const scoreUpdate = events[0];
+  if (!scoreUpdate || scoreUpdate.type !== "score_update") {
+    assert.fail("expected score_update event");
+  }
+
+  assert.equal(scoreUpdate.fuelDeposit?.fuelTypeId, 33);
+  assert.equal(scoreUpdate.fuelDeposit?.fuelGrade.grade, "refined");
+  assert.equal(scoreUpdate.fuelDeposit?.fuelGrade.bonus, 1.5);
 });

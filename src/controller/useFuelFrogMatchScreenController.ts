@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMatchController } from "@/controller/useMatchController";
 import { useMatchDemoReplayController } from "@/controller/useMatchDemoReplayController";
 import { useMatchRuntimeController } from "@/controller/useMatchRuntimeController";
+import { formatFuelGradeBadge, formatFuelMultiplier } from "@/utils/fuelGrade";
 import type { MatchPresentationMode } from "@/types/matchDemoReplay";
-import type { MatchStatus, MemberScoreLine } from "@/types/fuelMission";
+import type { MatchStatus, MemberScoreLine, ScoreEvent } from "@/types/fuelMission";
 
 interface ScreenTeamView {
   teamId: string;
@@ -194,12 +196,7 @@ function buildLiveTeams(
     totalScore: number;
     members: MemberScoreLine[];
   }>,
-  eventFeed: Array<{
-    id: string;
-    teamId: string;
-    memberName: string;
-    score: number;
-  }>
+  eventFeed: Array<Pick<ScoreEvent, "id" | "teamId" | "memberName" | "score" | "fuelGrade">>
 ): BaseScreenTeamView[] {
   return teams.map((team, index) => {
     const skin = LIVE_TEAM_SKINS[index % LIVE_TEAM_SKINS.length];
@@ -216,7 +213,7 @@ function buildLiveTeams(
       members: team.members,
       mascotSrc: skin.mascotSrc,
       accentColor: skin.accentColor,
-      lastAction: lastEvent ? `${lastEvent.memberName} +${Math.round(lastEvent.score)}` : "AWAITING SCORE EVENT",
+      lastAction: lastEvent ? `${formatFuelGradeBadge(lastEvent.fuelGrade)} // ${lastEvent.memberName} +${Math.round(lastEvent.score)}` : "AWAITING SCORE EVENT",
       rank: index + 1
     };
   }).sort((left, right) => right.totalScore - left.totalScore).map((team, index) => ({
@@ -226,14 +223,7 @@ function buildLiveTeams(
 }
 
 function buildLiveFeedEntries(
-  eventFeed: Array<{
-    id: string;
-    memberName: string;
-    assemblyId: string;
-    fuelDelta: number;
-    score: number;
-    createdAt: number;
-  }>,
+  eventFeed: ScoreEvent[],
   rejectionFeed: Array<{
     id: string;
     reason: string;
@@ -244,7 +234,10 @@ function buildLiveFeedEntries(
   const scoreEntries: Array<ScreenFeedView & { sortKey: number }> = eventFeed.map((event) => ({
     id: event.id,
     kind: "score",
-    message: `${event.memberName} -> ${event.assemblyId} | +${Math.round(event.fuelDelta)} fuel | +${Math.round(event.score)} pts`,
+    message:
+      `${formatFuelGradeBadge(event.fuelGrade)} // ${event.memberName} -> ${event.assemblyId} | ` +
+      `+${Math.round(event.fuelDelta)} fuel | +${Math.round(event.score)} pts | ` +
+      `U${formatFuelMultiplier(event.urgencyWeight)} × P${formatFuelMultiplier(event.panicMultiplier)} × G${formatFuelMultiplier(event.fuelGrade.bonus)}`,
     timeLabel: formatLiveTime(event.createdAt),
     sortKey: event.createdAt
   }));
@@ -264,6 +257,7 @@ function buildLiveFeedEntries(
 }
 
 export function useFuelFrogMatchScreenController() {
+  const searchParams = useSearchParams();
   const runtime = useMatchRuntimeController();
   const {
     startWatching: startLiveWatching,
@@ -277,20 +271,20 @@ export function useFuelFrogMatchScreenController() {
   } = useMatchController();
   const [presentationMode, setPresentationMode] = useState<MatchPresentationMode>("demo-replay");
   const replay = useMatchDemoReplayController(presentationMode === "demo-replay");
+  const liveMatchIdFromQuery = searchParams.get("matchId")?.trim() || null;
+  const liveMatchId = liveMatchIdFromQuery || runtime.state.room?.roomId || "match-local";
 
   useEffect(() => {
-    const matchId = runtime.state.room?.roomId ?? "match-local";
-
     if (presentationMode !== "live") {
       stopLiveWatching();
       return undefined;
     }
 
-    startLiveWatching(matchId);
+    startLiveWatching(liveMatchId);
     return () => {
       stopLiveWatching();
     };
-  }, [presentationMode, runtime.state.room?.roomId, startLiveWatching, stopLiveWatching]);
+  }, [presentationMode, liveMatchId, startLiveWatching, stopLiveWatching]);
 
   const liveRankedTeams = useMemo(
     () => [...(liveScoreBoard?.teams ?? [])].sort((left, right) => right.totalScore - left.totalScore),
@@ -385,7 +379,7 @@ export function useFuelFrogMatchScreenController() {
   const phase = isDemoMode ? replay.state.frame.status : runtime.state.status;
   const remainingSec = isDemoMode ? replay.state.frame.remainingSec : runtime.state.remainingSec;
   const panicActive = isDemoMode ? replay.state.frame.isPanic : runtime.state.isPanic || runtime.state.status === "panic";
-  const roomId = isDemoMode ? replay.state.frame.roomId : runtime.state.room?.roomId ?? "match-local";
+  const roomId = isDemoMode ? replay.state.frame.roomId : liveMatchId;
   const streamHealth = isDemoMode ? "healthy" : liveStreamHealth;
   const bannerMessage = !isDemoMode && runtime.state.staleSnapshot ? "STALE SNAPSHOT // CURRENT TELEMETRY MAY LAG" : undefined;
 

@@ -8,12 +8,14 @@ import {
 } from "node:fs";
 import path from "node:path";
 
+import type { FuelGrade } from "../types/fuelGrade.ts";
 import type { Match, MatchStreamEvent } from "../types/match.ts";
 import type { NetworkNode } from "../types/node.ts";
-import type { PlanningTeam } from "../types/planningTeam.ts";
+import type { PlanningTeam, PlanningTeamApplication } from "../types/planningTeam.ts";
 import type { SettlementBill, SettlementStatus } from "../types/settlement.ts";
 import type { SolarSystem } from "../types/solarSystem.ts";
 import type { PlayerRole, Team, TeamApplication, TeamMember } from "../types/team.ts";
+import { resolveFuelGradeInfo } from "../utils/fuelGrade.ts";
 
 export type ConstellationProjectionSummary = {
   constellationId: number;
@@ -45,6 +47,24 @@ export type PersistedMatchScore = {
   totalScore: number;
   fuelDeposited: number;
   updatedAt: string;
+};
+
+export type PersistedFuelEvent = {
+  matchId: string;
+  eventId: string;
+  txDigest: string;
+  senderWallet: string;
+  teamId: string;
+  assemblyId: string;
+  fuelAdded: number;
+  fuelTypeId: number;
+  fuelGrade: FuelGrade;
+  fuelGradeBonus: number;
+  urgencyWeight: number;
+  panicMultiplier: number;
+  scoreDelta: number;
+  chainTs: number;
+  createdAt: string;
 };
 
 export type PersistedMatchTargetNode = {
@@ -136,10 +156,12 @@ export type RuntimeProjectionState = {
   constellationSummaries: ConstellationProjectionSummary[];
   matches: Match[];
   planningTeams: PlanningTeam[];
+  planningTeamApplications: PlanningTeamApplication[];
   teams: PersistedTeam[];
   teamMembers: TeamMember[];
   teamJoinApplications: TeamApplication[];
   matchScores: PersistedMatchScore[];
+  fuelEvents: PersistedFuelEvent[];
   matchTargetNodes: PersistedMatchTargetNode[];
   matchStreamEvents: PersistedMatchStreamEvent[];
   teamPayments: PersistedTeamPayment[];
@@ -205,6 +227,86 @@ function normalizePersistedSettlement(candidate: unknown): PersistedSettlement |
   };
 }
 
+function normalizePersistedFuelEvent(candidate: unknown): PersistedFuelEvent | null {
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const record = candidate as Partial<PersistedFuelEvent> & {
+    sender?: string;
+    fuel_type_id?: number;
+    fuel_grade?: FuelGrade;
+    fuel_grade_bonus?: number;
+    score?: number;
+    fuel_added?: number;
+  };
+
+  const matchId = typeof record.matchId === "string" ? record.matchId : null;
+  const txDigest = typeof record.txDigest === "string" ? record.txDigest : null;
+  const senderWallet =
+    typeof record.senderWallet === "string"
+      ? record.senderWallet
+      : typeof record.sender === "string"
+        ? record.sender
+        : null;
+  const teamId = typeof record.teamId === "string" ? record.teamId : null;
+  const assemblyId = typeof record.assemblyId === "string" ? record.assemblyId : null;
+
+  if (!matchId || !txDigest || !senderWallet || !teamId || !assemblyId) {
+    return null;
+  }
+
+  const fuelTypeId =
+    typeof record.fuelTypeId === "number"
+      ? record.fuelTypeId
+      : typeof record.fuel_type_id === "number"
+        ? record.fuel_type_id
+        : 0;
+  const defaultFuelGrade = resolveFuelGradeInfo(fuelTypeId, null);
+  const fuelGrade =
+    record.fuelGrade === "standard" || record.fuelGrade === "premium" || record.fuelGrade === "refined"
+      ? record.fuelGrade
+      : record.fuel_grade === "standard" || record.fuel_grade === "premium" || record.fuel_grade === "refined"
+        ? record.fuel_grade
+        : defaultFuelGrade.grade;
+
+  return {
+    matchId,
+    eventId:
+      typeof record.eventId === "string" && record.eventId.trim().length > 0
+        ? record.eventId
+        : txDigest,
+    txDigest,
+    senderWallet,
+    teamId,
+    assemblyId,
+    fuelAdded:
+      typeof record.fuelAdded === "number"
+        ? record.fuelAdded
+        : typeof record.fuel_added === "number"
+          ? record.fuel_added
+          : 0,
+    fuelTypeId,
+    fuelGrade,
+    fuelGradeBonus:
+      typeof record.fuelGradeBonus === "number"
+        ? record.fuelGradeBonus
+        : typeof record.fuel_grade_bonus === "number"
+          ? record.fuel_grade_bonus
+          : defaultFuelGrade.bonus,
+    urgencyWeight: typeof record.urgencyWeight === "number" ? record.urgencyWeight : 1,
+    panicMultiplier: typeof record.panicMultiplier === "number" ? record.panicMultiplier : 1,
+    scoreDelta:
+      typeof record.scoreDelta === "number"
+        ? record.scoreDelta
+        : typeof record.score === "number"
+          ? record.score
+          : 0,
+    chainTs: typeof record.chainTs === "number" ? record.chainTs : Date.now(),
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : nowIso()
+  };
+}
+
 function createDefaultMeta(): ProjectionRuntimeMeta {
   return {
     nodes: {
@@ -235,10 +337,12 @@ export function createEmptyProjectionState(): RuntimeProjectionState {
     constellationSummaries: [],
     matches: [],
     planningTeams: [],
+    planningTeamApplications: [],
     teams: [],
     teamMembers: [],
     teamJoinApplications: [],
     matchScores: [],
+    fuelEvents: [],
     matchTargetNodes: [],
     matchStreamEvents: [],
     teamPayments: [],
@@ -289,10 +393,18 @@ function sanitizeProjectionState(candidate: unknown): RuntimeProjectionState {
     : [];
   state.matches = Array.isArray(value.matches) ? clone(value.matches) : [];
   state.planningTeams = Array.isArray(value.planningTeams) ? clone(value.planningTeams) : [];
+  state.planningTeamApplications = Array.isArray(value.planningTeamApplications)
+    ? clone(value.planningTeamApplications)
+    : [];
   state.teams = Array.isArray(value.teams) ? clone(value.teams) : [];
   state.teamMembers = Array.isArray(value.teamMembers) ? clone(value.teamMembers) : [];
   state.teamJoinApplications = Array.isArray(value.teamJoinApplications) ? clone(value.teamJoinApplications) : [];
   state.matchScores = Array.isArray(value.matchScores) ? clone(value.matchScores) : [];
+  state.fuelEvents = Array.isArray(value.fuelEvents)
+    ? value.fuelEvents
+        .map((entry) => normalizePersistedFuelEvent(entry))
+        .filter((entry): entry is PersistedFuelEvent => entry !== null)
+    : [];
   state.matchTargetNodes = Array.isArray(value.matchTargetNodes) ? clone(value.matchTargetNodes) : [];
   state.matchStreamEvents = Array.isArray(value.matchStreamEvents) ? clone(value.matchStreamEvents) : [];
   state.teamPayments = Array.isArray(value.teamPayments) ? clone(value.teamPayments) : [];
@@ -427,9 +539,20 @@ export function listPersistedPlanningTeams() {
   return clone(getRuntimeProjectionState().planningTeams);
 }
 
+export function listPersistedPlanningTeamApplications(teamId?: string) {
+  const rows = getRuntimeProjectionState().planningTeamApplications;
+  return clone(typeof teamId === "string" ? rows.filter((row) => row.teamId === teamId) : rows);
+}
+
 export function writePersistedPlanningTeams(teams: PlanningTeam[]) {
   updateRuntimeProjectionState((state) => {
     state.planningTeams = clone(teams);
+  });
+}
+
+export function writePersistedPlanningTeamApplications(applications: PlanningTeamApplication[]) {
+  updateRuntimeProjectionState((state) => {
+    state.planningTeamApplications = clone(applications);
   });
 }
 
@@ -437,6 +560,20 @@ export function upsertPersistedPlanningTeam(team: PlanningTeam) {
   updateRuntimeProjectionState((state) => {
     const existing = state.planningTeams.filter((item) => item.id !== team.id);
     state.planningTeams = [clone(team), ...existing];
+  });
+}
+
+export function upsertPersistedPlanningTeamApplication(application: PlanningTeamApplication) {
+  updateRuntimeProjectionState((state) => {
+    const existing = state.planningTeamApplications.filter((item) => item.id !== application.id);
+    state.planningTeamApplications = [clone(application), ...existing];
+  });
+}
+
+export function removePersistedPlanningTeam(teamId: string) {
+  updateRuntimeProjectionState((state) => {
+    state.planningTeams = state.planningTeams.filter((team) => team.id !== teamId);
+    state.planningTeamApplications = state.planningTeamApplications.filter((application) => application.teamId !== teamId);
   });
 }
 
@@ -473,6 +610,11 @@ export function listPersistedTeamApplications(matchId?: string) {
 export function listPersistedMatchScores(matchId?: string) {
   const scores = getRuntimeProjectionState().matchScores;
   return clone(typeof matchId === "string" ? scores.filter((score) => score.matchId === matchId) : scores);
+}
+
+export function listPersistedFuelEvents(matchId?: string) {
+  const rows = getRuntimeProjectionState().fuelEvents;
+  return clone(typeof matchId === "string" ? rows.filter((row) => row.matchId === matchId) : rows);
 }
 
 export function listPersistedMatchStreamEvents(matchId?: string) {
@@ -516,6 +658,7 @@ export function getPersistedMatchDetail(matchId: string) {
     members: state.teamMembers.filter((member) => teamIds.has(member.teamId)),
     applications: state.teamJoinApplications.filter((application) => teamIds.has(application.teamId)),
     scores: state.matchScores.filter((score) => score.matchId === matchId),
+    fuelEvents: state.fuelEvents.filter((event) => event.matchId === matchId),
     targetNodes: state.matchTargetNodes.filter((row) => row.matchId === matchId),
     streamEvents: state.matchStreamEvents.filter((row) => row.matchId === matchId),
     teamPayments: state.teamPayments.filter((row) => row.matchId === matchId),
@@ -608,6 +751,24 @@ export function appendPersistedMatchStreamEvents(events: PersistedMatchStreamEve
   });
 }
 
+export function appendPersistedFuelEvents(events: PersistedFuelEvent[]) {
+  if (events.length === 0) {
+    return;
+  }
+
+  updateRuntimeProjectionState((state) => {
+    const seen = new Set(state.fuelEvents.map((event) => `${event.matchId}:${event.txDigest}:${event.eventId}`));
+    for (const event of clone(events)) {
+      const key = `${event.matchId}:${event.txDigest}:${event.eventId}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      state.fuelEvents.push(event);
+    }
+  });
+}
+
 export function savePersistedTeamState(
   matchId: string,
   teams: PersistedTeam[],
@@ -664,6 +825,7 @@ export function deletePersistedMatch(matchId: string) {
     state.teamMembers = state.teamMembers.filter((member) => !teamIds.has(member.teamId));
     state.teamJoinApplications = state.teamJoinApplications.filter((application) => !teamIds.has(application.teamId));
     state.matchScores = state.matchScores.filter((score) => score.matchId !== matchId);
+    state.fuelEvents = state.fuelEvents.filter((event) => event.matchId !== matchId);
     state.matchTargetNodes = state.matchTargetNodes.filter((row) => row.matchId !== matchId);
     state.matchStreamEvents = state.matchStreamEvents.filter((row) => row.matchId !== matchId);
     state.teamPayments = state.teamPayments.filter((row) => row.matchId !== matchId);

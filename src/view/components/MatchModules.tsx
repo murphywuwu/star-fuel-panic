@@ -6,6 +6,9 @@ import type {
   ScoreEvent,
   ScoreRejectAuditLog
 } from "@/types/fuelMission";
+import type { ChallengeMode, PrimaryFuelGrade } from "@/types/match";
+import type { FuelGrade, FuelGradeIcon } from "@/types/fuelGrade";
+import { formatFuelGradeBadge, formatFuelMultiplier } from "@/utils/fuelGrade";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
@@ -272,19 +275,24 @@ export function EventFeed({ events, rejections = [], optimisticPatches = [] }: E
           <li>STANDBY // NO SCORE EVENTS</li>
         ) : null}
 
-        {visibleEvents.map((event) => (
-          <li key={event.id} className="border border-eve-yellow/25 bg-eve-black/70 px-2 py-2">
-            <p className="font-mono uppercase tracking-[0.12em] text-eve-yellow">
-              score_event // {event.memberName}
-            </p>
-            <p className="mt-1 break-all text-eve-offwhite/75">
-              {event.assemblyId} // +{event.score.toFixed(2)} pts // tx={event.txDigest}
-            </p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-eve-offwhite/70">
-              delta={event.fuelDelta} × urgency={event.urgencyWeight.toFixed(1)} × panic={event.panicMultiplier.toFixed(1)}
-            </p>
-          </li>
-        ))}
+        {visibleEvents.map((event) => {
+          const hasPrimaryBonus = event.primaryGradeMultiplier > 1;
+          return (
+            <li key={event.id} className="border border-eve-yellow/25 bg-eve-black/70 px-2 py-2">
+              <p className="font-mono uppercase tracking-[0.12em] text-eve-yellow">
+                score_event // {event.memberName} // {formatFuelGradeBadge(event.fuelGrade)}
+                {hasPrimaryBonus ? " // PRIMARY x2.0" : ""}
+              </p>
+              <p className="mt-1 break-all text-eve-offwhite/75">
+                {event.assemblyId} // +{event.score.toFixed(2)} pts // tx={event.txDigest}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-eve-offwhite/70">
+                delta={event.fuelDelta} × urgency={formatFuelMultiplier(event.urgencyWeight)} × panic={formatFuelMultiplier(event.panicMultiplier)} × grade={formatFuelMultiplier(event.fuelGradeBonus)}
+                {hasPrimaryBonus ? ` × primary=${formatFuelMultiplier(event.primaryGradeMultiplier)}` : ""}
+              </p>
+            </li>
+          );
+        })}
 
         {visibleRejections.map((audit) => (
           <li key={audit.id} className="border border-eve-red/60 bg-eve-red/10 px-2 py-2">
@@ -365,6 +373,111 @@ export function SprintAlert({ status, remainingSec, isPanic }: SprintAlertProps)
           T-{remainingSec}s
         </p>
         <p className="mt-1 text-xs text-eve-offwhite/80">{statusDescription(status)}</p>
+      </div>
+    </TacticalPanel>
+  );
+}
+
+const GRADE_ICON_MAP: Record<FuelGrade, FuelGradeIcon> = {
+  standard: "⚪",
+  premium: "🟡",
+  refined: "🟣"
+};
+
+const GRADE_LABEL_MAP: Record<FuelGrade, string> = {
+  standard: "Standard",
+  premium: "Premium",
+  refined: "Refined"
+};
+
+interface FuelGradeChallengeStatusProps {
+  challengeMode: ChallengeMode;
+  primaryFuelGrade?: PrimaryFuelGrade;
+  collectedGrades: FuelGrade[];
+  hasAllGrades: boolean;
+}
+
+export function FuelGradeChallengeStatus({
+  challengeMode,
+  primaryFuelGrade,
+  collectedGrades,
+  hasAllGrades
+}: FuelGradeChallengeStatusProps) {
+  if (challengeMode !== "fuel_grade_challenge") {
+    return null;
+  }
+
+  const collectedSet = new Set(collectedGrades);
+  const grades: FuelGrade[] = ["standard", "premium", "refined"];
+
+  return (
+    <TacticalPanel title="Fuel Grade Challenge" eyebrow="CHALLENGE MODE">
+      <div className="space-y-3">
+        {primaryFuelGrade ? (
+          <div className="border border-eve-yellow bg-eve-yellow/20 px-3 py-2">
+            <p className="font-mono text-xs uppercase tracking-[0.12em] text-eve-yellow">
+              PRIMARY GRADE // {GRADE_ICON_MAP[primaryFuelGrade]} {GRADE_LABEL_MAP[primaryFuelGrade].toUpperCase()}
+            </p>
+            <p className="mt-1 text-xs text-eve-offwhite/85">
+              Primary grade fuel deposits receive x2.0 score multiplier
+            </p>
+          </div>
+        ) : null}
+
+        <div className="border border-eve-yellow/30 bg-eve-black/70 px-3 py-2">
+          <p className="font-mono text-xs uppercase tracking-[0.12em] text-eve-yellow">
+            GRADE COLLECTION PROGRESS
+          </p>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {grades.map((grade) => {
+              const collected = collectedSet.has(grade);
+              const isPrimary = grade === primaryFuelGrade;
+              return (
+                <div
+                  key={grade}
+                  className={
+                    collected
+                      ? "border border-eve-yellow bg-eve-yellow/20 px-2 py-2 text-center"
+                      : "border border-eve-grey/50 bg-eve-black/50 px-2 py-2 text-center opacity-50"
+                  }
+                >
+                  <p className="text-lg">{GRADE_ICON_MAP[grade]}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-eve-offwhite">
+                    {GRADE_LABEL_MAP[grade]}
+                  </p>
+                  <p className="mt-1 text-[10px] text-eve-offwhite/75">
+                    {collected ? "COLLECTED" : "PENDING"}
+                  </p>
+                  {isPrimary ? (
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-eve-yellow">
+                      x2.0
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          className={
+            hasAllGrades
+              ? "border border-eve-yellow bg-eve-yellow/20 px-3 py-2 animate-pulse"
+              : "border border-eve-grey/50 bg-eve-black/50 px-3 py-2"
+          }
+        >
+          <p className="font-mono text-xs uppercase tracking-[0.12em] text-eve-yellow">
+            ALL GRADES BONUS
+          </p>
+          <p className="mt-1 text-xs text-eve-offwhite/85">
+            {hasAllGrades
+              ? "UNLOCKED! Your final score will receive +20% bonus"
+              : "Collect all 3 fuel grades to unlock +20% final score bonus"}
+          </p>
+          <p className="mt-1 font-mono text-sm text-eve-yellow">
+            {hasAllGrades ? "x1.2 ACTIVE" : `${collectedGrades.length}/3 GRADES`}
+          </p>
+        </div>
       </div>
     </TacticalPanel>
   );

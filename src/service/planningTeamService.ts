@@ -182,7 +182,7 @@ class PlanningTeamService {
     teamId: string;
     role: PlayerRole;
     walletAddress: string;
-  }): Promise<ControllerResult<{ team: PlanningTeam; totalTeams: number }>> {
+  }): Promise<ControllerResult<{ team: PlanningTeam; totalTeams: number; application?: unknown }>> {
     this.store.getState().setMutating(true);
     this.store.getState().setError(null);
 
@@ -192,7 +192,7 @@ class PlanningTeamService {
         input.teamId,
         input.walletAddress
       );
-      const payload = await parseJson<{ team: PlanningTeam; totalTeams: number }>(
+      const payload = await parseJson<{ team: PlanningTeam; totalTeams: number; application?: unknown }>(
         await fetch(`/api/planning-teams/${encodeURIComponent(input.teamId)}/join`, {
           method: "POST",
           headers: {
@@ -212,7 +212,149 @@ class PlanningTeamService {
         totalTeams: payload.totalTeams
       });
 
-      return ok("PLANNING_TEAM_JOINED", payload);
+      return ok("PLANNING_TEAM_JOIN_REQUESTED", payload);
+    } catch (error) {
+      const result = this.toControllerError(error);
+      this.store.getState().setError(result.message);
+      return result;
+    } finally {
+      this.store.getState().setMutating(false);
+    }
+  }
+
+  async approveApplication(input: {
+    teamId: string;
+    applicationId: string;
+    walletAddress: string;
+  }): Promise<ControllerResult<{ team: PlanningTeam; totalTeams: number }>> {
+    return this.runTeamMutation(
+      `/api/planning-teams/${encodeURIComponent(input.teamId)}/applications/${encodeURIComponent(input.applicationId)}/approve`,
+      "FuelFrogPanic:approve-planning-team-application",
+      `${input.teamId}:${input.applicationId}`,
+      input.walletAddress,
+      "PLANNING_TEAM_APPLICATION_APPROVED"
+    );
+  }
+
+  async rejectApplication(input: {
+    teamId: string;
+    applicationId: string;
+    walletAddress: string;
+    reason?: string;
+  }): Promise<ControllerResult<{ team: PlanningTeam; totalTeams: number }>> {
+    return this.runTeamMutation(
+      `/api/planning-teams/${encodeURIComponent(input.teamId)}/applications/${encodeURIComponent(input.applicationId)}/reject`,
+      "FuelFrogPanic:reject-planning-team-application",
+      `${input.teamId}:${input.applicationId}`,
+      input.walletAddress,
+      "PLANNING_TEAM_APPLICATION_REJECTED",
+      input.reason ? { reason: input.reason } : undefined
+    );
+  }
+
+  async leaveTeam(input: {
+    teamId: string;
+    walletAddress: string;
+  }): Promise<ControllerResult<{ team: PlanningTeam | null; totalTeams: number }>> {
+    return this.runGenericMutation<{ team: PlanningTeam | null; totalTeams: number }>(
+      `/api/planning-teams/${encodeURIComponent(input.teamId)}/leave`,
+      "FuelFrogPanic:leave-planning-team",
+      input.teamId,
+      input.walletAddress,
+      "PLANNING_TEAM_LEFT"
+    ).then((result) => {
+      if (result.ok) {
+        if (result.payload?.team) {
+          this.store.getState().upsertTeam(result.payload.team);
+          this.store.getState().setSnapshot({
+            teams: this.store.getState().teams,
+            totalTeams: result.payload.totalTeams
+          });
+        } else {
+          void this.load();
+        }
+      }
+      return result;
+    });
+  }
+
+  async disbandTeam(input: {
+    teamId: string;
+    walletAddress: string;
+  }): Promise<ControllerResult<{ teamId: string; totalTeams: number }>> {
+    return this.runGenericMutation<{ teamId: string; totalTeams: number }>(
+      `/api/planning-teams/${encodeURIComponent(input.teamId)}/disband`,
+      "FuelFrogPanic:disband-planning-team",
+      input.teamId,
+      input.walletAddress,
+      "PLANNING_TEAM_DISBANDED"
+    ).then((result) => {
+      if (result.ok && result.payload) {
+        this.store.getState().removeTeam(result.payload.teamId);
+        this.store.getState().setSnapshot({
+          teams: this.store.getState().teams,
+          totalTeams: result.payload.totalTeams
+        });
+      }
+      return result;
+    });
+  }
+
+  private async runTeamMutation(
+    url: string,
+    scope: string,
+    targetId: string,
+    walletAddress: string,
+    successMessage: string,
+    extraBody?: Record<string, unknown>
+  ): Promise<ControllerResult<{ team: PlanningTeam; totalTeams: number }>> {
+    return this.runGenericMutation<{ team: PlanningTeam; totalTeams: number }>(
+      url,
+      scope,
+      targetId,
+      walletAddress,
+      successMessage,
+      extraBody
+    ).then((result) => {
+      if (result.ok && result.payload?.team) {
+        this.store.getState().upsertTeam(result.payload.team);
+        this.store.getState().setSnapshot({
+          teams: this.store.getState().teams,
+          totalTeams: result.payload.totalTeams
+        });
+      }
+      return result;
+    });
+  }
+
+  private async runGenericMutation<T>(
+    url: string,
+    scope: string,
+    targetId: string,
+    walletAddress: string,
+    successMessage: string,
+    extraBody?: Record<string, unknown>
+  ): Promise<ControllerResult<T>> {
+    this.store.getState().setMutating(true);
+    this.store.getState().setError(null);
+
+    try {
+      const signed = buildSignedPayload(scope, targetId, walletAddress);
+      const payload = await parseJson<T>(
+        await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": createIdempotencyKey()
+          },
+          body: JSON.stringify({
+            ...extraBody,
+            ...signed
+          })
+        })
+      );
+
+      return ok(successMessage, payload);
     } catch (error) {
       const result = this.toControllerError(error);
       this.store.getState().setError(result.message);

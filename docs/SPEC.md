@@ -1,15 +1,15 @@
 # SPEC: Fuel Frog Panic — Interface Contracts
 
-Version: v6.4
-Last Updated: 2026-03-28
-Source PRD: `docs/PRD.md` v2.6.1
-Source Architecture: `docs/architecture.md` v6.2
+Version: v6.5
+Last Updated: 2026-03-31
+Source PRD: `docs/PRD.md` v2.7.0
+Source Architecture: `docs/architecture.md` v6.3
 
 ---
 
 ## 0. Scope
 
-本 SPEC 只覆盖 PRD v2.6.1 已批准范围内的实现契约：
+本 SPEC 只覆盖 PRD v2.7.0 已批准范围内的实现契约：
 
 - 比赛创建：自由模式、精准模式、星系选择、赞助费锁定、发布。
 - 独立战队注册：查看当前战队总数、创建不绑定比赛的战队。
@@ -29,11 +29,12 @@ Source Architecture: `docs/architecture.md` v6.2
 
 | PRD 章节 | 验收点 | SPEC 落点 |
 |---|---|---|
+| 0.8 燃料品级体系 | 品级映射规则（Tier 1/2/3）、效率区间、计分加成（1.0x/1.25x/1.5x）、缓存策略 | 第 2.2 节 `FuelGrade`、第 2.3 节 `FuelGradeInfo`、第 2.6 节燃料品级规则、第 5.7 节 `fuelConfigRuntime` |
 | 4.1 创建 & 发布比赛 | 两种模式、星系选择、赞助费 >= 50、精准模式选点、创建与发布分离 | 第 2.4 节、第 3.1 节、第 4.2 节 `POST /api/matches` 和 `POST /api/matches/{id}/publish` |
 | 4.2 创建战队 | `/planning` 首屏显示总战队数、独立战队列表、支持独立创建/加入战队；后续比赛报名链路保留 match-specific 创建/加入/离开/锁队 | 第 2.4 节、第 3.3 节、第 3.7 节、第 4.3 节和第 4.5 节 |
 | 4.3 发现 & 参加比赛 | Lobby 列表、位置选择、距离、推荐节点、比赛详情 | 第 2.3 节、第 3.2 节、第 4.1 节和第 4.2 节读接口 |
-| 4.4 启动比赛 | 状态机、得分板、流事件、三重过滤、Panic Mode | 第 2.5 节、第 3.4 节、第 4.2 节 `status/scoreboard/stream`、第 5.7 节 |
-| 4.5 自动分账 | 5% 平台抽成、95% 玩家奖池、排名分配、个人贡献占比 | 第 2.5 节、第 3.5 节、第 4.4 节、第 5.8 节 |
+| 4.4 启动比赛 | 状态机、得分板、流事件、三重过滤、Panic Mode、**燃料品级加成** | 第 2.5 节、第 3.4 节、第 4.2 节 `status/scoreboard/stream`、第 5.7-5.8 节 |
+| 4.5 自动分账 | 5% 平台抽成、95% 玩家奖池、排名分配、个人贡献占比 | 第 2.5 节、第 3.5 节、第 4.4 节、第 5.9 节 |
 | 8 链上 / 链下边界 | 上链事实、链下读模型 | 第 5 节运行时契约、第 6 节错误/幂等/观测契约 |
 
 ---
@@ -117,6 +118,10 @@ type PlayerRole = 'collector' | 'hauler' | 'escort';
 type TeamApplicationStatus = 'pending' | 'approved' | 'rejected';
 
 type NodeUrgency = 'critical' | 'warning' | 'safe';
+
+type FuelGrade = 'standard' | 'premium' | 'refined';
+
+type FuelGradeTier = 1 | 2 | 3;
 
 type SelectableState = 'selectable' | 'no_nodes' | 'offline_only' | 'not_public';
 
@@ -234,6 +239,21 @@ type NodeRecommendation = {
   urgencyWeight: number;
   score: number;
   reason: string;
+};
+
+type FuelGradeInfo = {
+  typeId: number;
+  efficiency: number;
+  tier: FuelGradeTier;
+  grade: FuelGrade;
+  bonus: number;
+  label: string;
+};
+
+type FuelConfigCache = {
+  lastUpdatedAt: string;
+  efficiencyMap: Record<number, number>;
+  stale: boolean;
 };
 ```
 
@@ -517,11 +537,27 @@ type SettlementStatus = {
   updatedAt: string;
 };
 
+type FuelDepositEvent = {
+  txDigest: string;
+  sender: string;
+  teamId: string;
+  nodeId: string;
+  nodeName: string;
+  fuelAdded: number;
+  fuelTypeId: number;
+  fuelGrade: FuelGradeInfo;
+  urgencyWeight: number;
+  panicMultiplier: number;
+  scoreDelta: number;
+  timestamp: string;
+};
+
 type MatchStreamEvent =
   | {
       type: 'score_update';
       matchId: string;
       scoreboard: ScoreboardSnapshot;
+      fuelDeposit?: FuelDepositEvent;
     }
   | {
       type: 'phase_change' | 'panic_mode';
@@ -552,10 +588,23 @@ type MatchStreamEvent =
 
 ### 2.6 Derived Rules
 
+**节点紧急度规则**：
 - `fillRatio = fuelQuantity / fuelMaxCapacity`
-- `urgency = critical` when `fillRatio < 0.2`
-- `urgency = warning` when `0.2 <= fillRatio < 0.5`
-- `urgency = safe` when `fillRatio >= 0.5`
+- `urgency = critical` when `fillRatio < 0.2`，`urgencyWeight = 3.0`
+- `urgency = warning` when `0.2 <= fillRatio < 0.5`，`urgencyWeight = 1.5`
+- `urgency = safe` when `fillRatio >= 0.5`，`urgencyWeight = 1.0`
+
+**燃料品级规则**：
+- `fuelGrade = standard (Tier 1)` when `efficiency` in `[10, 40]`，`fuelGradeBonus = 1.0`
+- `fuelGrade = premium (Tier 2)` when `efficiency` in `[41, 70]`，`fuelGradeBonus = 1.25`
+- `fuelGrade = refined (Tier 3)` when `efficiency` in `[71, 100]`，`fuelGradeBonus = 1.5`
+- 未知 `fuelTypeId` 或 `efficiency = 0` 时降级为 `Tier 1`，`fuelGradeBonus = 1.0`，记录告警
+
+**计分公式**：
+- `scoreDelta = fuelAdded × urgencyWeight × panicMultiplier × fuelGradeBonus`
+- 最高系数：`3.0 × 1.5 × 1.5 = 6.75x`
+
+**奖池规则**：
 - `grossPool = sponsorshipFee + entryFeeTotal + platformSubsidy`
 - `platformFee = floor(grossPool * 0.05)`
 - `payoutPool = grossPool - platformFee`
@@ -563,9 +612,11 @@ type MatchStreamEvent =
   - 2 队：`[0.7, 0.3]`
   - 3 队或以上：`[0.6, 0.3, 0.1]`
 - 个人奖金：`teamPrize * personalScore / teamTotalScore`，最后一名成员吸收舍入余数。
+
+**比赛规则**：
 - 自由模式的 `eligibleNodeSet` 以目标星系内节点为准。
 - 精准模式的 `eligibleNodeSet` 以发布时冻结的 `targetNodeIds` 为准。
-- Panic Mode 固定为比赛结束前最后 90 秒，乘数为 `1.5x`。
+- Panic Mode 固定为比赛结束前最后 90 秒，`panicMultiplier = 1.5`。
 
 ---
 
@@ -1496,14 +1547,52 @@ Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
 
 Request: `JoinPlanningTeamRequest`
 
-Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
+Response: `ApiResult<{ application: PlanningTeamApplication; team: PlanningTeam; totalTeams: number }>`
 
 校验规则：
 
 - 同一钱包在独立战队注册表中同一时间只能属于 1 支战队。
-- `memberCount < maxMembers` 时才允许加入。
+- 同一钱包对同一独立战队不能存在多个 `pending` 申请。
+- `memberCount < maxMembers` 时才允许创建申请。
 - 目标角色当前占用数必须小于 `roleSlots[role]`。
-- 成功后必须立即写入 projection，并回传最新 team 快照。
+- 成功后只创建 `pending` 申请，不直接写入成员事实。
+
+#### `POST /api/planning-teams/{teamId}/applications/{applicationId}/approve`
+
+Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
+
+校验规则：
+
+- 仅队长可批准。
+- 批准后申请状态改为 `approved`，并写入成员事实。
+- 若批准瞬间角色槽位已满或队伍已满，必须拒绝批准并返回 `CONFLICT`。
+
+#### `POST /api/planning-teams/{teamId}/applications/{applicationId}/reject`
+
+Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
+
+校验规则：
+
+- 仅队长可拒绝。
+- 拒绝后申请状态改为 `rejected`，且不写入成员事实。
+
+#### `POST /api/planning-teams/{teamId}/leave`
+
+Response: `ApiResult<{ team: PlanningTeam | null; totalTeams: number }>`
+
+校验规则：
+
+- 仅非队长成员可退出。
+- 退出后必须移除成员事实。
+
+#### `POST /api/planning-teams/{teamId}/disband`
+
+Response: `ApiResult<{ teamId: string; totalTeams: number }>`
+
+校验规则：
+
+- 仅队长可解散。
+- 解散后必须删除 team、member、application 事实。
 
 ### 4.6 Legacy Alias Policy
 
@@ -1575,20 +1664,39 @@ Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
   - `team_payments` 的规范链上来源是 `TeamEntryLocked` commitment，而不是“transfer 到固定 recipient”的地址到账口径。
   - `team_payments` 与 `match_whitelists` 是 paid/whitelist 状态的规范事实；runtime 重建时必须优先从这两类 persisted fact 恢复，不得只依赖 `team.hasPaid / whitelistCount` 反推。
 
-### 5.7 `chainSyncEngine`
+### 5.7 `fuelConfigRuntime`
 
-- 输入：Sui `FuelEvent(DEPOSITED)`、交易块详情、比赛白名单、比赛状态。
+- 输入：Sui RPC 读取 `FuelConfig` 共享对象。
+- 输出：`fuel_config_cache`（内存）。
+- 规则：
+  - 缓存 `FuelConfig.fuel_efficiency: Table<u64, u64>` 映射表。
+  - 刷新周期：5 分钟。
+  - 降级策略：读取失败时保留上一次有效缓存，并标记 `stale = true`。
+  - 未知 `fuelTypeId` 返回默认值 `{ tier: 1, bonus: 1.0 }`，记录告警日志。
+
+### 5.8 `chainSyncEngine`
+
+- 输入：Sui `FuelEvent(DEPOSITED)`、交易块详情、比赛白名单、比赛状态、`fuelConfigRuntime`。
 - 输出：`fuel_events`、`match_scores`、`match_stream_events`。
 - 去重键：`txDigest + eventSeq`。
 - 三重过滤：
   - `sender` 在白名单内
   - 自由模式节点在目标星系内；精准模式节点在冻结目标节点集内
   - `timestamp` 位于比赛时间窗口内
+- 燃料品级查询：
+  - 从 `FuelEvent.type_id` 获取燃料类型
+  - 通过 `fuelConfigRuntime` 查询 `efficiency`
+  - 映射品级加成：`Tier 1 = 1.0x`, `Tier 2 = 1.25x`, `Tier 3 = 1.5x`
 - 计分公式：
-  - `fuelAdded * urgencyWeight * panicMultiplier`
+  - `scoreDelta = fuelAdded × urgencyWeight × panicMultiplier × fuelGradeBonus`
   - `urgencyWeight` 以注入时刻的 `fillRatio` 计算
+  - `fuelGradeBonus` 以 `FuelEvent.type_id` 映射的品级计算
+- `fuel_events` 写入字段：
+  - `tx_digest`, `event_seq`, `match_id`, `sender`, `assembly_id`
+  - `fuel_added`, `fuel_type_id`, `fuel_grade`, `fuel_grade_bonus`
+  - `urgency_weight`, `panic_multiplier`, `score_delta`, `timestamp`
 
-### 5.8 `settlementRuntime`
+### 5.9 `settlementRuntime`
 
 - 输入：`match_scores` 最终快照、`team_payments`、比赛配置、平台补贴。
 - 输出：`settlements`、`matches.status = settled`、`match_stream_events`.
@@ -1601,15 +1709,16 @@ Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
   - `settlements` 是结算阶段的规范事实，至少支持 `running` 和 `succeeded` 两种 materialized 状态；`GET /result` 只能在 `status = succeeded` 时返回账单，不能直接绕过 persisted settlement fact 读取临时 bill。
   - settlement fact 的写入由状态迁移侧效触发，读接口只消费已存在事实并在缺失时做幂等补偿，不能成为主触发源。
 
-### 5.9 `planningTeamRuntime`
+### 5.10 `planningTeamRuntime`
 
-- 输入：`planning-teams` 读写请求、钱包签名、runtime projection。
-- 输出：独立战队列表、总战队数。
+- 输入：`planning-teams` 读写请求、钱包签名、runtime projection / backend projection。
+- 输出：独立战队列表、总战队数、独立战队申请事实。
 - 约束：
   - 战队创建不要求比赛上下文。
   - `/planning` 所需 team board 必须由单次读取直接驱动，不要求前端额外聚合。
-  - 独立战队加入不走审批流，成功后直接落成员事实。
-  - 创建成功后必须立即写入 projection，确保刷新后总数可恢复。
+  - 独立战队加入走申请制：`join -> pending -> captain approve/reject`。
+  - 普通成员支持 `leave`，队长支持 `disband`。
+  - 创建、申请、审批、退出、解散都必须同步到 backend projection，确保重启后总数和成员态可恢复。
 
 ---
 
@@ -1642,7 +1751,7 @@ Response: `ApiResult<{ team: PlanningTeam; totalTeams: number }>`
 ### 6.4 Runtime Health Endpoint
 
 - `GET /api/runtime/health` 必须返回 worker 心跳与投影新鲜度摘要。
-- 至少包含：`nodeRuntime`, `constellationRuntime`, `matchRuntime`, `chainSyncEngine`, `settlementRuntime`。
+- 至少包含：`nodeRuntime`, `constellationRuntime`, `matchRuntime`, `fuelConfigRuntime`, `chainSyncEngine`, `settlementRuntime`。
 
 ### 6.5 Required Metrics
 

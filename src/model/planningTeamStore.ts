@@ -12,6 +12,7 @@ export interface PlanningTeamState {
 interface PlanningTeamActions {
   setSnapshot: (snapshot: { teams: PlanningTeam[]; totalTeams: number }) => void;
   upsertTeam: (team: PlanningTeam) => void;
+  removeTeam: (teamId: string) => void;
   setLoading: (isLoading: boolean) => void;
   setMutating: (isMutating: boolean) => void;
   setError: (error: string | null) => void;
@@ -40,6 +41,14 @@ export const planningTeamStore = createStore<PlanningTeamStore>()((set) => ({
       const teams = [team, ...state.teams.filter((item) => item.id !== team.id)].sort((left, right) =>
         right.createdAt.localeCompare(left.createdAt)
       );
+      return {
+        teams,
+        totalTeams: teams.length
+      };
+    }),
+  removeTeam: (teamId) =>
+    set((state) => {
+      const teams = state.teams.filter((team) => team.id !== teamId);
       return {
         teams,
         totalTeams: teams.length

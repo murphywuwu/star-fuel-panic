@@ -1,7 +1,7 @@
 # 🐸 Fuel Frog Panic — Product Requirements Document
 
-**版本**：v2.6.1
-**最后更新**：2026-03-28  
+**版本**：v2.7.1
+**最后更新**：2026-03-31  
 **产品性质**：EVE Frontier 链上竞技任务平台（Hackathon Demo）  
 **核心链**：Sui  
 **核心合约模块**：`world::fuel`（`FuelEvent(DEPOSITED)`）
@@ -222,8 +222,12 @@ public struct FuelEvent has copy, drop {
 **计分逻辑**：
 ```typescript
 const fuelAdded = event.parsedJson.new_quantity - event.parsedJson.old_quantity;
-const score = fuelAdded × urgency_weight(node_fill_ratio) × panic_multiplier;
+const fuelTypeId = event.parsedJson.type_id;
+const fuelGradeBonus = getFuelGradeBonus(fuelTypeId);  // 1.0x / 1.25x / 1.5x
+const score = fuelAdded × urgency_weight(node_fill_ratio) × panic_multiplier × fuelGradeBonus;
 ```
+
+> **燃料品级加成**：通过 `type_id` 查询 `FuelConfig.fuel_efficiency`，映射为品级加成系数（详见 0.8 章节）。
 
 ---
 
@@ -244,6 +248,65 @@ const score = fuelAdded × urgency_weight(node_fill_ratio) × panic_multiplier;
 └─ API: GET /api/network-nodes
     └─ 从缓存读取 fill_ratio → 前端地图渲染
 ```
+
+---
+
+### 0.8 燃料品级体系（Fuel Grade System）
+
+EVE Frontier 游戏内燃料种类繁多，类似现实中汽油有 #92、#95、#98 等不同标号。本平台利用链上 `FuelConfig.fuel_efficiency` 配置，将燃料划分为三个品级，并在计分时给予差异化加成，增加策略深度。
+
+#### 0.8.1 品级划分规则
+
+**数据来源**：`world::fuel::FuelConfig.fuel_efficiency` 表
+
+```move
+public struct FuelConfig has key {
+    id: UID,
+    fuel_efficiency: Table<u64, u64>,  // fuel_type_id → efficiency (10-100)
+}
+```
+
+**品级映射逻辑**：
+
+| 品级 | 名称 | 效率区间 | 计分加成 | 视觉标识 |
+|------|------|----------|----------|----------|
+| **Tier 1** | 标准燃料 (Standard) | 10% – 40% | **1.0x** | ⚪ 白色 |
+| **Tier 2** | 高效燃料 (Premium) | 41% – 70% | **1.25x** | 🟡 金色 |
+| **Tier 3** | 精炼燃料 (Refined) | 71% – 100% | **1.5x** | 🟣 紫色 |
+
+> **设计理念**：高品级燃料在游戏中更稀缺、获取成本更高，给予计分加成是对玩家额外付出的奖励，同时鼓励团队在比赛前做好资源储备。
+
+#### 0.8.2 品级获取方式（后端实现）
+
+```typescript
+// 从 FuelConfig 获取燃料效率
+async function getFuelEfficiency(fuelTypeId: number): Promise<number> {
+  const fuelConfig = await suiClient.getObject({ id: FUEL_CONFIG_ID });
+  return fuelConfig.fuel_efficiency[fuelTypeId] ?? 0;
+}
+
+// 根据效率映射品级
+function getFuelGrade(efficiency: number): { tier: 1 | 2 | 3; bonus: number; label: string } {
+  if (efficiency >= 71) return { tier: 3, bonus: 1.5, label: 'Refined' };
+  if (efficiency >= 41) return { tier: 2, bonus: 1.25, label: 'Premium' };
+  return { tier: 1, bonus: 1.0, label: 'Standard' };
+}
+```
+
+#### 0.8.3 品级缓存策略
+
+| 数据 | 缓存位置 | 刷新频率 | 说明 |
+|------|----------|----------|------|
+| `FuelConfig.fuel_efficiency` | 后端内存 | 每 5 分钟 | 燃料效率配置变化极少 |
+| `fuel_type_id → grade` 映射表 | 后端内存 | 随 FuelConfig 刷新 | 预计算避免实时查表 |
+
+#### 0.8.4 边界情况处理
+
+| 场景 | 处理方式 |
+|------|----------|
+| `fuel_type_id` 不在 FuelConfig 中 | 默认视为 Tier 1（1.0x），记录告警日志 |
+| `efficiency = 0` | 视为无效燃料，不计分，记录异常 |
+| FuelConfig 读取失败 | 降级为全部 1.0x，保证比赛不中断 |
 
 ---
 
@@ -430,6 +493,12 @@ walletService.disconnectWallet(): Promise<void>
 |---|---|---|
 | **自由模式** | 指定星系内的**任意节点** | 探索型玩法，团队分头行动 |
 | **精准模式** | 指定星系内的**特定节点**（1-5 个） | 定向救援，集中火力 |
+
+**当前阶段范围澄清**：
+
+- **P0（当前 Demo 基线）**：比赛目标仅限 `NetworkNode`，即站点/基础设施加油竞赛。
+- **P1（扩展玩法）**：若 EVE Frontier 后续提供**可验证的舰船级加油事件或舰船燃料状态查询**，新增独立的「舰船补给赛 / Ship Refuel Match」。
+- **模式边界**：舰船是移动目标，发现、归因、反作弊和计分口径均不同，**不直接并入**现有自由模式 / 精准模式的节点计分规则。
 
 ---
 
@@ -924,13 +993,23 @@ POST /api/matches/{matchId}/publish
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**节点状态颜色说明**：
+**节点状态颜色说明**（紧急度权重）：
 
 | 颜色 | 条件 | 计分权重 |
 |---|---|---|
 | 🔴 红色 | `fill_ratio` < 20% | 3.0x |
 | 🟡 黄色 | 20% ≤ `fill_ratio` < 50% | 1.5x |
 | 🟢 绿色 | `fill_ratio` ≥ 50% | 1.0x |
+
+**燃料品级标识说明**（品级加成）：
+
+| 图标 | 品级 | 效率区间 | 计分加成 |
+|---|---|---|---|
+| ⚪ 白色 | Tier 1 标准燃料 | 10% – 40% | 1.0x |
+| 🟡 金色 | Tier 2 高效燃料 | 41% – 70% | 1.25x |
+| 🟣 紫色 | Tier 3 精炼燃料 | 71% – 100% | 1.5x |
+
+> 紧急度权重与燃料品级加成**相乘**计算最终得分，详见 4.4 章节计分系统。
 
 ---
 
@@ -951,7 +1030,10 @@ POST /api/matches/{matchId}/publish
 - 查看当前战队总数
 - 浏览全部独立战队列表
 - 创建新战队（成为队长）
-- 直接加入已有独立战队
+- 申请加入已有独立战队，由队长审批
+- 队长可同意/拒绝待审批申请
+- 普通成员可退出独立战队
+- 队长可解散独立战队
 - 设置队伍人数上限与角色槽位
 - 记录队长钱包与创建时间，供后续报名阶段复用
 - 提供独立 `/team` 战队档案页，查看当前编制与历史参赛记录
@@ -1012,6 +1094,35 @@ Body: {
   role: "collector" | "hauler" | "escort"
 }
 Response: {
+  application: PlanningTeamApplication,
+  team: PlanningTeam,
+  totalTeams: number
+}
+
+// 队长审批独立战队申请
+POST /api/planning-teams/{teamId}/applications/{applicationId}/approve
+Response: {
+  team: PlanningTeam,
+  totalTeams: number
+}
+
+// 队长拒绝独立战队申请
+POST /api/planning-teams/{teamId}/applications/{applicationId}/reject
+Response: {
+  team: PlanningTeam,
+  totalTeams: number
+}
+
+// 成员退出独立战队
+POST /api/planning-teams/{teamId}/leave
+Response: {
+  team: PlanningTeam | null,
+  totalTeams: number
+}
+
+// 队长解散独立战队
+POST /api/planning-teams/{teamId}/disband
+Response: {
   team: PlanningTeam,
   totalTeams: number
 }
@@ -1046,11 +1157,28 @@ Response: {
         ↓
 ③ 查看各队成员数、空槽和角色需求
         ↓
-④ 选择角色并点击 [加入战队]
+④ 选择角色并点击 [申请加入]
         ↓
-⑤ 加入成功，当前钱包写入该独立战队成员列表
+⑤ 申请进入 pending，等待队长审批
         ↓
-⑥ 后续在比赛报名阶段再把这支战队绑定到具体比赛
+⑥ 队长同意后，当前钱包写入该独立战队成员列表
+        ↓
+⑦ 后续在比赛报名阶段再把这支战队绑定到具体比赛
+```
+
+**成员退出 / 队长解散流程**：
+```
+① 普通成员进入 `/planning`
+        ↓
+② 点击 [退出战队]
+        ↓
+③ 当前钱包从该独立战队成员列表移除
+
+① 队长进入 `/planning`
+        ↓
+② 点击 [解散战队]
+        ↓
+③ 整支独立战队从注册表移除
 ```
 
 `/planning` 首屏不再展示比赛快照、match-specific 审批、锁队和支付操作，但需要直接显示独立战队列表与加入入口。
@@ -1408,7 +1536,7 @@ sui.subscribeEvent({ type: "FuelEvent" })
 每次玩家执行 `deposit_fuel()` 后，合约自动发射事件，后端计算得分：
 
 $$
-\text{score} = (\text{new\_quantity} - \text{old\_quantity}) \times \text{urgency\_weight} \times \text{panic\_multiplier}
+\text{score} = (\text{new\_quantity} - \text{old\_quantity}) \times \text{urgency\_weight} \times \text{panic\_multiplier} \times \text{fuel\_grade\_bonus}
 $$
 
 **紧急度权重（Urgency Weight）**：
@@ -1419,6 +1547,16 @@ $$
 | 🟡 **一般告警** | 20% – 50% | **1.5x** |
 | 🟢 **安全运行** | ≥ 50% | **1.0x** |
 
+**燃料品级加成（Fuel Grade Bonus）**：
+
+| 品级 | 效率区间 | 加成系数 | 视觉标识 |
+|---|---|---|---|
+| ⚪ **标准燃料** (Tier 1) | 10% – 40% | **1.0x** | 白色图标 |
+| 🟡 **高效燃料** (Tier 2) | 41% – 70% | **1.25x** | 金色图标 |
+| 🟣 **精炼燃料** (Tier 3) | 71% – 100% | **1.5x** | 紫色图标 |
+
+> **品级判定依据**：通过 `FuelEvent.type_id` 查询链上 `FuelConfig.fuel_efficiency` 表获取燃料效率值，映射到对应品级（详见 0.8 章节）。
+
 **冲刺加成（Panic Multiplier）**：
 
 | 阶段 | 时间段 | 得分乘数 |
@@ -1426,9 +1564,20 @@ $$
 | Normal Mode | 比赛开始 → 剩余 90 秒 | 1.0x |
 | Panic Mode | 最后 90 秒 | **1.5x** |
 
-**最高单次得分系数**：3.0 × 1.5 = **4.5x**
+**最高单次得分系数**：3.0 × 1.5 × 1.5 = **6.75x**
 
-> 关键设计：权重以**注入时刻**的 `fill_ratio` 为准，防止"少量多次维持红色刷分"的作弊行为。
+> 关键设计：
+> - 紧急度权重以**注入时刻**的 `fill_ratio` 为准，防止"少量多次维持红色刷分"的作弊行为
+> - 燃料品级以**实际注入燃料的 type_id** 为准，鼓励团队储备高品级燃料
+
+**计分示例**：
+
+| 场景 | 燃料数量 | 站点状态 | 燃料品级 | 时间阶段 | 最终得分 |
+|---|---|---|---|---|---|
+| 普通加油 | 100 | 🟢 安全 (1.0x) | ⚪ 标准 (1.0x) | Normal (1.0x) | 100 pts |
+| 紧急救援 | 100 | 🔴 极危 (3.0x) | ⚪ 标准 (1.0x) | Normal (1.0x) | 300 pts |
+| 高品燃料 | 100 | 🟢 安全 (1.0x) | 🟣 精炼 (1.5x) | Normal (1.0x) | 150 pts |
+| 极限冲刺 | 100 | 🔴 极危 (3.0x) | 🟣 精炼 (1.5x) | Panic (1.5x) | **675 pts** |
 
 ---
 
@@ -1507,10 +1656,12 @@ $$
 │  🔴 Turret-Gam  [█░░░░░░░░░]  9%  ⚠️    │
 ├──────────────────────────────────────────┤
 │  💬 弹幕区                                │
-│  🐸 玩家B 为 Gate-Alpha 注入！+600pts    │
-│  🐸 玩家X 为 SSU-Beta 注入！+450pts      │
+│  🐸 玩家B 🟣精炼 Gate-Alpha +600pts ×4.5 │
+│  🐸 玩家X ⚪标准 SSU-Beta +150pts ×1.5   │
 └──────────────────────────────────────────┘
 ```
+
+> **弹幕品级标识**：每条加油弹幕显示燃料品级图标（⚪/🟡/🟣），帮助玩家直观感知品级差异对得分的影响。
 
 **浮窗区域说明**：
 
@@ -1519,7 +1670,7 @@ $$
 | **顶栏** | 品牌 + 倒计时（< 90s 变红） | 每秒刷新 |
 | **得分板** | 各队实时得分 + 进度条 | 链上事件触发 |
 | **站点状态** | 目标节点 fill_ratio 进度 | 每 5 秒轮询 |
-| **弹幕区** | 送油成功记录滚动显示 | 链上事件触发 |
+| **弹幕区** | 送油记录 + 燃料品级 + 乘数明细 | 链上事件触发 |
 
 **Panic Mode 视觉效果**：
 
@@ -2157,6 +2308,7 @@ if fill_ratio < 0.20 AND node.is_public AND no_active_match:
 | **入场费 vs 预期收益 UI** | 在 Lobby 清晰展示"投入 vs 预期回报"，提高玩家点击 `[Join & Pay]` 转化率 | 高 |
 | **紧急补给 UI 仪表盘** | 站点 `fill_ratio` 降至 10% 时触发全屏高频闪烁 + 音效警报 | 中 |
 | **悬赏加码功能** | 站点所有者可随时追加 LUX 到进行中的奖池，吸引更多队伍入场 | 中 |
+| **舰船补给赛** | 将比赛目标从固定基础设施扩展到高活跃玩家舰船，但仅在确认存在**舰船级链上可验证加油事件 / 状态**后启用；作为独立玩法，不与节点模式混算 | 高 |
 
 ---
 
@@ -2269,12 +2421,48 @@ EVE Frontier 链上（Sui）
 
 ## 9. PM Discussion Log
 
+### 2026-03-31（舰船补给赛范围澄清）
+
+- 用户问题：官方建议提到“主要燃料消耗载体不止 NetworkNode，也包括玩家舰船”，是否意味着当前加油比赛模式除了支持给 `NetworkNode` 加油，也应该支持给舰船加油。
+- PM 答复：
+  1. **产品方向上是**：这说明 Fuel Frog Panic 不应永久局限于“节点抢修”，后续应把“舰船补给”视为重要扩展方向。
+  2. **当前基线上不是**：现阶段比赛仍以 `NetworkNode` 为唯一计分目标；舰船补给不直接并入当前自由模式 / 精准模式。
+  3. **原因**：舰船属于移动目标，目标发现、归因、反作弊、紧急度定义和任务发起方都与节点模式不同，需要独立业务规则。
+  4. **落地前提**：只有在 EVE Frontier 暴露**可验证的舰船级加油事件或舰船燃料状态**后，才进入 `P1` 作为独立玩法模式推进。
+- 决策类型：产品范围澄清 + 路线图扩展
+- 影响章节：
+  - `4.1 创建 & 发布比赛`（新增 P0/P1 范围澄清）
+  - `6. 扩展功能（Roadmap）`（新增舰船补给赛）
+  - `10. Open Questions`（新增舰船级链上可验证能力待确认）
+
+### 2026-03-31（燃料品级计分加成机制）
+
+- 用户问题：EVE Frontier 团队建议考虑以下情况让作品更完善：1) 游戏内燃料种类繁多（类似现实中有 #92 也有 #95）；2) 游戏内消耗燃料的主要载体除了 NetworkNode 之外更多是玩家驾驶的舰船（尤其是活跃度较高的用户）。
+- PM 答复：
+  1. **燃料品级加成**（本次实现）：基于链上 `FuelConfig.fuel_efficiency` 表，将燃料划分为三个品级（Tier 1 标准 / Tier 2 高效 / Tier 3 精炼），分别给予 1.0x / 1.25x / 1.5x 的计分加成。这让团队在比赛前需要做资源储备决策，增加策略深度。
+  2. **舰船燃料任务**（后续规划）：需进一步确认 EVE Frontier 是否支持舰船级别的 FuelEvent，若支持可扩展为「舰船紧急加油任务」玩法。
+- 决策类型：计分机制优化 + 产品策略深度增强
+- 影响章节：
+  - `0.8 燃料品级体系`（新增）
+  - `4.1 创建比赛 - 节点状态颜色说明`（新增品级标识表）
+  - `4.4 启动比赛 - 计分系统`（公式新增 fuel_grade_bonus 因子，最高系数从 4.5x 提升到 6.75x）
+  - `4.4 UI 设计 - 游戏内浮窗`（弹幕区新增品级图标展示）
+
+---
+
 ### 2026-03-28（`/planning` 改为独立战队创建页）
 
 - 用户问题：`/planning` 创建战队实际上不需要绑定比赛，这个页面只需要显示当前有多少个战队，并支持创建战队。
 - PM 答复：接受。`/planning` 改为独立战队注册页，默认只显示总战队数和创建入口；比赛绑定、入队审批、锁队和支付从该页首屏移除，保留到后续比赛报名阶段处理。
 - 决策类型：组队入口定位调整。
 - 影响章节：`4.2 创建战队`、`5.3 前端模块`
+
+### 2026-03-31（独立战队加入改为申请制，并补退出/解散）
+
+- 用户问题：独立战队除了支持创建，还需要支持“加入需队长审核、成员退出、队长解散”。
+- PM 答复：接受。`/planning` 下的独立战队也采用“申请加入 -> 队长审批”模型；普通成员支持退出，队长支持解散整队。
+- 决策类型：独立战队生命周期规则补充
+- 影响章节：`4.2.1 功能说明`、`4.2.2 技术支持`、`4.2.3 用户操作漏斗`
 
 ---
 
@@ -2479,4 +2667,10 @@ EVE Frontier 链上（Sui）
 
 ---
 
-*文档结束 — Fuel Frog Panic PRD v2.6*
+## 10. Open Questions
+
+- **舰船级可验证加油能力待确认**：当前合约基线已确认 `FuelEvent` 与公开 `deposit_fuel` 入口实际落在 `NetworkNode` 侧；是否存在可供平台直接归因的**舰船级加油事件、舰船燃料状态读取口径、以及与玩家钱包/角色的稳定绑定关系**，仍需等待 EVE Frontier 官方能力说明或后续合约开放。
+
+---
+
+*文档结束 — Fuel Frog Panic PRD v2.7.1*

@@ -7,6 +7,7 @@ import {
   type PersistedTeam
 } from "./runtimeProjectionStore.ts";
 import type { Match, MatchStatus } from "../types/match.ts";
+import type { PlanningTeam, PlanningTeamApplication, PlanningTeamMember } from "../types/planningTeam.ts";
 import type { SettlementBill } from "../types/settlement.ts";
 import type { TeamMember } from "../types/team.ts";
 
@@ -77,6 +78,39 @@ type SettlementRow = {
   runtime_payload?: PersistedSettlement | null;
 };
 
+type PlanningTeamRow = {
+  id: string;
+  captain_wallet: string;
+  team_name: string;
+  max_members: number;
+  member_count: number | null;
+  role_slots: Record<string, number> | null;
+  created_at: string | null;
+  updated_at: string | null;
+  runtime_payload?: PlanningTeam | null;
+};
+
+type PlanningTeamMemberRow = {
+  team_id: string;
+  wallet_address: string;
+  role: string;
+  joined_at: string | null;
+  runtime_payload?: PlanningTeamMember | null;
+};
+
+type PlanningTeamApplicationRow = {
+  id: string;
+  team_id: string;
+  applicant_wallet: string;
+  role: string;
+  status: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  reason: string | null;
+  created_at: string | null;
+  runtime_payload?: PlanningTeamApplication | null;
+};
+
 function resolveBackendConfig(): BackendConfig | null {
   const baseUrl =
     process.env.SUPABASE_URL?.trim() ??
@@ -92,6 +126,28 @@ function resolveBackendConfig(): BackendConfig | null {
     baseUrl: baseUrl.replace(/\/+$/, ""),
     serviceRoleKey
   };
+}
+
+export function isBackendRelationMissing(error: unknown, relationName?: string) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const normalizedMessage = error.message.replaceAll('\\"', '"');
+
+  if (!normalizedMessage.includes("42P01")) {
+    return false;
+  }
+
+  if (!relationName) {
+    return true;
+  }
+
+  return normalizedMessage.includes(`public.${relationName}`);
+}
+
+export function buildPlanningTeamBackendMissingMessage() {
+  return "Planning team backend tables are missing. Run the latest Supabase migrations to create planning_teams and planning_team_members.";
 }
 
 function readNumber(value: unknown, fallback = 0) {
@@ -231,6 +287,43 @@ function toTeamMemberRow(member: TeamMember): Record<string, unknown> {
   };
 }
 
+function toPlanningTeamRow(team: PlanningTeam): Record<string, unknown> {
+  return {
+    id: team.id,
+    captain_wallet: team.captainAddress,
+    team_name: team.name,
+    max_members: team.maxMembers,
+    member_count: team.memberCount,
+    role_slots: team.roleSlots,
+    runtime_payload: team
+  };
+}
+
+function toPlanningTeamMemberRows(team: PlanningTeam): Array<Record<string, unknown>> {
+  return team.members.map((member) => ({
+    team_id: team.id,
+    wallet_address: member.walletAddress,
+    role: member.role,
+    joined_at: member.joinedAt,
+    runtime_payload: member
+  }));
+}
+
+function toPlanningTeamApplicationRows(team: PlanningTeam): Array<Record<string, unknown>> {
+  return team.applications.map((application) => ({
+    id: application.id,
+    team_id: team.id,
+    applicant_wallet: application.applicantWalletAddress,
+    role: application.role,
+    status: application.status,
+    reviewed_at: application.reviewedAt,
+    reviewed_by: application.reviewedBy,
+    reason: application.reason,
+    created_at: application.createdAt,
+    runtime_payload: application
+  }));
+}
+
 function normalizeMatch(row: MatchRow): Match {
   if (row.runtime_payload && typeof row.runtime_payload === "object") {
     return {
@@ -259,6 +352,7 @@ function normalizeMatch(row: MatchRow): Match {
     startThresholdText: undefined,
     durationMinutes: Math.max(1, Math.floor(readNumber(row.duration_sec, 600) / 60)),
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: "min_threshold",
     triggerNodeId: undefined,
     triggerNodeName: undefined,
@@ -337,6 +431,73 @@ function normalizeSettlement(row: SettlementRow): PersistedSettlement {
     payoutTxDigest: row.settlement_tx ?? null,
     updatedAt: row.updated_at ?? new Date().toISOString(),
     status: row.status === "failed" ? "failed" : row.status === "settled" ? "succeeded" : "running"
+  };
+}
+
+function normalizePlanningTeamMember(row: PlanningTeamMemberRow): PlanningTeamMember {
+  if (row.runtime_payload && typeof row.runtime_payload === "object") {
+    return row.runtime_payload;
+  }
+
+  return {
+    walletAddress: row.wallet_address,
+    role: row.role === "hauler" || row.role === "escort" ? row.role : "collector",
+    joinedAt: row.joined_at ?? new Date().toISOString()
+  };
+}
+
+function normalizePlanningTeamApplication(row: PlanningTeamApplicationRow): PlanningTeamApplication {
+  if (row.runtime_payload && typeof row.runtime_payload === "object") {
+    return row.runtime_payload;
+  }
+
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    applicantWalletAddress: row.applicant_wallet,
+    role: row.role === "hauler" || row.role === "escort" ? row.role : "collector",
+    status: row.status === "approved" || row.status === "rejected" ? row.status : "pending",
+    createdAt: row.created_at ?? new Date().toISOString(),
+    reviewedAt: row.reviewed_at,
+    reviewedBy: row.reviewed_by,
+    reason: row.reason
+  };
+}
+
+function normalizePlanningTeam(
+  row: PlanningTeamRow,
+  members: PlanningTeamMember[],
+  applications: PlanningTeamApplication[]
+): PlanningTeam {
+  if (row.runtime_payload && typeof row.runtime_payload === "object") {
+    return {
+      ...row.runtime_payload,
+      members,
+      applications,
+      memberCount: members.length
+    };
+  }
+
+  const roleSlots = row.role_slots ?? {
+    collector: 1,
+    hauler: 1,
+    escort: 1
+  };
+
+  return {
+    id: row.id,
+    name: row.team_name,
+    captainAddress: row.captain_wallet,
+    maxMembers: row.max_members,
+    memberCount: row.member_count ?? members.length,
+    roleSlots: {
+      collector: Number(roleSlots.collector ?? 0),
+      hauler: Number(roleSlots.hauler ?? 0),
+      escort: Number(roleSlots.escort ?? 0)
+    },
+    members,
+    applications,
+    createdAt: row.created_at ?? new Date().toISOString()
   };
 }
 
@@ -466,6 +627,62 @@ export async function persistMatchDetailForTeamToBackend(teamId: string) {
   return persistMatchDetailToBackend(team.matchId);
 }
 
+export async function persistPlanningTeamToBackend(teamId: string) {
+  if (!isMatchBackendConfigured()) {
+    return false;
+  }
+
+  const state = readRuntimeProjectionState();
+  const team = state.planningTeams.find((candidate) => candidate.id === teamId);
+  if (!team) {
+    return false;
+  }
+
+  await supabaseRequest("planning_teams?on_conflict=id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify([toPlanningTeamRow(team)])
+  });
+
+  await supabaseRequest(`planning_team_members?team_id=eq.${encodeURIComponent(team.id)}`, {
+    method: "DELETE",
+    headers: {
+      Prefer: "return=minimal"
+    }
+  });
+
+  if (team.members.length > 0) {
+    await supabaseRequest("planning_team_members", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(toPlanningTeamMemberRows(team))
+    });
+  }
+
+  await supabaseRequest(`planning_team_applications?team_id=eq.${encodeURIComponent(team.id)}`, {
+    method: "DELETE",
+    headers: {
+      Prefer: "return=minimal"
+    }
+  });
+
+  if (team.applications.length > 0) {
+    await supabaseRequest("planning_team_applications", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(toPlanningTeamApplicationRows(team))
+    });
+  }
+
+  return true;
+}
+
 export async function deleteMatchDetailFromBackend(matchId: string) {
   if (!isMatchBackendConfigured()) {
     return false;
@@ -573,6 +790,76 @@ export async function hydrateRuntimeProjectionFromBackendIfNeeded(options: { mat
     ...settlements
   ];
 
+  writeRuntimeProjectionState(next);
+  return true;
+}
+
+export async function hydratePlanningTeamsFromBackendIfNeeded(options: { force?: boolean } = {}) {
+  if (!isMatchBackendConfigured()) {
+    return false;
+  }
+
+  const current = readRuntimeProjectionState();
+  if (!options.force && current.planningTeams.length > 0) {
+    return false;
+  }
+
+  const teamRows =
+    (await supabaseRequest<PlanningTeamRow[]>("planning_teams?select=*", {
+      method: "GET",
+      headers: {
+        Prefer: "return=representation"
+      }
+    })) ?? [];
+
+  if (teamRows.length === 0) {
+    return false;
+  }
+
+  const teamIds = teamRows.map((row) => row.id);
+  const memberRows =
+    (await supabaseRequest<PlanningTeamMemberRow[]>(
+      `planning_team_members?select=*&team_id=in.(${teamIds.join(",")})`,
+      {
+        method: "GET",
+        headers: {
+          Prefer: "return=representation"
+        }
+      }
+    )) ?? [];
+  const applicationRows =
+    (await supabaseRequest<PlanningTeamApplicationRow[]>(
+      `planning_team_applications?select=*&team_id=in.(${teamIds.join(",")})`,
+      {
+        method: "GET",
+        headers: {
+          Prefer: "return=representation"
+        }
+      }
+    )) ?? [];
+
+  const membersByTeamId = new Map<string, PlanningTeamMember[]>();
+  for (const row of memberRows) {
+    const bucket = membersByTeamId.get(row.team_id) ?? [];
+    bucket.push(normalizePlanningTeamMember(row));
+    membersByTeamId.set(row.team_id, bucket);
+  }
+  const applicationsByTeamId = new Map<string, PlanningTeamApplication[]>();
+  for (const row of applicationRows) {
+    const bucket = applicationsByTeamId.get(row.team_id) ?? [];
+    bucket.push(normalizePlanningTeamApplication(row));
+    applicationsByTeamId.set(row.team_id, bucket);
+  }
+
+  const next = readRuntimeProjectionState();
+  next.planningTeams = teamRows.map((row) =>
+    normalizePlanningTeam(
+      row,
+      membersByTeamId.get(row.id) ?? [],
+      applicationsByTeamId.get(row.id) ?? []
+    )
+  );
+  next.planningTeamApplications = applicationRows.map((row) => normalizePlanningTeamApplication(row));
   writeRuntimeProjectionState(next);
   return true;
 }

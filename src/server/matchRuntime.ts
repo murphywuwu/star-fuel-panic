@@ -8,6 +8,7 @@ import {
   appendPersistedMatchStreamEvents,
   deletePersistedMatch,
   getPersistedMatchDetail,
+  listPersistedFuelEvents,
   getPersistedSettlement,
   listPersistedMatchStreamEvents,
   listPersistedMatches,
@@ -19,6 +20,7 @@ import {
 import type { ErrorCode } from "../types/common.ts";
 import type { Mission, StartRuleMode } from "../types/mission.ts";
 import type {
+  FuelDepositEvent,
   Match,
   MatchCreationMode,
   MatchFilters,
@@ -28,6 +30,7 @@ import type {
   TriggerMode
 } from "../types/match.ts";
 import type { PlayerRole, Team, TeamMember } from "../types/team.ts";
+import { hydrateFuelGradeInfo } from "../utils/fuelGrade.ts";
 
 export type MatchScore = {
   matchId: string;
@@ -276,7 +279,8 @@ function hydratePersistedStreamEvent(row: PersistedMatchStreamEvent): MatchStrea
       return {
         type: "score_update",
         matchId: row.matchId,
-        scoreboard: payload.scoreboard as MatchScoreboardSnapshot
+        scoreboard: payload.scoreboard as MatchScoreboardSnapshot,
+        ...(payload.fuelDeposit ? { fuelDeposit: payload.fuelDeposit as import("../types/match.ts").FuelDepositEvent } : {})
       };
     case "phase_change":
     case "panic_mode":
@@ -358,6 +362,7 @@ function buildMatchFromMission(mission: Mission): Match {
     maxTeams: mission.maxTeams,
     durationMinutes: 10,
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: toTriggerMode(mission.startRuleMode),
     startedAt: mission.status === "in_progress" ? mission.createdAt : null,
     endedAt: mission.status === "settled" || mission.status === "expired" ? nowIso() : null,
@@ -696,17 +701,56 @@ export async function getMatchScoreboardSnapshot(matchId: string): Promise<Match
   };
 }
 
+function findLatestMaterializedFuelDeposit(matchId: string): FuelDepositEvent | null {
+  const persistedFuelEvent = listPersistedFuelEvents(matchId).sort((left, right) => right.chainTs - left.chainTs)[0];
+  if (persistedFuelEvent) {
+    const fuelGrade = hydrateFuelGradeInfo(
+      persistedFuelEvent.fuelTypeId,
+      persistedFuelEvent.fuelGrade,
+      {
+        bonus: persistedFuelEvent.fuelGradeBonus
+      }
+    );
+    return {
+      txDigest: persistedFuelEvent.txDigest,
+      sender: persistedFuelEvent.senderWallet,
+      teamId: persistedFuelEvent.teamId,
+      nodeId: persistedFuelEvent.assemblyId,
+      nodeName: `Node ${persistedFuelEvent.assemblyId.slice(0, 8)}`,
+      fuelAdded: persistedFuelEvent.fuelAdded,
+      fuelTypeId: persistedFuelEvent.fuelTypeId,
+      fuelGrade,
+      urgencyWeight: persistedFuelEvent.urgencyWeight,
+      panicMultiplier: persistedFuelEvent.panicMultiplier,
+      scoreDelta: persistedFuelEvent.scoreDelta,
+      timestamp: persistedFuelEvent.createdAt
+    };
+  }
+
+  const materializedEvents = listMaterializedMatchStreamEvents(matchId);
+  for (let index = materializedEvents.length - 1; index >= 0; index -= 1) {
+    const candidate = materializedEvents[index];
+    if (candidate?.type === "score_update" && candidate.fuelDeposit) {
+      return candidate.fuelDeposit;
+    }
+  }
+
+  return null;
+}
+
 export async function buildMatchStreamFrame(matchId: string): Promise<MatchStreamEvent[] | null> {
   await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
   const status = getMatchStatusSnapshot(matchId);
   const scoreboard = await getMatchScoreboardSnapshot(matchId);
   if (!status || !scoreboard) return null;
+  const latestFuelDeposit = findLatestMaterializedFuelDeposit(matchId);
 
   const events: MatchStreamEvent[] = [
     {
       type: "score_update",
       matchId,
-      scoreboard
+      scoreboard,
+      ...(latestFuelDeposit ? { fuelDeposit: latestFuelDeposit } : {})
     },
     {
       type: "node_status",
@@ -899,6 +943,8 @@ export function createHostedMatch(input: {
     durationMinutes?: number;
     scoringMode?: "weighted" | "volume";
     creationMode?: MatchCreationMode;
+    challengeMode?: "normal" | "fuel_grade_challenge";
+    primaryFuelGrade?: "standard" | "premium" | "refined";
   };
   txDigest: string;
   walletAddress: string;
@@ -921,6 +967,9 @@ export function createHostedMatch(input: {
 
   const matchId = crypto.randomUUID();
   const onChainId = `hosted_${input.txDigest.trim().slice(0, 12)}_${Date.now()}`;
+  const challengeMode = input.config.challengeMode ?? "normal";
+  const primaryFuelGrade = challengeMode === "fuel_grade_challenge" ? (input.config.primaryFuelGrade ?? "refined") : undefined;
+
   const match: Match = {
     id: matchId,
     onChainId,
@@ -934,6 +983,8 @@ export function createHostedMatch(input: {
     maxTeams,
     durationMinutes,
     scoringMode,
+    challengeMode,
+    primaryFuelGrade,
     triggerMode: minTeams === maxTeams ? "dynamic" : "min_threshold",
     startedAt: null,
     endedAt: null,
@@ -998,6 +1049,7 @@ export function createMatchDraft(input: CreateDraftInput): ApiResult<{ match: Ma
     maxTeams,
     durationMinutes: durationHours * 60,
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: "min_threshold",
     startedAt: null,
     endedAt: null,
