@@ -1,36 +1,11 @@
-# Dependencies
-node_modules
-.pnpm-store
-
-# Build outputs
-.next
-out
-dist
-
-# Development
-.env
-.env.local
-.env.*.local
-
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-
-# Testing
-coverage
-.nyc_output
-
-# Documentation
-docs
-*.md
-!README.md
-
-# Git
 .git
-.gitignore
-
-# Misc
+.github
+.next
+node_modules
+coverage
+dist
+tmp
 .DS_Store
 *.log
+data/runtime-projections.json
+data/node-index.json

@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { registerWhitelistOnChain } from "../_shared/chain.ts";
 import { corsHeaders, env, jsonResponse } from "../_shared/http.ts";
 import { normalizeWallet, syncMissionCounters } from "../_shared/lobby.ts";

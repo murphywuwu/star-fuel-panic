@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { startMatchOnChain } from "../_shared/chain.ts";
 import { canTransition, computeRemainingSec } from "../_shared/matchState.ts";
 import { corsHeaders, env, jsonResponse } from "../_shared/http.ts";

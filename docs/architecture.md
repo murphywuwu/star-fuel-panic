@@ -459,3 +459,82 @@ BFF / Runtime Layer
 - `draft` 与 `cancelled` 为内部状态，用于支撑“先创建草稿后发布”和“未开赛退款”两类流程；公开大厅默认不返回这两类状态。
 - 自由模式的记分边界以目标星系为准；精准模式的记分边界以发布时冻结的 `targetNodeIds` 为准。
 - `activeMatchId` 不是节点与比赛的一对一强约束字段；节点与比赛的规范关系以 `matches.solar_system_id` 和 `match_target_nodes` 为准。
+
+---
+
+## 12. Deployment Topology
+
+### 12.1 Recommended Production Shape
+
+- Frontend + BFF:
+  部署为**同一个 Next.js web service**。原因是当前仓库的 `/lobby`、`/planning`、`/match` 页面与 `src/app/api/**` Route Handlers 共享同一套 TypeScript 领域模型与运行时读写逻辑，不适合再拆成第二个独立 BFF 仓库。
+- Runtime workers:
+  单独部署为**长期运行的 worker service**，至少承载：
+  - `nodeRuntime`
+  - `constellationRuntime`
+  - `matchRuntime`
+  - `chainSyncEngine`
+  - `settlementRuntime`
+- Node indexer:
+  单独部署为**第二个长期运行的 worker / cron-capable service**，负责 `nodeIndexer.ts`。它不在 `runtimeSupervisor` 中，不能假定由 web service 代跑。
+- Supabase:
+  使用托管 Supabase project 作为生产数据库与后端事实层，承载：
+  - Postgres
+  - Realtime
+  - migrations
+  - Edge Functions（仅保留仍然需要的 Supabase function path）
+
+### 12.2 Environment Split
+
+- `dev`:
+  本地 `.env` + 本地/测试 Supabase。
+- `staging`:
+  独立 Supabase project + 独立 web service + 独立 worker service；用于合约配置、支付校验、链上只读验证和预发布回归。
+- `prod`:
+  独立 Supabase project + 独立 web service + 独立 worker service；禁止与 staging 共享数据库、Service Role Key、链上提交密钥。
+
+### 12.3 Runtime Placement Rules
+
+- Web service 只负责：
+  - Next.js 页面渲染
+  - `src/app/api/**` Route Handlers
+  - 短生命周期读写请求
+- Worker service 只负责：
+  - 周期轮询
+  - 链上事件监听/归因
+  - 结算与投影刷新
+  - `worker_health` 心跳上报
+- 不允许把 `runtimeSupervisor` 或 `nodeIndexer` 塞进 serverless / edge request 生命周期中执行。
+
+### 12.4 Persistence Rules
+
+- 生产事实层以 Supabase 为准，不依赖本地 `.json` 文件做持久化来源。
+- `runtime-projections.json`、`node-index.json` 仅允许作为：
+  - 本地开发缓存
+  - 启动期 fallback
+  - 调试快照
+- 线上实例重启后必须能够从 Supabase /链上只读源重新 hydrate，不能要求容器本地磁盘长期保存状态。
+
+### 12.5 Release Order
+
+1. 先创建 `staging` / `prod` Supabase project。
+2. 运行数据库 migrations。
+3. 部署 web service。
+4. 部署 worker service。
+5. 部署 node indexer service。
+6. 注入链上 / Supabase / world API secrets。
+7. 先在 staging 完成：
+   - `pnpm build`
+   - `node ./scripts/check-layer-imports.mjs`
+   - 关键 API smoke test
+   - worker heartbeat 检查
+8. 再切 prod 域名 / 流量。
+
+### 12.6 Baseline Recommendation
+
+- 当前代码基线**更适合“容器化 web + 容器化 workers + 托管 Supabase”**，而不是“纯 serverless 前后端一把梭”。
+- 如果未来坚持把 BFF 放到纯 serverless 平台，则需要先移除：
+  - 本地进程内状态依赖
+  - 本地文件投影依赖
+  - 长期运行 worker 依赖
+  否则生产行为会与本地不一致。

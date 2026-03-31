@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - staging
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify layer imports
+        run: node ./scripts/check-layer-imports.mjs
+
+      - name: Run targeted regression
+        run: >
+          node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test
+          src/server/matchRuntime.test.ts
+          src/server/criticalPath.e2e.test.ts
+          src/server/teamRuntime.solo.test.ts
+          src/server/matchRuntime.stream.test.ts
+          src/app/api/__tests__/f007-match-flow.test.ts
+          src/service/createMatchService.test.ts

@@ -1,0 +1,84 @@
+name: deploy-production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify layer imports
+        run: node ./scripts/check-layer-imports.mjs
+
+      - name: Run targeted regression
+        run: >
+          node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test
+          src/server/matchRuntime.test.ts
+          src/server/criticalPath.e2e.test.ts
+          src/server/teamRuntime.solo.test.ts
+          src/server/matchRuntime.stream.test.ts
+          src/app/api/__tests__/f007-match-flow.test.ts
+          src/service/createMatchService.test.ts
+
+  deploy-supabase:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_PRODUCTION }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_PRODUCTION }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID_PRODUCTION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push database migrations
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
+
+      - name: Deploy Edge Functions
+        run: |
+          for fn in create-team get-settlement-bill join-team lock-team match-tick node-scanner pay-entry trigger-settlement; do
+            supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_ID"
+          done
+
+  deploy-railway:
+    needs: deploy-supabase
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger web deploy
+        run: curl -fsSL -X POST "${{ secrets.RAILWAY_WEB_DEPLOY_HOOK_URL_PRODUCTION }}"
+
+      - name: Trigger runtime workers deploy
+        run: curl -fsSL -X POST "${{ secrets.RAILWAY_RUNTIME_WORKERS_DEPLOY_HOOK_URL_PRODUCTION }}"
+
+      - name: Trigger node indexer deploy
+        run: curl -fsSL -X POST "${{ secrets.RAILWAY_NODE_INDEXER_DEPLOY_HOOK_URL_PRODUCTION }}"

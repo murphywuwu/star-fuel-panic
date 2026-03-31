@@ -211,6 +211,32 @@ Visit the `/match` page to experience the full **Demo Replay Mode**:
 
 ---
 
+## Deployment
+
+Production deployment for this repo is **not** just static frontend hosting.
+
+Recommended topology:
+
+- 1 `web` service for Next.js frontend + App Router BFF
+- 1 `runtime-workers` service for long-running loops
+- 1 `node-indexer` service for chain/node indexing
+- 1 hosted Supabase project for Postgres + Realtime
+
+Deployment assets in this repo:
+
+- Root web container: [`Dockerfile`](/Users/Murphywuwu/Documents/star-fuel-panic/Dockerfile)
+- Worker container: [`workers/Dockerfile`](/Users/Murphywuwu/Documents/star-fuel-panic/workers/Dockerfile)
+- Dynamic web start script: [`scripts/start-web.mjs`](/Users/Murphywuwu/Documents/star-fuel-panic/scripts/start-web.mjs)
+- Staging env template: [`.env.staging.example`](/Users/Murphywuwu/Documents/star-fuel-panic/.env.staging.example)
+- Production env template: [`.env.production.example`](/Users/Murphywuwu/Documents/star-fuel-panic/.env.production.example)
+- CI workflow: [`.github/workflows/ci.yml`](/Users/Murphywuwu/Documents/star-fuel-panic/.github/workflows/ci.yml)
+- Staging deploy workflow: [`.github/workflows/deploy-staging.yml`](/Users/Murphywuwu/Documents/star-fuel-panic/.github/workflows/deploy-staging.yml)
+- Production deploy workflow: [`.github/workflows/deploy-production.yml`](/Users/Murphywuwu/Documents/star-fuel-panic/.github/workflows/deploy-production.yml)
+- Checklist: [`docs/deployment-checklist.md`](/Users/Murphywuwu/Documents/star-fuel-panic/docs/deployment-checklist.md)
+- Runbook: [`docs/deployment-runbook.md`](/Users/Murphywuwu/Documents/star-fuel-panic/docs/deployment-runbook.md)
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |

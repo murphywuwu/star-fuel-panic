@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, env, jsonResponse } from "../_shared/http.ts";
 import {
   countByRole,

@@ -1,11 +1,80 @@
 # Fuel Frog Panic Deployment Checklist
 
-Last Updated: 2026-03-28
-Related Docs: `docs/PRD.md`, `docs/SPEC.md`, `docs/architecture.md`, `docs/TODO.md`
+Last Updated: 2026-04-01  
+Related Docs: `docs/PRD.md`, `docs/SPEC.md`, `docs/architecture.md`, `docs/TODO.md`, `docs/test-plan.md`
 
-## 1. Frontend Env (Vercel)
+## 1. Recommended Topology
 
-Required variables:
+Deploy four components:
+
+1. `web`
+   Next.js frontend + App Router BFF (`src/app/**`, `src/app/api/**`)
+2. `runtime-workers`
+   Long-running worker container using `workers/runtimeSupervisor.ts`
+3. `node-indexer`
+   Long-running worker container using `workers/nodeIndexer.ts`
+4. `supabase`
+   Hosted Postgres + Realtime + migrations + optional Edge Functions
+
+Do not treat this repo as pure serverless. The current production baseline requires persistent workers.
+
+## 2. One-time Platform Setup
+
+### Railway
+
+Create three services per environment:
+
+- `web`
+- `runtime-workers`
+- `node-indexer`
+
+Recommended Railway configuration:
+
+- `web`
+  - Builder: Dockerfile from repo root (`/Dockerfile`)
+  - Start command: default Docker CMD
+- `runtime-workers`
+  - Builder: `workers/Dockerfile`
+  - Env var: `WORKER_ENTRY=workers/runtimeSupervisor.ts`
+- `node-indexer`
+  - Builder: `workers/Dockerfile`
+  - Env var: `WORKER_ENTRY=workers/nodeIndexer.ts`
+
+Create one deploy hook per Railway service and environment:
+
+- `RAILWAY_WEB_DEPLOY_HOOK_URL_STAGING`
+- `RAILWAY_RUNTIME_WORKERS_DEPLOY_HOOK_URL_STAGING`
+- `RAILWAY_NODE_INDEXER_DEPLOY_HOOK_URL_STAGING`
+- `RAILWAY_WEB_DEPLOY_HOOK_URL_PRODUCTION`
+- `RAILWAY_RUNTIME_WORKERS_DEPLOY_HOOK_URL_PRODUCTION`
+- `RAILWAY_NODE_INDEXER_DEPLOY_HOOK_URL_PRODUCTION`
+
+### Supabase
+
+Create two hosted projects:
+
+- `staging`
+- `production`
+
+For GitHub Actions, prepare:
+
+- `SUPABASE_ACCESS_TOKEN_STAGING`
+- `SUPABASE_PROJECT_ID_STAGING`
+- `SUPABASE_DB_URL_STAGING`
+- `SUPABASE_ACCESS_TOKEN_PRODUCTION`
+- `SUPABASE_PROJECT_ID_PRODUCTION`
+- `SUPABASE_DB_URL_PRODUCTION`
+
+## 3. Environment Variable Matrix
+
+Use these templates as the starting point:
+
+- `.env.staging.example`
+- `.env.production.example`
+
+### 3.1 Web
+
+Public runtime vars:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -13,115 +82,163 @@ Required variables:
 - `NEXT_PUBLIC_SUI_RPC_URL`
 - `NEXT_PUBLIC_LUX_COIN_TYPE`
 - `NEXT_PUBLIC_LUX_DECIMALS`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_LABEL`
+- `NEXT_PUBLIC_PAYMENT_TOKEN_SYMBOL`
 - `NEXT_PUBLIC_FUEL_FROG_PACKAGE_ID`
+
+Server-side vars:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 - `SUI_RPC_URL`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
 - `FUEL_FROG_CHAIN_MODE`
-
-Notes:
-
-- 当前前端余额查询与入场费交易都走 `NEXT_PUBLIC_LUX_COIN_TYPE` 配置；发布前必须确认该值与目标网络上的真实 LUX coin type 一致。
-- 创建比赛的 sponsorship payment 与 `pay-team` 现在都走 `fuel_frog_panic` escrow 合约入口；必须配置 `NEXT_PUBLIC_FUEL_FROG_PACKAGE_ID` 指向已发布包地址。
-- `NEXT_PUBLIC_MATCH_SPONSORSHIP_RECIPIENT` 与 `NEXT_PUBLIC_ENTRY_PAYMENT_RECIPIENT` 对当前 escrow 主路径都不再是必需项；它们只在旧的地址收款兼容路径下有意义。
-- 本地/测试链若希望真正校验 `publishTxDigest`，`FUEL_FROG_CHAIN_MODE` 不应保持 `mock`。
-
-Optional variables:
-
+- `EVE_FRONTIER_FUEL_CONFIG_ID`
 - `CHAIN_GATEWAY_URL`
 - `CHAIN_GATEWAY_API_KEY`
 - `PAYMENT_TX_VERIFIER_URL`
 - `SETTLEMENT_CHAIN_SUBMITTER_URL`
+- `EVE_FRONTIER_WORLD_API_BASE_URL`
+- `RUNTIME_PROJECTION_STORE_PATH=/tmp/runtime-projections.json`
 
-## 2. Supabase DB Migration
+Recommended optional vars:
 
-Run in order:
+- `ENABLE_LOCAL_MATCH_SIMULATION=`
+- `SETTLEMENT_PLATFORM_FEE_BPS=1000`
+- `DEFAULT_MAX_TEAMS=10`
+- `FORCE_START_SEC=180`
 
-1. `supabase/migrations/20260321_f001_missions.sql`
-2. `supabase/migrations/202603210002_f002_lobby_match_tables.sql`
-3. `supabase/migrations/202603210001_f005_settlements.sql`
-4. `supabase/migrations/202603280002_f007_match_runtime_backend.sql`
-5. `supabase/migrations/202603280003_f007_reconcile_base_foreign_keys.sql`
-6. `scripts/sql/20260321_f006_audit_logs_indexes.sql`
+### 3.2 Runtime Workers
 
-Recommended command:
+Required:
 
-```bash
-supabase db push
-```
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUI_RPC_URL`
+- `NEXT_PUBLIC_LUX_COIN_TYPE`
+- `NEXT_PUBLIC_LUX_DECIMALS`
+- `FUEL_FROG_CHAIN_MODE`
+- `EVE_FRONTIER_FUEL_CONFIG_ID`
+- `EVE_FRONTIER_WORLD_API_BASE_URL`
+- `RUNTIME_PROJECTION_STORE_PATH=/tmp/runtime-projections.json`
 
-Notes:
+Runtime loop tuning:
 
-- 由于早期迁移文件名与依赖顺序不一致，当前仓库通过 `202603280003_f007_reconcile_base_foreign_keys.sql` 在所有基础表创建后统一补 `matches -> missions` 与 `settlements -> matches` 外键；全新本地 `supabase start` 已验证可正常初始化。
+- `NODE_RUNTIME_INTERVAL_MS`
+- `MATCH_RUNTIME_INTERVAL_MS`
+- `CHAIN_SYNC_ENGINE_INTERVAL_MS`
+- `RUNTIME_SUPERVISOR_RESTART_DELAY_MS`
 
-## 3. Deploy Edge Functions
+### 3.3 Node Indexer
 
-Deploy required functions:
+Required:
 
-- `node-scanner`
-- `create-team`
-- `join-team`
-- `lock-team`
-- `pay-entry`
-- `match-tick`
-- `trigger-settlement`
-- `get-settlement-bill`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUI_RPC_URL`
+- `EVE_FRONTIER_WORLD_API_BASE_URL`
+- `NODE_INDEX_STORE_PATH=/tmp/node-index.json`
 
-Example:
+Indexer tuning:
 
-```bash
-supabase functions deploy create-team
-supabase functions deploy join-team
-supabase functions deploy lock-team
-supabase functions deploy pay-entry
-supabase functions deploy match-tick
-supabase functions deploy node-scanner
-supabase functions deploy trigger-settlement
-supabase functions deploy get-settlement-bill
-```
+- `NODE_INDEXER_INTERVAL_MS`
+- `NODE_INDEXER_MAX_EVENT_PAGES`
 
-## 4. Configure Edge Secrets
+### 3.4 Supabase Edge Functions
 
-Use either `supabase secrets set ...` manually or run:
-
-```bash
-source .env.local
-bash scripts/supabase/set-edge-secrets.sh
-```
-
-Must-have secrets:
+If you still deploy `supabase/functions`, set at least:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Notes:
-
-- Next.js 后端路由现在也会使用 `SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY` 将比赛/战队主数据镜像到后端表，并在冷启动时从表 hydrate 本地 runtime projection。
-- 若未配置这两个变量，代码会继续退回本地 `runtime-projections.json` 缓存模式，无法满足跨进程/跨实例恢复比赛状态的要求。
-
-Optional integration secrets:
+And only add integration secrets actually used by those functions:
 
 - `CHAIN_GATEWAY_URL`
 - `CHAIN_GATEWAY_API_KEY`
 - `PAYMENT_TX_VERIFIER_URL`
 - `SETTLEMENT_CHAIN_SUBMITTER_URL`
 
-## 5. Pre-Release Checks
+## 4. Database and Function Rollout
 
-Run before release:
+Apply remote schema:
 
 ```bash
-pnpm typecheck
-pnpm lint:imports
-pnpm qa:all
-sui move test
-bash scripts/devnet-verify.sh
+supabase db push --db-url "$SUPABASE_DB_URL"
 ```
 
-## 6. Runtime Smoke
+Deploy Edge Functions:
 
-1. Open heatmap and verify mission card + node detail + lobby rule summaries一致。
-2. Complete one flow: `create-team -> join-team -> lock-team -> pay-entry`.
-3. Confirm `match_whitelist` contains all member addresses.
-4. Confirm `match-tick` can advance `lobby -> pre_start -> running -> panic -> settling -> settled`.
-5. Confirm settlement bill includes `sponsorshipFee`, `entryFeeTotal`, `platformSubsidy`, `platformFee`, `payoutPool`, and `payoutTxDigest`.
+```bash
+supabase functions deploy create-team --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy get-settlement-bill --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy join-team --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy lock-team --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy match-tick --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy node-scanner --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy pay-entry --project-ref "$SUPABASE_PROJECT_ID"
+supabase functions deploy trigger-settlement --project-ref "$SUPABASE_PROJECT_ID"
+```
+
+## 5. GitHub Actions Secrets
+
+Staging:
+
+- `SUPABASE_ACCESS_TOKEN_STAGING`
+- `SUPABASE_PROJECT_ID_STAGING`
+- `SUPABASE_DB_URL_STAGING`
+- `RAILWAY_WEB_DEPLOY_HOOK_URL_STAGING`
+- `RAILWAY_RUNTIME_WORKERS_DEPLOY_HOOK_URL_STAGING`
+- `RAILWAY_NODE_INDEXER_DEPLOY_HOOK_URL_STAGING`
+
+Production:
+
+- `SUPABASE_ACCESS_TOKEN_PRODUCTION`
+- `SUPABASE_PROJECT_ID_PRODUCTION`
+- `SUPABASE_DB_URL_PRODUCTION`
+- `RAILWAY_WEB_DEPLOY_HOOK_URL_PRODUCTION`
+- `RAILWAY_RUNTIME_WORKERS_DEPLOY_HOOK_URL_PRODUCTION`
+- `RAILWAY_NODE_INDEXER_DEPLOY_HOOK_URL_PRODUCTION`
+
+## 6. Local Preflight Helpers
+
+Before wiring secrets into a platform, you can validate required variables locally:
+
+```bash
+pnpm deploy:check:web
+pnpm deploy:check:workers
+pnpm deploy:check:indexer
+pnpm deploy:check:github:staging
+pnpm deploy:check:github:production
+```
+
+To manually trigger Railway deploy hooks from your shell:
+
+```bash
+pnpm deploy:staging:railway
+pnpm deploy:production:railway
+```
+
+## 7. Pre-release Verification
+
+Run before any manual or automated deploy:
+
+```bash
+pnpm build
+node ./scripts/check-layer-imports.mjs
+node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test \
+  src/server/matchRuntime.test.ts \
+  src/server/criticalPath.e2e.test.ts \
+  src/server/teamRuntime.solo.test.ts \
+  src/server/matchRuntime.stream.test.ts \
+  src/app/api/__tests__/f007-match-flow.test.ts \
+  src/service/createMatchService.test.ts
+```
+
+## 8. Post-deploy Smoke Checks
+
+1. Open `/lobby` and verify match cards load.
+2. Open `/planning?matchId=<id>` and verify Team Lobby loads.
+3. Hit `/api/runtime/health` and confirm worker heartbeat payload is non-empty.
+4. Create one draft match and publish it.
+5. Create a team, approve joins, lock, and pay.
+6. Confirm Supabase receives mirrored `matches`, `teams`, `team_members`, `team_payments`.
+7. Confirm worker services remain healthy after at least one loop interval.

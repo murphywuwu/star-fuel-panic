@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "rm -rf .next && next dev -p 3010",
     "build": "next build",
-    "start": "next start -p 3010",
+    "start": "node ./scripts/start-web.mjs",
+    "start:web": "node ./scripts/start-web.mjs",
+    "start:workers": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/runtimeSupervisor.ts",
+    "start:node-indexer": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/nodeIndexer.ts",
     "test": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test",
     "test:nodes": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test 'src/app/api/nodes/__tests__/**/*.test.ts' 'src/server/__tests__/nodeRuntime.test.ts' 'src/server/__tests__/nodeIndexerRuntime.test.ts'",
     "test:nodes:api": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/app/api/nodes/__tests__/route.test.ts",
@@ -35,7 +38,14 @@
     "worker:match-runtime": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/matchRuntime.ts",
     "worker:chain-sync": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/chainSyncEngine.ts",
     "worker:settlement-runtime": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/settlementRuntime.ts",
-    "worker:supervisor": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/runtimeSupervisor.ts"
+    "worker:supervisor": "node --experimental-strip-types --import ./scripts/register-test-loader.mjs ./workers/runtimeSupervisor.ts",
+    "deploy:check:web": "node ./scripts/deploy/check-required-env.mjs web",
+    "deploy:check:workers": "node ./scripts/deploy/check-required-env.mjs runtime-workers",
+    "deploy:check:indexer": "node ./scripts/deploy/check-required-env.mjs node-indexer",
+    "deploy:check:github:staging": "node ./scripts/deploy/check-required-env.mjs github-staging",
+    "deploy:check:github:production": "node ./scripts/deploy/check-required-env.mjs github-production",
+    "deploy:staging:railway": "node ./scripts/deploy/trigger-railway-hooks.mjs staging",
+    "deploy:production:railway": "node ./scripts/deploy/trigger-railway-hooks.mjs production"
   },
   "dependencies": {
     "@mysten/dapp-kit-react": "^2.0.1",
@@ -43,7 +53,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@types/three": "^0.183.1",
-    "next": "15.3.0",
+    "next": "15.5.14",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "three": "^0.183.2",

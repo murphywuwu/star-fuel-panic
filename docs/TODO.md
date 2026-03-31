@@ -159,6 +159,21 @@ Maintainer: Todo Agent
 | T-1902 | F-019 | 3.3, Architecture 4.1, 7.3 | View / Routing | View + Controller | 让 `/planning?matchId=<id>` 实际渲染 `TeamLobbyScreen`，并在页面上明确显示该比赛固定编制与单队报名费，保证 Lobby 的 `JOIN MATCH` deep-link 真正进入 match-specific Team Lobby | 当前 `/planning` 默认只显示独立战队注册页，无法承接比赛固定编制与报名支付规则 | T-1901 | `/planning?matchId=...` 打开 Team Lobby；页面显示 `teamSize` 和固定 `teamEntryFee`；独立 `/planning` 行为不变 | Done |
 | T-1903 | F-019 | 6.1 | QA | QA only | 为固定编制收费模型补测试与门禁：create-match 请求包含 `teamSize`、Team Lobby 创建/锁队/支付校验、`/planning?matchId=` 路由切换、build/layer check | 这是业务规则变更，必须有契约回归，否则极易出现 UI/运行时收费口径分裂 | T-1900, T-1901, T-1902 | 定向测试、`pnpm build`、`node ./scripts/check-layer-imports.mjs` 通过，并回填 `docs/test-plan.md` | Done |
 
+### F-020 Deployment Readiness
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-2000 | F-020 | Architecture 12 | Web / Deploy | Service only | 让 Next.js web 服务具备生产部署入口：补 `start-web` 启动脚本、修复固定 `3010` 端口问题、提供 root `Dockerfile` | 当前前端+BFF 无法直接部署到 Railway/容器平台，`start` 写死端口会导致生产平台 healthcheck/ingress 失败 | - | `package.json` 使用动态 `PORT`，root `Dockerfile` 可构建 web，`pnpm build` 通过 | Done |
+| T-2001 | F-020 | Architecture 12 | Worker / Deploy | Service only | 参数化 worker 容器入口，允许同一 `workers/Dockerfile` 复用于 `runtime-workers` 与 `node-indexer` 两个 Railway 服务 | 线上至少需要两个长期运行服务；如果 worker 镜像入口写死，部署与运维会反复分叉 | T-2000 | `workers/Dockerfile` 支持通过 `WORKER_ENTRY` 选择 supervisor 或 nodeIndexer 入口 | Done |
+| T-2002 | F-020 | Architecture 12 | CI/CD | Docs + Tooling | 提供 GitHub Actions：`ci`、`deploy-staging`、`deploy-production`，串联 build/layer checks、Supabase migrations / functions deploy、Railway service deploy | 没有自动化部署，web、workers、Supabase 三层很容易版本漂移 | T-2000, T-2001 | `.github/workflows/*` 已落地，并包含所需 secrets / vars 约定 | Done |
+| T-2003 | F-020 | Architecture 12 | Docs | Docs only | 更新部署文档：环境变量矩阵、Railway/Supabase 服务拆分、手动 Runbook、上线前检查项 | 用户要求前端、BFF、Supabase 全部上线；没有环境矩阵和 Runbook，很难稳定执行 | T-2000, T-2001, T-2002 | `docs/deployment-checklist.md` 与 `docs/deployment-runbook.md` 已回填当前拓扑 | Done |
+
+### F-021 Shell Navigation Density Cleanup
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-2100 | F-021 | Architecture 4.4 | View | View only | 重构共享 `FuelMissionShell` 导航栏：桌面端移除顶部重复的全量路由导航，改为当前路由摘要；移动端补紧凑横向导航条，缓解品牌、路由与主操作同屏拥挤 | 目前 `lg` 以上同时显示顶部全量导航和左侧全量导航，信息重复且按钮文案过长，导致共享壳层第一屏过于拥挤 | - | `FuelMissionShell` 桌面 top bar 不再重复渲染全量路由；移动端可横向切换主路由；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+
 ## 3. Ordered Execution Plan (Critical Path)
 
 1. [x] `T-0800` - 先建立 `fuelConfigRuntime`，锁定品级来源和降级策略。
@@ -195,6 +210,11 @@ Maintainer: Todo Agent
 29. [x] `T-1901` - 让 match-specific Team Lobby 继承比赛固定编制与固定单队报名费。
 30. [x] `T-1902` - 让 `/planning?matchId=` 实际进入 Team Lobby。
 31. [x] `T-1903` - 为固定编制收费模型补测试与门禁。
+32. [x] `T-2000` - 为 web 服务补动态端口启动与容器入口。
+33. [x] `T-2001` - 让 worker 容器支持 supervisor / nodeIndexer 双入口。
+34. [x] `T-2002` - 增加 CI、staging、production GitHub Actions。
+35. [x] `T-2003` - 补部署环境矩阵与手动 Runbook。
+36. [x] `T-2100` - 压缩共享壳导航密度，去掉桌面重复导航并补移动端紧凑导航条。
 
 ## 4. Definition of Done
 
@@ -244,3 +264,7 @@ Maintainer: Todo Agent
 - 2026-04-01: 完成 `T-1803`。`/lobby` 比赛卡片已移除重复的 `VIEW DETAIL` 按钮；整卡 click / Enter / Space 选中交互保持不变；清理 `.next` 后重新执行 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs`，均通过。
 - 2026-03-31: 新增 `T-1900 / T-1901 / T-1902 / T-1903`，将“报名费按人收”正式收口为“比赛创建时必须定义固定 `teamSize`”，并要求 Team Lobby、支付金额、deep-link 路由与测试门禁同步升级。
 - 2026-03-31: 完成 `T-1900 / T-1901 / T-1902 / T-1903`。create-match 已新增固定 `teamSize` 字段并驱动 projected pool；`/api/matches`、`matchRuntime`、backend projection 与 discovery DTO 已持久化 `teamSize`；match-specific Team Lobby 创建战队改为继承比赛编制、支付金额改为 `entryFee × teamSize`；`/planning?matchId=` 已实际切换到 `TeamLobbyScreen`；定向测试、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-04-01: 新增 `T-2000 / T-2001 / T-2002 / T-2003`，为 Railway + Supabase 生产部署补齐 web 入口、worker 容器参数化、GitHub Actions 和手动 Runbook。
+- 2026-04-01: 完成 `T-2000 / T-2001 / T-2002 / T-2003`。新增 `scripts/start-web.mjs`、root `Dockerfile`、`.dockerignore`，将 `package.json` 的 web 启动改为动态 `PORT`；`workers/Dockerfile` 现可通过 `WORKER_ENTRY` 复用为 `runtime-workers` 与 `node-indexer`；新增 `.github/workflows/ci.yml`、`deploy-staging.yml`、`deploy-production.yml`；重写 `docs/deployment-checklist.md` 并新增 `docs/deployment-runbook.md`；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-04-01: 新增 `T-2100`，收紧共享 `FuelMissionShell` 的导航密度，解决桌面端顶部导航与左侧导航重复导致的第一屏拥挤问题。
+- 2026-04-01: 完成 `T-2100`。`src/view/components/FuelMissionShell.tsx` 的 desktop top bar 已改为品牌 + 当前路由摘要 + 主操作，移除重复的顶部全量路由按钮；移动端新增横向滚动紧凑导航条；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。

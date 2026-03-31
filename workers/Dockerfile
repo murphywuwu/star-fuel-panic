@@ -14,5 +14,6 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Run the supervisor which manages all workers
-CMD ["node", "--experimental-strip-types", "workers/runtimeSupervisor.ts"]
+ENV WORKER_ENTRY=workers/runtimeSupervisor.ts
+
+CMD ["sh", "-lc", "node --experimental-strip-types \"$WORKER_ENTRY\""]
