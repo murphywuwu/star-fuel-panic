@@ -13,3 +13,4 @@ build
 
 # Gate topology build checkpoint (generated file, do not commit)
 data/.gate-topology-checkpoint.json
+.vercel
