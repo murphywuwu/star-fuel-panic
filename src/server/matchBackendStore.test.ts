@@ -37,6 +37,7 @@ function createMatch(matchId: string): Match {
     maxTeams: 4,
     durationMinutes: 120,
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: "min_threshold",
     startedAt: null,
     endedAt: null,
@@ -214,4 +215,58 @@ test("hydrateRuntimeProjectionFromBackendIfNeeded restores backend match rows in
   assert.equal(state.matches[0]?.status, "lobby");
   assert.equal(state.teams.length, 1);
   assert.equal(state.teamMembers.length, 1);
+});
+
+test("hydrateRuntimeProjectionFromBackendIfNeeded merges backend matches even when local projection already has history", async () => {
+  const localHistory = createMatch("match-local-history");
+  localHistory.status = "settled";
+
+  const backendMatch = createMatch("match-live-lobby");
+  backendMatch.status = "lobby";
+  backendMatch.solarSystemId = 30000145;
+
+  const state = createEmptyProjectionState();
+  state.matches = [localHistory];
+  writeRuntimeProjectionState(state);
+
+  const calls: string[] = [];
+  global.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    calls.push(url);
+
+    let payload: unknown = [];
+    if (url.includes("/rest/v1/matches?")) {
+      payload = [
+        {
+          id: backendMatch.id,
+          status: "lobby",
+          runtime_payload: backendMatch
+        }
+      ];
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return payload;
+      },
+      async text() {
+        return JSON.stringify(payload);
+      }
+    } as Response;
+  }) as typeof fetch;
+
+  const hydrated = await hydrateRuntimeProjectionFromBackendIfNeeded();
+  assert.equal(hydrated, true);
+  assert.ok(calls.some((url) => url.includes("/rest/v1/matches?select=*")));
+
+  const next = readRuntimeProjectionState();
+  assert.equal(next.matches.length, 2);
+  assert.deepEqual(
+    next.matches.map((match) => match.id).sort(),
+    [backendMatch.id, localHistory.id].sort()
+  );
+  assert.equal(next.matches.find((match) => match.id === backendMatch.id)?.status, "lobby");
+  assert.equal(next.matches.find((match) => match.id === localHistory.id)?.status, "settled");
 });

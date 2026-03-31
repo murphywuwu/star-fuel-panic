@@ -708,9 +708,6 @@ export async function hydrateRuntimeProjectionFromBackendIfNeeded(options: { mat
     if (options.matchId && current.matches.some((match) => match.id === options.matchId)) {
       return false;
     }
-    if (!options.matchId && current.matches.length > 0) {
-      return false;
-    }
   }
 
   const matchPath = options.matchId

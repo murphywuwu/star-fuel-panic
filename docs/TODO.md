@@ -109,6 +109,30 @@ Maintainer: Todo Agent
 | T-1300 | F-013 | 3.4, 5.5, 5.8 | Runtime / API | Runtime + API | 为运行中的本地服务增加模拟 FuelEvent 注入能力，支持更新 live match scoreboard、fuel event fact 和 stream feed | 用户当前无法在 EVE 客户端内真实操作，需要一条不依赖游戏客户端的 live match 测试路径 | - | 已新增 `src/server/matchSimulationRuntime.ts` 与 `/api/matches/{id}/simulate-fuel`，注入后可更新 scoreboard 与 `fuel_events` 事实 | Done |
 | T-1301 | F-013 | 3.4 | Tooling | Tooling only | 提供一键脚本 `scripts/test-match-live.mjs`，自动驱动 standard / premium / refined / panic 组合场景并打印每步 scoreboard | 仅有模拟 API 不足以让开发者快速验证 `/match`，需要一个可重复的一键脚本 | T-1300 | `scripts/test-match-live.mjs --match-id <id>` 可运行场景；真实本地 API 已验证 create-less live flow | Done |
 
+### F-014 Lobby Entry Cleanup
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1400 | F-014 | 3.2, Architecture 1.2 | View | View only | 删除 `/lobby` 页面上的 `NODE MAP` 入口按钮，避免继续暴露与“Lobby 为任务发现主入口”相冲突的旧入口 | 文档基线已要求节点地图不再作为默认入口；保留按钮会制造错误导航心智 | - | `LobbyDiscoveryScreen` 不再渲染 `NODE MAP` CTA，且 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+
+### F-015 Build Gate Recovery
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1401 | F-015 | Architecture 4.4, 6.1 | View Shell | View only | 修复 `/match` page 缺少 `Suspense` 边界导致的 Next.js prerender 构建失败，恢复前端门禁可执行性 | 当前 `pnpm build` 无法通过，导致任何前端变更都无法完成正式验证收口 | T-1400 | `src/app/match/page.tsx` 为 `FuelFrogMatchScreen` 提供 `Suspense` 边界，且 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+
+### F-016 Wallet Session Persistence
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1600 | F-016 | Architecture 4.2, 4.4 | Entry / Auth | Controller + Service | 修复钱包连接后刷新页面即断开的缺陷：恢复 dAppKit provider 的自动重连，并避免非用户主动断开时清空 provider 持久化连接信息 | 钱包刷新即断开会打断 `/` 到 Lobby 的主链路，用户每次刷新都要重新授权，无法满足入口体验基线 | - | `buildRuntimeDAppKitConfig` 已锁定 `autoConnect=true` + persisted storage；`pnpm test src/service/suiDappKit.test.ts src/service/walletService.test.ts src/app/api/__tests__/players.test.ts src/server/matchBackendStore.test.ts src/server/matchRuntime.refund.test.ts src/server/matchRuntime.stream.test.ts src/server/matchSimulationRuntime.test.ts src/server/settlementRuntime.test.ts`、`pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs` 通过 | Done |
+
+### F-017 Lobby Match Backend Hydration
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-1700 | F-017 | 3.2, 5.5, 6.1 | Runtime / Data / API | Runtime + Data | 修复 `/api/matches -> matchDiscoveryRuntime -> matchBackendStore` 的冷启动 hydrate：即使本地已有历史/测试 `matches` projection，也必须继续从 backend merge 新的真实比赛，避免 Lobby 漏掉已创建/已发布比赛 | 当前本地 projection 只要非空就会短路 hydrate，导致 backend 中真实存在的 lobby match 无法进入 Discovery 列表 | - | `src/server/matchBackendStore.test.ts` 已新增“已有本地 projection 时仍能 merge backend matches”回归，并通过 `pnpm test src/server/matchBackendStore.test.ts`、`pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs` | Done |
+
 ## 3. Ordered Execution Plan (Critical Path)
 
 1. [x] `T-0800` - 先建立 `fuelConfigRuntime`，锁定品级来源和降级策略。
@@ -130,6 +154,10 @@ Maintainer: Todo Agent
 17. [x] `T-1204` - 为 planning team 审批/退出/解散补回归和门禁验证。
 18. [x] `T-1300` - 给运行中的本地服务增加模拟 FuelEvent 注入能力。
 19. [x] `T-1301` - 提供一键 `/match` live 场景脚本。
+20. [x] `T-1400` - 删除 `/lobby` 页 `NODE MAP` 入口，收口任务发现主入口。
+21. [x] `T-1401` - 修复 `/match` page 的 `Suspense` 缺失，恢复 `pnpm build` 门禁。
+22. [x] `T-1600` - 恢复钱包 provider persisted session 的自动重连，避免刷新后掉线。
+23. [x] `T-1700` - 修复 Lobby match backend hydrate 在本地 projection 非空时被短路的问题。
 
 ## 4. Definition of Done
 
@@ -160,3 +188,10 @@ Maintainer: Todo Agent
 - 2026-03-31: 新增 `T-1200 / T-1201 / T-1202 / T-1203 / T-1204`，将独立战队加入升级为申请制，并补队长审批、成员退出、队长解散。
 - 2026-03-31: 完成 `T-1200 / T-1201 / T-1202 / T-1203 / T-1204`。独立战队已支持 apply -> approve/reject、member leave、captain disband，并新增 `planning_team_applications` backend mirror、API routes、UI controls 与定向回归。
 - 2026-03-31: 完成 `T-1300 / T-1301`。新增本地 match 模拟注入 runtime、`/api/matches/[id]/simulate-fuel` 和 `scripts/test-match-live.mjs`，支持在不进入 EVE 客户端的情况下驱动 `/match` live scoreboard / stream / fuel event 展示。
+- 2026-03-31: 新增 `T-1400`，删除 `/lobby` 页面遗留的 `NODE MAP` 入口按钮，保持 Lobby 作为任务发现唯一主入口。
+- 2026-03-31: 新增 `T-1401`，修复验证阶段暴露的 `/match` page `useSearchParams()` 缺少 `Suspense` 边界问题，恢复 Next.js 构建门禁。
+- 2026-03-31: 完成 `T-1400 / T-1401`。`/lobby` 已移除 `NODE MAP` CTA；`/match` page 新增 `Suspense` 页壳 fallback 以满足 Next.js 15 prerender 约束；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 均通过。
+- 2026-03-31: 新增 `T-1600`，修复钱包连接后刷新页面会丢失 dAppKit provider session 的问题，范围限定在 `Entry / Auth` 的 `Controller + Service`。
+- 2026-03-31: 完成 `T-1600`。`src/service/suiDappKit.ts` 已启用 persisted wallet session 的 `autoConnect`，`src/controller/useAuthController.ts` 不再手动清空 dAppKit 的连接存储；新增 `src/service/suiDappKit.test.ts`，并通过定向测试、`pnpm typecheck`、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs`。
+- 2026-03-31: 新增 `T-1700`，修复 Lobby 发现链路在本地已有历史/测试 match projection 时无法继续从 backend merge 真实比赛的问题。
+- 2026-03-31: 完成 `T-1700`。`src/server/matchBackendStore.ts` 不再因本地 `matches` 非空而整体跳过 backend hydrate，`/api/matches` 可继续 merge 真实 lobby match；新增 `src/server/matchBackendStore.test.ts` 回归并通过 `pnpm typecheck`、`pnpm build`、`node ./scripts/check-layer-imports.mjs`。

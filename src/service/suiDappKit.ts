@@ -26,18 +26,25 @@ function resolveRpcUrl(network: SuiClientTypes.Network) {
 }
 
 const defaultNetwork = resolveNetwork();
-export function createRuntimeDAppKit() {
-  return createDAppKit({
+export const DAPP_KIT_WALLET_CONNECTION_STORAGE_KEY = "sui:dapp-kit:wallet-connection-info";
+
+export function buildRuntimeDAppKitConfig(storage = typeof window !== "undefined" ? window.localStorage : undefined) {
+  return {
     networks: [defaultNetwork],
     defaultNetwork,
-    autoConnect: false,
+    // Keep the last approved wallet session across page reloads.
+    autoConnect: true,
     slushWalletConfig: null,
-    createClient: (network) =>
+    createClient: (network: SuiClientTypes.Network) =>
       new SuiGrpcClient({
         network,
         baseUrl: resolveRpcUrl(network)
       }),
-    storage: typeof window !== "undefined" ? window.localStorage : undefined,
-    storageKey: "sui:dapp-kit:wallet-connection-info"
-  });
+    storage,
+    storageKey: DAPP_KIT_WALLET_CONNECTION_STORAGE_KEY
+  };
+}
+
+export function createRuntimeDAppKit() {
+  return createDAppKit(buildRuntimeDAppKitConfig());
 }

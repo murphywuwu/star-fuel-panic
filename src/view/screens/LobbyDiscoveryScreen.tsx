@@ -271,9 +271,6 @@ export function LobbyDiscoveryScreen() {
                     CLEAR
                   </TacticalButton>
                 ) : null}
-                <Link href="/nodes-map" className="border border-eve-yellow/40 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-eve-yellow">
-                  NODE MAP
-                </Link>
               </div>
             </div>
           </TacticalPanel>

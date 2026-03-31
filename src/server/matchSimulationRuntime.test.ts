@@ -26,6 +26,7 @@ function buildDetail(): MatchDetail {
       maxTeams: 4,
       durationMinutes: 60,
       scoringMode: "weighted",
+      challengeMode: "normal",
       triggerMode: "min_threshold",
       startedAt: nowIso(),
       endedAt: null,

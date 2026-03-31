@@ -30,6 +30,7 @@ function buildDetail(overrides?: {
       maxTeams: 4,
       durationMinutes: 10,
       scoringMode: "weighted",
+      challengeMode: "normal",
       triggerMode: "dynamic",
       startedAt: null,
       endedAt: null,

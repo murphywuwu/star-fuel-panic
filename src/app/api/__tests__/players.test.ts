@@ -127,6 +127,7 @@ function buildDetail(input: {
       maxTeams: 4,
       durationMinutes: 120,
       scoringMode: "weighted",
+      challengeMode: "normal",
       triggerMode: "dynamic",
       startedAt: input.status === "lobby" ? null : input.createdAt,
       endedAt: input.status === "settled" ? new Date(Date.parse(input.createdAt) + 7_200_000).toISOString() : null,

@@ -138,10 +138,6 @@ export function useAuthController() {
           } catch {
             // Best-effort cleanup only. EVE Vault may already be deauthorized.
           }
-
-          if (typeof window !== "undefined") {
-            window.localStorage.removeItem("sui:dapp-kit:wallet-connection-info");
-          }
         }
 
         const connected = await dAppKit.connectWallet({ wallet: preferredWallet });
@@ -153,9 +149,6 @@ export function useAuthController() {
       },
       disconnect: async () => {
         await dAppKit.disconnectWallet();
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem("sui:dapp-kit:wallet-connection-info");
-        }
       },
       currentAddress: () => (walletConnection.status === "connected" ? account?.address ?? null : null),
       isWalletReady: () => walletConnection.status === "connected" && Boolean(account?.address),

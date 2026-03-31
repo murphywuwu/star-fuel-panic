@@ -25,6 +25,7 @@ function buildMatch(status: Match["status"] = "settled", prizePool = 1200): Matc
     maxTeams: 4,
     durationMinutes: 10,
     scoringMode: "weighted",
+    challengeMode: "normal",
     triggerMode: "dynamic",
     startedAt: "2026-03-23T00:00:00.000Z",
     endedAt: "2026-03-23T00:10:00.000Z",
