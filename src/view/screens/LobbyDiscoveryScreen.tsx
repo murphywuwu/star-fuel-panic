@@ -245,9 +245,6 @@ function MatchCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-        <TacticalButton tone="ghost" onClick={onSelect}>
-          View Detail
-        </TacticalButton>
         <JoinMatchAction joinCta={joinCta} />
       </div>
     </div>

@@ -148,6 +148,7 @@ Maintainer: Todo Agent
 | T-1800 | F-018 | 3.2, 3.3, Architecture 4.4 | View / Controller | View + Controller | 修复 `/lobby` 比赛列表与详情的 `JOIN MATCH` CTA：按钮必须始终可见；当当前钱包未建队、队伍不在该比赛、或当前队伍人数不足/未编满时，按钮显示为禁用态并明确提示 blocker，而不是直接不展示 | 当前 Lobby 缺少稳定的 join CTA，玩家在队伍尚未满足参赛条件时看不到入口和失败原因，导致“为什么不能加入”不可解释 | - | `/lobby` 每个比赛卡片和详情侧栏都渲染 `JOIN MATCH` CTA；不满足条件时展示 disabled + blocker 文案；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
 | T-1801 | F-018 | 3.2, 3.3, Architecture 4.4 | View | View only | 修复 `/lobby` 交互回归：比赛卡片本体必须可选中；disabled `JOIN MATCH` 的 blocker 改为 hover/focus tooltip 提示，避免常驻挤占卡片空间 | 当前版本把卡片选择入口收窄成 `VIEW DETAIL`，且 blocker 常驻展示，导致比赛难以选中、禁用原因呈现过重 | T-1800 | 点击或键盘聚焦比赛卡片即可选中；disabled `JOIN MATCH` 在 hover/focus 时显示 blocker tooltip；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
 | T-1802 | F-018 | 3.2, Architecture 4.4 | View | View only | 修复 `/lobby` 奖池读数口径：比赛卡片 `Prize Pool` 与详情 `Gross Pool` 统一改为与创建页相同的“满编 projected full pool”显示，而不是直接回显当前已入账 `grossPool` | 当前 Lobby 显示的奖池值与 Create Match 的 prize poster 口径不一致，用户会认为比赛奖池显示错误 | T-1801 | `/lobby` 卡片与详情都显示 `sponsorshipFee + entryFee × maxTeams × 3` 的 projected pool，且 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+| T-1803 | F-018 | 3.2, Architecture 4.4 | View | View only | 删除 `/lobby` 比赛卡片里的 `VIEW DETAIL` 按钮，保留整卡 click / Enter / Space 选中行为，避免重复 CTA | 当前卡片本体已经可选中，继续保留 `VIEW DETAIL` 只会增加视觉噪音和重复操作 | T-1801 | `MatchCard` 不再渲染 `VIEW DETAIL` 按钮，且 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
 
 ### F-019 Fixed Match Team Size
 
@@ -189,10 +190,11 @@ Maintainer: Todo Agent
 24. [x] `T-1800` - 修复 `/lobby` 的 `JOIN MATCH` CTA 可见性与 blocker 提示。
 25. [x] `T-1801` - 修复 `/lobby` 比赛卡片选择交互与 disabled `JOIN MATCH` tooltip。
 26. [x] `T-1802` - 统一 `/lobby` 奖池显示为 projected full pool 口径。
-27. [x] `T-1900` - 为比赛创建链路新增固定 `teamSize` 并同步读模型。
-28. [x] `T-1901` - 让 match-specific Team Lobby 继承比赛固定编制与固定单队报名费。
-29. [x] `T-1902` - 让 `/planning?matchId=` 实际进入 Team Lobby。
-30. [x] `T-1903` - 为固定编制收费模型补测试与门禁。
+27. [x] `T-1803` - 删除 `/lobby` 比赛卡片里的 `VIEW DETAIL` 按钮。
+28. [x] `T-1900` - 为比赛创建链路新增固定 `teamSize` 并同步读模型。
+29. [x] `T-1901` - 让 match-specific Team Lobby 继承比赛固定编制与固定单队报名费。
+30. [x] `T-1902` - 让 `/planning?matchId=` 实际进入 Team Lobby。
+31. [x] `T-1903` - 为固定编制收费模型补测试与门禁。
 
 ## 4. Definition of Done
 
@@ -238,5 +240,7 @@ Maintainer: Todo Agent
 - 2026-03-31: 完成 `T-1801`。比赛卡片本体已恢复 click / Enter / Space 选中；disabled `JOIN MATCH` 改为 wrapper tooltip，在 hover 或 focus 时显示 blocker；详情侧栏同步改为提示用户 hover disabled 按钮查看原因；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
 - 2026-03-31: 新增 `T-1802`，修复 `/lobby` 的 `Prize Pool / Gross Pool` 与 Create Match prize poster 口径不一致的问题，统一按满编 projected pool 显示。
 - 2026-03-31: 完成 `T-1802`。`/lobby` 比赛卡片 `Prize Pool` 与详情 `Gross Pool` 改为使用 `sponsorshipFee + entryFee × maxTeams × 3` 的 projected full pool，并对已入账 `grossPool` 取上限保护；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-04-01: 新增 `T-1803`，删除 `/lobby` 比赛卡片中重复的 `VIEW DETAIL` 按钮，保留整卡可选中交互。
+- 2026-04-01: 完成 `T-1803`。`/lobby` 比赛卡片已移除重复的 `VIEW DETAIL` 按钮；整卡 click / Enter / Space 选中交互保持不变；清理 `.next` 后重新执行 `pnpm build` 与 `node ./scripts/check-layer-imports.mjs`，均通过。
 - 2026-03-31: 新增 `T-1900 / T-1901 / T-1902 / T-1903`，将“报名费按人收”正式收口为“比赛创建时必须定义固定 `teamSize`”，并要求 Team Lobby、支付金额、deep-link 路由与测试门禁同步升级。
 - 2026-03-31: 完成 `T-1900 / T-1901 / T-1902 / T-1903`。create-match 已新增固定 `teamSize` 字段并驱动 projected pool；`/api/matches`、`matchRuntime`、backend projection 与 discovery DTO 已持久化 `teamSize`；match-specific Team Lobby 创建战队改为继承比赛编制、支付金额改为 `entryFee × teamSize`；`/planning?matchId=` 已实际切换到 `TeamLobbyScreen`；定向测试、`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
