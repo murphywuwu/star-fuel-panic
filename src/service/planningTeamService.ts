@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { planningTeamStore, type PlanningTeamStore } from "@/model/planningTeamStore";
 import type { ControllerResult } from "@/types/common";
 import type { PlanningTeam } from "@/types/planningTeam";
@@ -118,6 +119,7 @@ class PlanningTeamService {
       .catch((error) => {
         const result = this.toControllerError(error);
         this.store.getState().setError(result.message);
+        toast.error(result.message);
         return result;
       })
       .finally(() => {
@@ -168,10 +170,12 @@ class PlanningTeamService {
         totalTeams: payload.totalTeams
       });
 
+      toast.success("Team created successfully");
       return ok("PLANNING_TEAM_CREATED", payload);
     } catch (error) {
       const result = this.toControllerError(error);
       this.store.getState().setError(result.message);
+      toast.error(result.message);
       return result;
     } finally {
       this.store.getState().setMutating(false);
@@ -212,10 +216,12 @@ class PlanningTeamService {
         totalTeams: payload.totalTeams
       });
 
+      toast.success("Join request sent");
       return ok("PLANNING_TEAM_JOIN_REQUESTED", payload);
     } catch (error) {
       const result = this.toControllerError(error);
       this.store.getState().setError(result.message);
+      toast.error(result.message);
       return result;
     } finally {
       this.store.getState().setMutating(false);
@@ -354,14 +360,26 @@ class PlanningTeamService {
         })
       );
 
+      toast.success(this.formatSuccessMessage(successMessage));
       return ok(successMessage, payload);
     } catch (error) {
       const result = this.toControllerError(error);
       this.store.getState().setError(result.message);
+      toast.error(result.message);
       return result;
     } finally {
       this.store.getState().setMutating(false);
     }
+  }
+
+  private formatSuccessMessage(code: string): string {
+    const messages: Record<string, string> = {
+      PLANNING_TEAM_APPLICATION_APPROVED: "Application approved",
+      PLANNING_TEAM_APPLICATION_REJECTED: "Application rejected",
+      PLANNING_TEAM_LEFT: "Left team successfully",
+      PLANNING_TEAM_DISBANDED: "Team disbanded"
+    };
+    return messages[code] ?? "Operation completed";
   }
 
   private toControllerError(error: unknown) {

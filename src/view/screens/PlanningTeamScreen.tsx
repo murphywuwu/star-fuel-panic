@@ -2,6 +2,7 @@
 
 import { usePlanningTeamScreenController } from "@/controller/usePlanningTeamScreenController";
 import { FuelMissionShell } from "@/view/components/FuelMissionShell";
+import { LoadingOverlay } from "@/view/components/LoadingOverlay";
 import { TacticalButton } from "@/view/components/TacticalButton";
 import { TacticalPanel } from "@/view/components/TacticalPanel";
 
@@ -659,6 +660,11 @@ export function PlanningTeamScreen() {
           </div>
         </div>
       ) : null}
+
+      <LoadingOverlay
+        visible={state.isLoading || state.isMutating}
+        message={state.isLoading ? "LOADING TEAMS..." : "PROCESSING..."}
+      />
     </FuelMissionShell>
   );
 }
