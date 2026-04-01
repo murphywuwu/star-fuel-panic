@@ -16,6 +16,8 @@ type BackendConfig = {
   serviceRoleKey: string;
 };
 
+const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
+
 type MatchRow = {
   id: string;
   status: string;
@@ -208,7 +210,8 @@ async function supabaseRequest<T>(path: string, init: RequestInit = {}) {
       Prefer: "return=representation",
       ...init.headers
     },
-    cache: "no-store"
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -556,19 +559,21 @@ export async function persistMatchDetailToBackend(matchId: string) {
     });
   }
 
-  await supabaseRequest(`team_members?team_id=in.(${projection.teams.map((team) => team.id).join(",") || "null"})`, {
-    method: "DELETE",
-    headers: {
-      Prefer: "return=minimal"
-    }
-  }).catch(() => null);
+  if (projection.teams.length > 0) {
+    await supabaseRequest(`team_members?team_id=in.(${projection.teams.map((team) => team.id).join(",")})`, {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=minimal"
+      }
+    }).catch(() => null);
 
-  await supabaseRequest(`teams?match_id=eq.${encodeURIComponent(matchId)}`, {
-    method: "DELETE",
-    headers: {
-      Prefer: "return=minimal"
-    }
-  });
+    await supabaseRequest(`teams?match_id=eq.${encodeURIComponent(matchId)}`, {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=minimal"
+      }
+    });
+  }
 
   if (projection.teams.length > 0) {
     await supabaseRequest("teams?on_conflict=id", {

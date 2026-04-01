@@ -42,6 +42,17 @@ const originalEntryPaymentRecipient = process.env.NEXT_PUBLIC_ENTRY_PAYMENT_RECI
 const originalLuxCoinType = process.env.NEXT_PUBLIC_LUX_COIN_TYPE;
 const originalLuxDecimals = process.env.NEXT_PUBLIC_LUX_DECIMALS;
 const originalChainMode = process.env.FUEL_FROG_CHAIN_MODE;
+const originalSupabaseUrl = process.env.SUPABASE_URL;
+const originalSupabaseAnonUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const originalSupabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function restoreOptionalEnv(key: string, value: string | undefined) {
+  if (typeof value === "string") {
+    process.env[key] = value;
+    return;
+  }
+  delete process.env[key];
+}
 
 function createResponse(body: unknown, status = 200) {
   return {
@@ -309,8 +320,70 @@ test.afterEach(() => {
   process.env.NEXT_PUBLIC_LUX_COIN_TYPE = originalLuxCoinType;
   process.env.NEXT_PUBLIC_LUX_DECIMALS = originalLuxDecimals;
   process.env.FUEL_FROG_CHAIN_MODE = originalChainMode;
+  restoreOptionalEnv("SUPABASE_URL", originalSupabaseUrl);
+  restoreOptionalEnv("NEXT_PUBLIC_SUPABASE_URL", originalSupabaseAnonUrl);
+  restoreOptionalEnv("SUPABASE_SERVICE_ROLE_KEY", originalSupabaseServiceRoleKey);
   resetMatchRuntime();
   resetTeamRuntime();
+});
+
+test("POST /api/matches skips full backend hydrate before persisting a new draft", async () => {
+  process.env.SUPABASE_URL = "https://supabase.example";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  const requestedUrls: string[] = [];
+  global.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requestedUrls.push(url);
+
+    if (url === "https://supabase.example/rest/v1/matches?on_conflict=id") {
+      return createResponse([]);
+    }
+
+    if (url.includes("https://supabase.example/rest/v1/match_targets?match_id=eq.")) {
+      return createResponse({}, 204);
+    }
+
+    if (url === "https://supabase.example/rest/v1/match_targets") {
+      return createResponse({}, 201);
+    }
+
+    throw new Error(`Unexpected fetch url: ${url}`);
+  }) as typeof fetch;
+
+  const message = buildMatchMessage("FuelFrogPanic:create-match-draft", "hosted", "0xhost-timeout");
+  const signature = createTestMatchSignature("0xhost-timeout", message);
+  const response = await createDraftRoute(
+    new Request("http://localhost/api/matches", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": "create-draft-timeout-hardening"
+      },
+      body: JSON.stringify({
+        name: "Timeout Hardening Draft",
+        mode: "precision",
+        solarSystemId: 30000142,
+        targetNodeIds: ["node-jita-critical"],
+        sponsorshipFee: 600,
+        entryFee: 120,
+        maxTeams: 4,
+        teamSize: 3,
+        durationHours: 2,
+        walletAddress: "0xhost-timeout",
+        signature,
+        message
+      })
+    })
+  );
+
+  assert.equal(response.status, 201);
+  assert.equal(
+    requestedUrls.some((url) => url.includes("/rest/v1/matches?select=*")),
+    false,
+    "create route should not hydrate the full backend projection before persisting a new draft"
+  );
 });
 
 test("F-007 T-0702/T-0705 publish is idempotent for the same key and rejects duplicate publish with a different key", async () => {

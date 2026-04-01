@@ -174,6 +174,13 @@ Maintainer: Todo Agent
 |---|---|---|---|---|---|---|---|---|---|
 | T-2100 | F-021 | Architecture 4.4 | View | View only | 重构共享 `FuelMissionShell` 导航栏：桌面端移除顶部重复的全量路由导航，改为当前路由摘要；移动端补紧凑横向导航条，缓解品牌、路由与主操作同屏拥挤 | 目前 `lg` 以上同时显示顶部全量导航和左侧全量导航，信息重复且按钮文案过长，导致共享壳层第一屏过于拥挤 | - | `FuelMissionShell` 桌面 top bar 不再重复渲染全量路由；移动端可横向切换主路由；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
 
+### F-022 Vercel Match Create Timeout Hardening
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-2200 | F-022 | 4.2, 5.5, 6.1 | Runtime / API | Runtime + API | 修复 `POST /api/matches` 在线上创建草稿时的超时：移除创建前不必要的全量 backend hydrate，并压缩 draft 持久化链路，避免每次写请求都扫全量 `matches/teams/team_members/...` | 当前 Vercel `POST /api/matches` 命中 `FUNCTION_INVOCATION_TIMEOUT`，会直接阻断主办方建赛主链路 | - | `POST /api/matches` 不再在创建前触发全量 hydrate；定向 route 回归证明不会请求 `GET /rest/v1/matches?select=*` | Done |
+| T-2201 | F-022 | 6.1 | QA | QA only | 为创建草稿链路补线上超时回归：覆盖“Supabase 已配置时 create route 不做全量 hydrate”的路径，并执行定向测试验证 | 这是生产缺陷修复，没有回归很容易在后续路由重构时被带回去 | T-2200 | 新增路由级测试通过，且 `pnpm build` 不回归 | Done |
+
 ## 3. Ordered Execution Plan (Critical Path)
 
 1. [x] `T-0800` - 先建立 `fuelConfigRuntime`，锁定品级来源和降级策略。
@@ -215,6 +222,8 @@ Maintainer: Todo Agent
 34. [x] `T-2002` - 增加 CI、staging、production GitHub Actions。
 35. [x] `T-2003` - 补部署环境矩阵与手动 Runbook。
 36. [x] `T-2100` - 压缩共享壳导航密度，去掉桌面重复导航并补移动端紧凑导航条。
+37. [x] `T-2200` - 修复 `POST /api/matches` 的 Vercel 超时，去掉创建前全量 hydrate 并压缩 draft 持久化请求。
+38. [x] `T-2201` - 为创建草稿链路补“不做全量 hydrate”的定向回归。
 
 ## 4. Definition of Done
 
@@ -268,3 +277,5 @@ Maintainer: Todo Agent
 - 2026-04-01: 完成 `T-2000 / T-2001 / T-2002 / T-2003`。新增 `scripts/start-web.mjs`、root `Dockerfile`、`.dockerignore`，将 `package.json` 的 web 启动改为动态 `PORT`；`workers/Dockerfile` 现可通过 `WORKER_ENTRY` 复用为 `runtime-workers` 与 `node-indexer`；新增 `.github/workflows/ci.yml`、`deploy-staging.yml`、`deploy-production.yml`；重写 `docs/deployment-checklist.md` 并新增 `docs/deployment-runbook.md`；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
 - 2026-04-01: 新增 `T-2100`，收紧共享 `FuelMissionShell` 的导航密度，解决桌面端顶部导航与左侧导航重复导致的第一屏拥挤问题。
 - 2026-04-01: 完成 `T-2100`。`src/view/components/FuelMissionShell.tsx` 的 desktop top bar 已改为品牌 + 当前路由摘要 + 主操作，移除重复的顶部全量路由按钮；移动端新增横向滚动紧凑导航条；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-04-01: 新增 `T-2200 / T-2201`，修复 `POST /api/matches` 在线上 Vercel 部署中的 `FUNCTION_INVOCATION_TIMEOUT`，重点收口创建前全量 backend hydrate 与 draft 持久化请求链路。
+- 2026-04-01: 完成 `T-2200 / T-2201`。`src/app/api/matches/route.ts` 已移除 create draft 前的全量 `hydrateRuntimeProjectionFromBackendIfNeeded()`；`src/server/matchBackendStore.ts` 为 Supabase REST 请求增加 5 秒 timeout，并在空队伍 draft 持久化时跳过无意义的 team delete；新增 `src/app/api/__tests__/f007-match-flow.test.ts` 回归，验证 `POST /api/matches` 不再请求 `GET /rest/v1/matches?select=*`；`pnpm build` 通过。

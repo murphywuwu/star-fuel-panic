@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildErrorRecord } from "@/server/apiContract";
-import { hydrateRuntimeProjectionFromBackendIfNeeded, persistMatchDetailToBackend } from "@/server/matchBackendStore";
+import { persistMatchDetailToBackend } from "@/server/matchBackendStore";
 import { createMatchDraft } from "@/server/matchRuntime";
 import { listMatchDiscoveryItems } from "@/server/matchDiscoveryRuntime";
 import { finalizeMutation, parseJsonBody, prepareSignedMutation } from "@/server/mutationRoute";
@@ -57,7 +57,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  await hydrateRuntimeProjectionFromBackendIfNeeded();
   const parsed = await parseJsonBody(request);
   if (!parsed.ok) {
     return NextResponse.json(

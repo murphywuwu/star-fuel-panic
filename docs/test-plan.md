@@ -6,10 +6,10 @@
 - Related PRD: `docs/PRD.md` v2.7.0
 - Related SPEC: `docs/SPEC.md` v6.5
 - Related TODO: `docs/TODO.md` v2.7.0
-- Version: v1.10
+- Version: v1.11
 - Status: In Progress
 - Owner (Testing Agent): Codex
-- Last Updated: 2026-03-31
+- Last Updated: 2026-04-01
 
 ## 2. Scope
 
@@ -51,6 +51,8 @@
   - F-019 `T-1901`: match-specific Team Lobby inherits match `teamSize`, enforces fixed role-slot total, and charges `entryFee × teamSize`
   - F-019 `T-1902`: `/planning?matchId=` routes into Team Lobby and surfaces fixed roster + team entry fee
   - F-019 `T-1903`: fixed team-size pricing model passes targeted runtime/API/build/layer verification
+  - F-022 `T-2200`: `POST /api/matches` no longer performs full backend hydrate before persisting a new draft
+  - F-022 `T-2201`: create-draft route regression covers the Vercel timeout path and verifies no `GET /rest/v1/matches?select=*` prefetch
   - F-008 `T-0800`: `fuelConfigRuntime` loads `FuelConfig.fuel_efficiency` and keeps stale fallback on failure
   - F-008 `T-0801`: accepted score events persist into `fuel_events` runtime fact with v2.7 grade fields and legacy fallback
   - F-008 `T-0802`: `chainSyncEngine` applies `fuelGradeBonus` in the score formula
@@ -117,6 +119,7 @@
 | TC-0708-TOOL | 4.x / 6.1 | QA / Tooling | T-0708 | P1 |
 | TC-1900-MATCH-TEAMSIZE | 4.1 / 4.3 | 2.4, 3.1, 7.1 | T-1900 / T-1901 | P0 |
 | TC-1902-TEAMLOBBY-ROUTE | 4.3 | 3.3, Architecture 4.1, 7.3 | T-1902 | P0 |
+| TC-2200-CREATE-TIMEOUT | 4.1 | 4.2, 5.5, 6.1 | T-2200 / T-2201 | P0 |
 
 ## 4. Test Strategy
 
@@ -1006,6 +1009,11 @@ Detected during this pass:
   - 根因：planning team registry 只有 create/join 两个动作，没有独立申请事实层，也没有对应 API/UI 控制
   - 当前结论：独立战队需要独立的 `planning_team_applications` 事实层，并在 `/planning` 首屏直接提供 captain approval / member leave / captain disband
   - 当前状态：runtime、backend mirror、API、UI 和定向回归均已完成
+- `T-2200 / T-2201` 已完成
+  - 症状：线上 `POST /api/matches` 在 Vercel 返回 `FUNCTION_INVOCATION_TIMEOUT`
+  - 根因：创建草稿前会无条件执行一次全量 backend hydrate，额外扫 `matches / teams / team_members / match_targets / settlements`；随后 draft 持久化又继续串行请求后端
+  - 当前结论：创建草稿不需要在请求前把整份 backend projection 回填到本地 runtime；保留直接持久化新 draft 即可
+  - 当前状态：已移除 create route 的前置全量 hydrate，给 backend REST 请求加 5s timeout，并补了 route 回归验证“不再请求 `GET /rest/v1/matches?select=*`”；`pnpm build` 已通过
 
 ## 7. Exit Criteria
 
