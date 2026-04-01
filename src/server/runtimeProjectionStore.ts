@@ -422,8 +422,20 @@ function sanitizeProjectionState(candidate: unknown): RuntimeProjectionState {
 
 function getRuntimeProjectionState(): RuntimeProjectionState {
   const filePath = resolveProjectionPath();
+
+  // On read-only file systems (Vercel), prefer in-memory cache
+  if (isReadOnlyFileSystem()) {
+    if (projectionStateCache) {
+      return projectionStateCache.state;
+    }
+    return createEmptyProjectionState();
+  }
+
   if (!existsSync(filePath)) {
-    projectionStateCache = null;
+    // Return in-memory cache if available, otherwise empty state
+    if (projectionStateCache) {
+      return projectionStateCache.state;
+    }
     return createEmptyProjectionState();
   }
 
@@ -448,7 +460,10 @@ function getRuntimeProjectionState(): RuntimeProjectionState {
     };
     return state;
   } catch {
-    projectionStateCache = null;
+    // Return in-memory cache if available, otherwise empty state
+    if (projectionStateCache) {
+      return projectionStateCache.state;
+    }
     return createEmptyProjectionState();
   }
 }
@@ -457,25 +472,52 @@ export function readRuntimeProjectionState(): RuntimeProjectionState {
   return clone(getRuntimeProjectionState());
 }
 
-export function writeRuntimeProjectionState(state: RuntimeProjectionState) {
-  const filePath = resolveProjectionPath();
-  mkdirSync(path.dirname(filePath), { recursive: true });
+function isReadOnlyFileSystem(): boolean {
+  // Vercel serverless functions have read-only file systems
+  return Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+}
 
+export function writeRuntimeProjectionState(state: RuntimeProjectionState) {
   const nextState = clone({
     ...state,
     version: 1 as const,
     updatedAt: nowIso()
   });
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-  writeFileSync(tempPath, JSON.stringify(nextState, null, 2), "utf8");
-  renameSync(tempPath, filePath);
-  const stat = statSync(filePath);
+
+  // Update in-memory cache regardless of file system
   projectionStateCache = {
-    filePath,
-    mtimeMs: stat.mtimeMs,
-    size: stat.size,
+    filePath: resolveProjectionPath(),
+    mtimeMs: Date.now(),
+    size: 0,
     state: nextState
   };
+
+  // Skip file write on read-only file systems (Vercel)
+  if (isReadOnlyFileSystem()) {
+    return;
+  }
+
+  try {
+    const filePath = resolveProjectionPath();
+    mkdirSync(path.dirname(filePath), { recursive: true });
+
+    const tempPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+    writeFileSync(tempPath, JSON.stringify(nextState, null, 2), "utf8");
+    renameSync(tempPath, filePath);
+    const stat = statSync(filePath);
+    projectionStateCache = {
+      filePath,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      state: nextState
+    };
+  } catch (error) {
+    // Silently ignore EROFS (read-only file system) errors
+    if (error instanceof Error && error.message.includes("EROFS")) {
+      return;
+    }
+    throw error;
+  }
 }
 
 export function updateRuntimeProjectionState<T>(mutate: (state: RuntimeProjectionState) => T): T {
