@@ -529,7 +529,8 @@ export async function persistMatchDetailToBackend(matchId: string) {
     return false;
   }
 
-  await supabaseRequest("matches?on_conflict=id", {
+  try {
+    await supabaseRequest("matches?on_conflict=id", {
     method: "POST",
     headers: {
       Prefer: "resolution=merge-duplicates,return=representation"
@@ -619,7 +620,11 @@ export async function persistMatchDetailToBackend(matchId: string) {
     });
   }
 
-  return true;
+    return true;
+  } catch (err) {
+    console.error("[persistMatchDetailToBackend] Failed (non-fatal):", err);
+    return false;
+  }
 }
 
 export async function persistMatchDetailForTeamToBackend(teamId: string) {
@@ -643,7 +648,8 @@ export async function persistPlanningTeamToBackend(teamId: string) {
     return false;
   }
 
-  await supabaseRequest("planning_teams?on_conflict=id", {
+  try {
+    await supabaseRequest("planning_teams?on_conflict=id", {
     method: "POST",
     headers: {
       Prefer: "resolution=merge-duplicates,return=minimal"
@@ -685,7 +691,11 @@ export async function persistPlanningTeamToBackend(teamId: string) {
     });
   }
 
-  return true;
+    return true;
+  } catch (err) {
+    console.error("[persistPlanningTeamToBackend] Failed (non-fatal):", err);
+    return false;
+  }
 }
 
 export async function deleteMatchDetailFromBackend(matchId: string) {
@@ -693,14 +703,18 @@ export async function deleteMatchDetailFromBackend(matchId: string) {
     return false;
   }
 
-  await supabaseRequest(`matches?id=eq.${encodeURIComponent(matchId)}`, {
-    method: "DELETE",
-    headers: {
-      Prefer: "return=minimal"
-    }
-  });
-
-  return true;
+  try {
+    await supabaseRequest(`matches?id=eq.${encodeURIComponent(matchId)}`, {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=minimal"
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error("[deleteMatchDetailFromBackend] Failed (non-fatal):", err);
+    return false;
+  }
 }
 
 export async function hydrateRuntimeProjectionFromBackendIfNeeded(options: { matchId?: string; force?: boolean } = {}) {
@@ -715,7 +729,8 @@ export async function hydrateRuntimeProjectionFromBackendIfNeeded(options: { mat
     }
   }
 
-  const matchPath = options.matchId
+  try {
+    const matchPath = options.matchId
     ? `matches?select=*&id=eq.${encodeURIComponent(options.matchId)}`
     : "matches?select=*";
   const matchRows = (await supabaseRequest<MatchRow[]>(matchPath, {
@@ -792,8 +807,12 @@ export async function hydrateRuntimeProjectionFromBackendIfNeeded(options: { mat
     ...settlements
   ];
 
-  writeRuntimeProjectionState(next);
-  return true;
+    writeRuntimeProjectionState(next);
+    return true;
+  } catch (err) {
+    console.error("[hydrateRuntimeProjectionFromBackendIfNeeded] Failed (non-fatal):", err);
+    return false;
+  }
 }
 
 export async function hydratePlanningTeamsFromBackendIfNeeded(options: { force?: boolean } = {}) {
@@ -806,8 +825,9 @@ export async function hydratePlanningTeamsFromBackendIfNeeded(options: { force?:
     return false;
   }
 
-  const teamRows =
-    (await supabaseRequest<PlanningTeamRow[]>("planning_teams?select=*", {
+  try {
+    const teamRows =
+      (await supabaseRequest<PlanningTeamRow[]>("planning_teams?select=*", {
       method: "GET",
       headers: {
         Prefer: "return=representation"
@@ -862,6 +882,10 @@ export async function hydratePlanningTeamsFromBackendIfNeeded(options: { force?:
     )
   );
   next.planningTeamApplications = applicationRows.map((row) => normalizePlanningTeamApplication(row));
-  writeRuntimeProjectionState(next);
-  return true;
+    writeRuntimeProjectionState(next);
+    return true;
+  } catch (err) {
+    console.error("[hydratePlanningTeamsFromBackendIfNeeded] Failed (non-fatal):", err);
+    return false;
+  }
 }

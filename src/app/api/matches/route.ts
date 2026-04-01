@@ -120,7 +120,12 @@ export async function POST(request: Request) {
     });
   }
 
-  await persistMatchDetailToBackend(result.data.match.id);
+  // Backend persistence is best-effort - don't fail the request if Supabase is unavailable
+  try {
+    await persistMatchDetailToBackend(result.data.match.id);
+  } catch (err) {
+    console.error("[POST /api/matches] Backend persist failed (non-fatal):", err);
+  }
 
   return finalizeMutation("POST:/api/matches", mutation.mutation, {
     status: 201,

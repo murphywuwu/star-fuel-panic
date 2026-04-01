@@ -179,7 +179,12 @@ export async function listMatchDiscoveryItems(options: {
   filters?: MatchFilters;
   currentSystemId?: number | null;
 }) {
-  await hydrateRuntimeProjectionFromBackendIfNeeded();
+  // Hydration is best-effort - don't fail the request if Supabase is unavailable
+  try {
+    await hydrateRuntimeProjectionFromBackendIfNeeded();
+  } catch (err) {
+    console.error("[listMatchDiscoveryItems] Backend hydration failed (non-fatal):", err);
+  }
   const [matches, nodes] = await Promise.all([Promise.resolve(listMatches(options.filters)), listNodes({})]);
   const nodeById = createNodeLookup(nodes);
 
@@ -187,7 +192,12 @@ export async function listMatchDiscoveryItems(options: {
 }
 
 export async function getMatchDiscoveryDetail(matchId: string, currentSystemId?: number | null): Promise<MatchDiscoveryDetail | null> {
-  await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
+  // Hydration is best-effort - don't fail the request if Supabase is unavailable
+  try {
+    await hydrateRuntimeProjectionFromBackendIfNeeded({ matchId });
+  } catch (err) {
+    console.error("[getMatchDiscoveryDetail] Backend hydration failed (non-fatal):", err);
+  }
   const [detail, nodes] = await Promise.all([Promise.resolve(getMatchDetail(matchId)), listNodes({})]);
 
   if (!detail) {
