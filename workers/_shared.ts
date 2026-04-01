@@ -1,4 +1,4 @@
-import { reportWorkerHeartbeat } from "../src/server/workerHealth.ts";
+import { reportWorkerHeartbeatAsync } from "../src/server/workerHealth.ts";
 
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -9,7 +9,7 @@ export async function runWorkerLoop(
   intervalMs: number,
   task: () => Promise<string | void>
 ) {
-  reportWorkerHeartbeat(worker, {
+  await reportWorkerHeartbeatAsync(worker, {
     status: "starting",
     pid: process.pid,
     detail: `booting interval=${intervalMs}ms`
@@ -18,14 +18,14 @@ export async function runWorkerLoop(
   while (true) {
     try {
       const detail = await task();
-      reportWorkerHeartbeat(worker, {
+      await reportWorkerHeartbeatAsync(worker, {
         status: "healthy",
         pid: process.pid,
         detail: detail ?? null,
         lastError: null
       });
     } catch (error) {
-      reportWorkerHeartbeat(worker, {
+      await reportWorkerHeartbeatAsync(worker, {
         status: "degraded",
         pid: process.pid,
         detail: null,

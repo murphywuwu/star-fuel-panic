@@ -6,6 +6,12 @@ import {
   updateProjectionRuntimeMeta,
   writePersistedNetworkNodes
 } from "./runtimeProjectionStore.ts";
+import {
+  isSupabaseRuntimeStoreAvailable,
+  readNetworkNodesFromSupabase,
+  writeNetworkNodesToSupabase,
+  updateRuntimeMetaInSupabase
+} from "./supabaseRuntimeStore.ts";
 import type { Match, MatchStatus } from "../types/match.ts";
 import type { Mission, UrgencyLevel } from "../types/mission.ts";
 import type { NetworkNode, NodeFilters } from "../types/node.ts";
@@ -97,27 +103,53 @@ async function buildNodes(options: { forceRefresh?: boolean } = {}) {
     try {
       snapshot = await syncNodeIndexOnce();
       console.log(`[nodeRuntime] Synced ${snapshot.nodes.length} nodes from chain`);
-      updateProjectionRuntimeMeta("nodes", {
+      const metaPatch = {
         lastSyncAt: snapshot.lastSyncAt,
         stale: false,
         reason: null
-      });
+      };
+      updateProjectionRuntimeMeta("nodes", metaPatch);
+      if (isSupabaseRuntimeStoreAvailable()) {
+        updateRuntimeMetaInSupabase("nodes", metaPatch).catch(() => {});
+      }
     } catch (error) {
       console.error("[nodeRuntime] Failed to sync nodes from chain:", error);
       // 如果同步失败，继续使用缓存数据（可能为空）
-      updateProjectionRuntimeMeta("nodes", {
+      const metaPatch = {
         stale: true,
         reason: error instanceof Error ? error.message : "NODE_SYNC_FAILED"
-      });
+      };
+      updateProjectionRuntimeMeta("nodes", metaPatch);
+      if (isSupabaseRuntimeStoreAvailable()) {
+        updateRuntimeMetaInSupabase("nodes", metaPatch).catch(() => {});
+      }
     }
   }
 
   let indexedNodes = snapshot.nodes;
   if (indexedNodes.length === 0) {
-    indexedNodes = readPersistedNetworkNodes();
+    // Try Supabase first, then local file
+    if (isSupabaseRuntimeStoreAvailable()) {
+      try {
+        indexedNodes = await readNetworkNodesFromSupabase();
+      } catch (error) {
+        console.error("[nodeRuntime] Failed to read from Supabase:", error);
+      }
+    }
+    if (indexedNodes.length === 0) {
+      indexedNodes = readPersistedNetworkNodes();
+    }
   }
 
+  // Write to local store
   writePersistedNetworkNodes(indexedNodes);
+
+  // Write to Supabase (for production persistence)
+  if (isSupabaseRuntimeStoreAvailable() && indexedNodes.length > 0) {
+    writeNetworkNodesToSupabase(indexedNodes).catch((error) => {
+      console.error("[nodeRuntime] Failed to write to Supabase:", error);
+    });
+  }
 
   const nodes = indexedNodes.map((indexedNode) => {
     const activeMission = missionByObjectId.get(indexedNode.objectId);

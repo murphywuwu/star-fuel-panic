@@ -11,6 +11,12 @@ import {
   writePersistedConstellationSummaries,
   type ConstellationProjectionSummary
 } from "@/server/runtimeProjectionStore";
+import {
+  isSupabaseRuntimeStoreAvailable,
+  readConstellationsFromSupabase,
+  writeConstellationsToSupabase,
+  updateRuntimeMetaInSupabase
+} from "@/server/supabaseRuntimeStore";
 import type { NetworkNode } from "@/types/node";
 import type { SolarSystem } from "@/types/solarSystem";
 
@@ -104,27 +110,67 @@ export async function syncConstellationSummaries(options: RuntimeOptions = {}) {
       (left, right) => right.sortScore - left.sortScore || left.constellationId - right.constellationId
     );
 
+    // Write to local store
     writePersistedConstellationSummaries(summaries);
-    updateProjectionRuntimeMeta("constellations", {
+
+    // Write to Supabase
+    if (isSupabaseRuntimeStoreAvailable()) {
+      writeConstellationsToSupabase(summaries).catch((error) => {
+        console.error("[constellationRuntime] Failed to write to Supabase:", error);
+      });
+    }
+
+    const metaPatch = {
       lastSyncAt: updatedAt,
       stale: false,
       reason: null
-    });
+    };
+    updateProjectionRuntimeMeta("constellations", metaPatch);
+    if (isSupabaseRuntimeStoreAvailable()) {
+      updateRuntimeMetaInSupabase("constellations", metaPatch).catch(() => {});
+    }
 
     return summaries;
   } catch (error) {
-    const cached = readPersistedConstellationSummaries();
-    updateProjectionRuntimeMeta("constellations", {
+    // Try Supabase first, then local file
+    let cached: ConstellationProjectionSummary[] = [];
+    if (isSupabaseRuntimeStoreAvailable()) {
+      try {
+        cached = await readConstellationsFromSupabase();
+      } catch {
+        // Fallback to local
+      }
+    }
+    if (cached.length === 0) {
+      cached = readPersistedConstellationSummaries();
+    }
+
+    const metaPatch = {
       stale: true,
       reason: error instanceof Error ? error.message : "CONSTELLATION_SYNC_FAILED"
-    });
+    };
+    updateProjectionRuntimeMeta("constellations", metaPatch);
+    if (isSupabaseRuntimeStoreAvailable()) {
+      updateRuntimeMetaInSupabase("constellations", metaPatch).catch(() => {});
+    }
     return cached;
   }
 }
 
 export async function listConstellations(options: RuntimeOptions = {}) {
   if (!options.forceRefresh) {
-    const cached = readPersistedConstellationSummaries();
+    // Try Supabase first, then local file
+    let cached: ConstellationProjectionSummary[] = [];
+    if (isSupabaseRuntimeStoreAvailable()) {
+      try {
+        cached = await readConstellationsFromSupabase();
+      } catch (error) {
+        console.error("[constellationRuntime] Failed to read from Supabase:", error);
+      }
+    }
+    if (cached.length === 0) {
+      cached = readPersistedConstellationSummaries();
+    }
     if (cached.length > 0) {
       return cached;
     }

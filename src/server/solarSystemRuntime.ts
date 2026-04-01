@@ -9,6 +9,12 @@ import {
   updateProjectionRuntimeMeta,
   writePersistedSolarSystems
 } from "./runtimeProjectionStore.ts";
+import {
+  isSupabaseRuntimeStoreAvailable,
+  readSolarSystemsFromSupabase,
+  writeSolarSystemsToSupabase,
+  updateRuntimeMetaInSupabase
+} from "./supabaseRuntimeStore.ts";
 import type { NetworkNode } from "../types/node.ts";
 import type {
   PlotPoint3D,
@@ -334,15 +340,31 @@ async function getSolarSystemSnapshot(options: RuntimeOptions = {}) {
   }
 
   if (!options.forceRefresh) {
-    const persistedSystems = readPersistedSolarSystems();
+    // Try Supabase first, then local file
+    let persistedSystems: SolarSystem[] = [];
+    if (isSupabaseRuntimeStoreAvailable()) {
+      try {
+        persistedSystems = await readSolarSystemsFromSupabase();
+      } catch (error) {
+        console.error("[solarSystemRuntime] Failed to read from Supabase:", error);
+      }
+    }
+    if (persistedSystems.length === 0) {
+      persistedSystems = readPersistedSolarSystems();
+    }
+
     if (persistedSystems.length > 0) {
       const persistedSnapshot = buildPersistedSnapshot(persistedSystems);
       cachedSnapshot = persistedSnapshot;
-      updateProjectionRuntimeMeta("solarSystems", {
+      const metaPatch = {
         lastSyncAt: persistedSnapshot.lastSyncAt,
         stale: !isSnapshotFresh(persistedSnapshot),
         reason: null
-      });
+      };
+      updateProjectionRuntimeMeta("solarSystems", metaPatch);
+      if (isSupabaseRuntimeStoreAvailable()) {
+        updateRuntimeMetaInSupabase("solarSystems", metaPatch).catch(() => {});
+      }
       return persistedSnapshot;
     }
   }
@@ -350,24 +372,54 @@ async function getSolarSystemSnapshot(options: RuntimeOptions = {}) {
   try {
     const snapshot = await fetchAllSolarSystemsFromWorldApi();
     cachedSnapshot = snapshot;
+
+    // Write to local store
     writePersistedSolarSystems(snapshot.systems);
-    updateProjectionRuntimeMeta("solarSystems", {
+
+    // Write to Supabase
+    if (isSupabaseRuntimeStoreAvailable()) {
+      writeSolarSystemsToSupabase(snapshot.systems).catch((error) => {
+        console.error("[solarSystemRuntime] Failed to write to Supabase:", error);
+      });
+    }
+
+    const metaPatch = {
       lastSyncAt: snapshot.lastSyncAt,
       stale: false,
       reason: null
-    });
+    };
+    updateProjectionRuntimeMeta("solarSystems", metaPatch);
+    if (isSupabaseRuntimeStoreAvailable()) {
+      updateRuntimeMetaInSupabase("solarSystems", metaPatch).catch(() => {});
+    }
     return snapshot;
   } catch (error) {
-    const persistedSystems = readPersistedSolarSystems();
+    // Try Supabase first, then local file for fallback
+    let persistedSystems: SolarSystem[] = [];
+    if (isSupabaseRuntimeStoreAvailable()) {
+      try {
+        persistedSystems = await readSolarSystemsFromSupabase();
+      } catch {
+        // Ignore, fallback to local
+      }
+    }
+    if (persistedSystems.length === 0) {
+      persistedSystems = readPersistedSolarSystems();
+    }
+
     if (persistedSystems.length > 0) {
       const fallbackSnapshot = buildPersistedSnapshot(persistedSystems);
 
       cachedSnapshot = fallbackSnapshot;
-      updateProjectionRuntimeMeta("solarSystems", {
+      const metaPatch = {
         lastSyncAt: fallbackSnapshot.lastSyncAt,
         stale: true,
         reason: error instanceof Error ? error.message : "WORLD_API_FALLBACK"
-      });
+      };
+      updateProjectionRuntimeMeta("solarSystems", metaPatch);
+      if (isSupabaseRuntimeStoreAvailable()) {
+        updateRuntimeMetaInSupabase("solarSystems", metaPatch).catch(() => {});
+      }
       return fallbackSnapshot;
     }
 
