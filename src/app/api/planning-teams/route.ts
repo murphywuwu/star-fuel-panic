@@ -40,7 +40,7 @@ export async function GET() {
   const snapshot = getPlanningTeamsSnapshot();
 
   // Log for debugging - helps identify when data wasn't loaded from Supabase
-  if (!hydrated && snapshot.teams.length === 0) {
+  if (!hydrated && snapshot.items.length === 0) {
     console.warn("[GET /api/planning-teams] No teams found - Supabase hydration may have failed. Check Supabase connection.");
   }
 
@@ -50,7 +50,7 @@ export async function GET() {
     data: snapshot,
     _debug: {
       hydrated,
-      teamsCount: snapshot.teams.length
+      teamsCount: snapshot.items.length
     }
   });
 }
