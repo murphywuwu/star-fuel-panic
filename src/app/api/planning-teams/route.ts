@@ -36,28 +36,22 @@ function parseRoleSlots(value: unknown): RoleSlots {
 }
 
 export async function GET() {
-  try {
-    await hydratePlanningTeamsFromBackendIfNeeded();
-  } catch (error) {
-    if (isBackendRelationMissing(error, "planning_teams")) {
-      return NextResponse.json(
-        buildErrorRecord(
-          crypto.randomUUID(),
-          503,
-          "CHAIN_SYNC_ERROR",
-          buildPlanningTeamBackendMissingMessage()
-        ).body,
-        { status: 503 }
-      );
-    }
-
-    throw error;
-  }
+  const hydrated = await hydratePlanningTeamsFromBackendIfNeeded();
   const snapshot = getPlanningTeamsSnapshot();
+
+  // Log for debugging - helps identify when data wasn't loaded from Supabase
+  if (!hydrated && snapshot.teams.length === 0) {
+    console.warn("[GET /api/planning-teams] No teams found - Supabase hydration may have failed. Check Supabase connection.");
+  }
+
   return NextResponse.json({
     ok: true,
     requestId: crypto.randomUUID(),
-    data: snapshot
+    data: snapshot,
+    _debug: {
+      hydrated,
+      teamsCount: snapshot.teams.length
+    }
   });
 }
 
