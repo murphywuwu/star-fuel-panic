@@ -42,6 +42,7 @@ export function useLobbyController(input: {
     filters: state.filters,
     matches: visibleMatches,
     selectedMatch,
+    selectedMatchId: state.selectedMatchId,
     loadingMatches: state.loadingMatches,
     loadingDetail: state.loadingDetail,
     loadingRecommendationsFor: state.loadingRecommendationsFor,

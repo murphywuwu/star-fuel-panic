@@ -417,7 +417,7 @@ export function LobbyDiscoveryScreen() {
               ) : null}
 
               {lobby.matches.map((match) => {
-                const selected = selectedMatch?.match.id === match.id;
+                const selected = lobby.selectedMatchId === match.id;
                 const joinCta = helpers.getJoinCta(match);
 
                 return (
