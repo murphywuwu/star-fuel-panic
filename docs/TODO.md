@@ -1,7 +1,7 @@
 # TODO: Fuel Frog Panic Active Backlog
 
 Version: v2.7.0
-Last Updated: 2026-03-31
+Last Updated: 2026-04-02
 Source Docs: `docs/PRD.md` v2.7.0, `docs/architecture.md` v6.3, `docs/SPEC.md` v6.5
 Maintainer: Todo Agent
 
@@ -181,6 +181,20 @@ Maintainer: Todo Agent
 | T-2200 | F-022 | 4.2, 5.5, 6.1 | Runtime / API | Runtime + API | 修复 `POST /api/matches` 在线上创建草稿时的超时：移除创建前不必要的全量 backend hydrate，并压缩 draft 持久化链路，避免每次写请求都扫全量 `matches/teams/team_members/...` | 当前 Vercel `POST /api/matches` 命中 `FUNCTION_INVOCATION_TIMEOUT`，会直接阻断主办方建赛主链路 | - | `POST /api/matches` 不再在创建前触发全量 hydrate；定向 route 回归证明不会请求 `GET /rest/v1/matches?select=*` | Done |
 | T-2201 | F-022 | 6.1 | QA | QA only | 为创建草稿链路补线上超时回归：覆盖“Supabase 已配置时 create route 不做全量 hydrate”的路径，并执行定向测试验证 | 这是生产缺陷修复，没有回归很容易在后续路由重构时被带回去 | T-2200 | 新增路由级测试通过，且 `pnpm build` 不回归 | Done |
 
+### F-023 Lobby Match Detail Modal
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-2300 | F-023 | 3.2, Architecture 4.4 | View / Controller | View + Controller | 将 `/lobby` 的比赛详情入口从右侧固定详情栏改为“选中比赛卡片即打开详情弹窗”，并保持现有 `selectedMatchDetail` 读模型与 join CTA 逻辑复用 | 当前右侧详情栏会挤占 Lobby 主视图区；需求改为更聚焦的详情弹窗交互 | - | `/lobby` 不再显示右侧详情边栏；点击比赛卡片后直接弹出详情 modal；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过 | Done |
+| T-2301 | F-023 | 6.1 | QA | QA only | 为 Lobby 详情弹窗补回归，验证卡片选中后打开 modal、close 后列表仍保持可用，且不破坏 join CTA | 这是交互路径变更，没有回归容易把旧 sidebar 状态残留带回去 | T-2300 | `pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过；未额外新增自动化 UI 测试 | Done |
+
+### F-024 Match Detail Runtime Read-Path Hardening
+
+| TODO ID | Feature ID | SPEC Section | Layer | Layer Scope | Task | Why (value) | Dependency | Acceptance Signal | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| T-2400 | F-024 | 5.1, 5.2, Architecture 2 | Runtime / API | Runtime only | 收紧 `nodeRuntime` 的 Supabase 回写时机：普通 `GET /api/matches/[id]` / Lobby 详情读取只消费节点快照，不再在被动读路径里触发 `network_nodes` upsert | 当前打开比赛详情会触发非必要的 runtime projection 回写；当 Supabase 未应用 `network_nodes` migration 时会产生误导性控制台报错 | - | 打开比赛详情不再触发被动 `network_nodes` upsert；`src/server/nodeRuntime.ts` 仅在显式刷新/worker 同步路径回写 Supabase | Done |
+| T-2401 | F-024 | 6.1 | QA | QA only | 为 `nodeRuntime` 增加回归，验证“已有本地 node index 快照时，普通读取不会请求 Supabase upsert” | 这是线上噪音缺陷修复；如果没有回归，后续 runtime 重构很容易把读路径副作用带回来 | T-2400 | `node --experimental-strip-types --import ./scripts/register-test-loader.mjs --test src/server/__tests__/nodeRuntime.read-path.test.ts` 通过 | Done |
+
 ## 3. Ordered Execution Plan (Critical Path)
 
 1. [x] `T-0800` - 先建立 `fuelConfigRuntime`，锁定品级来源和降级策略。
@@ -224,6 +238,10 @@ Maintainer: Todo Agent
 36. [x] `T-2100` - 压缩共享壳导航密度，去掉桌面重复导航并补移动端紧凑导航条。
 37. [x] `T-2200` - 修复 `POST /api/matches` 的 Vercel 超时，去掉创建前全量 hydrate 并压缩 draft 持久化请求。
 38. [x] `T-2201` - 为创建草稿链路补“不做全量 hydrate”的定向回归。
+39. [x] `T-2300` - 将 `/lobby` 的比赛详情从右侧边栏改为卡片选中即弹出 modal。
+40. [x] `T-2301` - 为 Lobby 详情弹窗交互补回归与构建验证。
+41. [x] `T-2400` - 收紧比赛详情节点读取的 Supabase 回写时机，去掉被动读路径的 `network_nodes` upsert。
+42. [x] `T-2401` - 为 nodeRuntime 补“读路径不写”的定向回归。
 
 ## 4. Definition of Done
 
@@ -279,3 +297,7 @@ Maintainer: Todo Agent
 - 2026-04-01: 完成 `T-2100`。`src/view/components/FuelMissionShell.tsx` 的 desktop top bar 已改为品牌 + 当前路由摘要 + 主操作，移除重复的顶部全量路由按钮；移动端新增横向滚动紧凑导航条；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
 - 2026-04-01: 新增 `T-2200 / T-2201`，修复 `POST /api/matches` 在线上 Vercel 部署中的 `FUNCTION_INVOCATION_TIMEOUT`，重点收口创建前全量 backend hydrate 与 draft 持久化请求链路。
 - 2026-04-01: 完成 `T-2200 / T-2201`。`src/app/api/matches/route.ts` 已移除 create draft 前的全量 `hydrateRuntimeProjectionFromBackendIfNeeded()`；`src/server/matchBackendStore.ts` 为 Supabase REST 请求增加 5 秒 timeout，并在空队伍 draft 持久化时跳过无意义的 team delete；新增 `src/app/api/__tests__/f007-match-flow.test.ts` 回归，验证 `POST /api/matches` 不再请求 `GET /rest/v1/matches?select=*`；`pnpm build` 通过。
+- 2026-04-01: 新增 `T-2300 / T-2301`，将 `/lobby` 的比赛详情交互从右侧固定边栏改为卡片选中即打开详情弹窗。
+- 2026-04-01: 完成 `T-2300 / T-2301`。`src/controller/useLobbyDiscoveryScreenController.ts` 新增 detail modal 生命周期与 `Escape` 关闭；`src/view/screens/LobbyDiscoveryScreen.tsx` 移除了右侧 `Match Detail` 固定栏，改为单列 Lobby 列表 + `MatchDetailModal` 弹窗，继续复用现有 `selectedMatchDetail`、join CTA 与 free-mode recommendations；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过。
+- 2026-04-02: 新增 `T-2400 / T-2401`，修复打开比赛详情时 `nodeRuntime` 在被动读路径中误触发 `network_nodes` Supabase upsert 的控制台噪音。
+- 2026-04-02: 完成 `T-2400 / T-2401`。`src/server/nodeRuntime.ts` 现在只在显式刷新路径回写 `network_nodes` 到 Supabase，普通比赛详情读取保持只读；新增 `src/server/__tests__/nodeRuntime.read-path.test.ts` 回归，并通过定向测试与 `pnpm build`。

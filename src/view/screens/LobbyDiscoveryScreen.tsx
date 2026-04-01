@@ -309,6 +309,159 @@ function MatchDetailSummary({ detail }: { detail: MatchDiscoveryDetail }) {
   );
 }
 
+function MatchDetailModal({
+  detail,
+  isLoading,
+  error,
+  joinCta,
+  recommendations,
+  loadingRecommendationsFor,
+  hasLocation,
+  onClose,
+  onRefreshRecommendations
+}: {
+  detail: MatchDiscoveryDetail | null;
+  isLoading: boolean;
+  error: string | null;
+  joinCta:
+    | {
+        href: string;
+        label: string;
+        disabled: boolean;
+        blocker: string | null;
+      }
+    | null;
+  recommendations: ReturnType<typeof useLobbyDiscoveryScreenController>["lobby"]["recommendations"];
+  loadingRecommendationsFor: string | null;
+  hasLocation: boolean;
+  onClose: () => void;
+  onRefreshRecommendations: (matchId: string) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[72] flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[88vh] w-full max-w-4xl overflow-auto border border-eve-red/25 bg-[linear-gradient(180deg,rgba(15,15,15,0.98)_0%,rgba(8,8,8,0.98)_100%)] p-5 shadow-[0_0_0_1px_rgba(255,95,0,0.12),0_24px_80px_rgba(0,0,0,0.6)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-eve-red/90">Match Detail</p>
+            <h2 className="mt-1 text-sm font-black uppercase tracking-[0.18em] text-eve-offwhite">
+              Tactical Match Brief
+            </h2>
+            <p className="mt-2 text-xs uppercase tracking-[0.12em] text-eve-offwhite/70">
+              Inspect match scope, squad access, and current battlefield context without leaving the lobby stream.
+            </p>
+          </div>
+          <TacticalButton tone="ghost" onClick={onClose}>
+            Close
+          </TacticalButton>
+        </div>
+
+        {isLoading ? (
+          <div className="mt-5 border border-eve-red/15 bg-[#080808]/80 px-4 py-6 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
+            Loading match detail...
+          </div>
+        ) : null}
+
+        {!isLoading && !detail ? (
+          <div className="mt-5 border border-eve-red/15 bg-[#080808]/80 px-4 py-6 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
+            {error ?? "Match detail is unavailable for the selected card."}
+          </div>
+        ) : null}
+
+        {!isLoading && detail ? (
+          <div className="mt-5 space-y-4">
+            <MatchDetailSummary detail={detail} />
+
+            {joinCta ? (
+              <div className="space-y-3 border border-eve-red/15 bg-[#080808]/80 px-4 py-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Join Access</p>
+                <div className="flex flex-wrap gap-2">
+                  <JoinMatchAction joinCta={joinCta} />
+                  <Link href="/planning" className={actionLinkClass("ghost")}>
+                    Open Team Registry
+                  </Link>
+                </div>
+                {joinCta.blocker ? (
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+                    Hover the disabled join button to inspect the blocker.
+                  </p>
+                ) : (
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+                    Squad verified. Continue into Team Lobby to finish lock and payment.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            {detail.match.mode === "precision" ? (
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Target Nodes</p>
+                {detail.match.targetNodes.length === 0 ? (
+                  <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">No frozen target-node snapshot is available yet.</p>
+                ) : null}
+                {detail.match.targetNodes.map((node) => (
+                  <div key={node.objectId} className="border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-xs uppercase tracking-[0.16em]">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>{node.name}</span>
+                      <span className={urgencyTone(node.urgency)}>{node.urgency}</span>
+                    </div>
+                    <p className="mt-2 text-eve-offwhite/65">Fuel Fill: {Math.round(node.fillRatio * 100)}%</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Free Mode Recommendations</p>
+                  {hasLocation ? (
+                    <TacticalButton
+                      tone="ghost"
+                      onClick={() => onRefreshRecommendations(detail.match.id)}
+                      disabled={loadingRecommendationsFor === detail.match.id}
+                    >
+                      {loadingRecommendationsFor === detail.match.id ? "LOADING" : "REFRESH"}
+                    </TacticalButton>
+                  ) : null}
+                </div>
+
+                {!hasLocation ? (
+                  <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">Set your current location to unlock node recommendations.</p>
+                ) : null}
+
+                {hasLocation && recommendations.length === 0 ? (
+                  <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">No recommendations are available for the current context.</p>
+                ) : null}
+
+                {recommendations.map((recommendation) => (
+                  <div key={recommendation.node.id} className="border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-xs uppercase tracking-[0.16em]">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-black text-eve-offwhite">{recommendation.node.name}</span>
+                      <span className={urgencyTone(recommendation.node.urgency)}>{recommendation.node.urgency}</span>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      <MatchMetric
+                        label="Route"
+                        value={recommendation.distanceHops === 0 ? "ON SITE" : `${recommendation.distanceHops} JUMPS`}
+                      />
+                      <MatchMetric label="Score" value={recommendation.score.toFixed(2)} tone="text-eve-yellow" />
+                    </div>
+                    <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/52">{recommendation.reason}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function LobbyDiscoveryScreen() {
   const controller = useLobbyDiscoveryScreenController();
   const { location, lobby, selectedMatch, ui, actions, helpers } = controller;
@@ -325,208 +478,112 @@ export function LobbyDiscoveryScreen() {
       bannerMessage={lobby.error ?? location.error ?? undefined}
       bannerTone="error"
     >
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,0.9fr)]">
-        <div className="space-y-4">
-          <TacticalPanel title="My Position" eyebrow="Navigation Anchor">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/65">
-                  {location.location
-                    ? `${location.location.systemName ?? `System ${location.location.systemId}`} / ${
-                        location.location.constellationName ?? `Constellation ${location.location.constellationId}`
-                      }`
-                    : "Location Not Set"}
-                </p>
-                <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-eve-red/80">
-                  {location.location
-                    ? `Region ${location.location.regionId} // Distance hints and recommendations online`
-                    : "Set your location to unlock hop distance hints and free-mode recommendations"}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <TacticalButton onClick={actions.openCreateMatch}>
-                  CREATE MATCH
+      <section className="space-y-4">
+        <TacticalPanel title="My Position" eyebrow="Navigation Anchor">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/65">
+                {location.location
+                  ? `${location.location.systemName ?? `System ${location.location.systemId}`} / ${
+                      location.location.constellationName ?? `Constellation ${location.location.constellationId}`
+                    }`
+                  : "Location Not Set"}
+              </p>
+              <p className="mt-2 text-[10px] uppercase tracking-[0.22em] text-eve-red/80">
+                {location.location
+                  ? `Region ${location.location.regionId} // Distance hints and recommendations online`
+                  : "Set your location to unlock hop distance hints and free-mode recommendations"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <TacticalButton onClick={actions.openCreateMatch}>
+                CREATE MATCH
+              </TacticalButton>
+              <TacticalButton onClick={actions.openPicker}>
+                {location.location ? "CHANGE LOCATION" : "SET LOCATION"}
+              </TacticalButton>
+              {location.location ? (
+                <TacticalButton tone="ghost" onClick={() => actions.clearLocation()}>
+                  CLEAR
                 </TacticalButton>
-                <TacticalButton onClick={actions.openPicker}>
-                  {location.location ? "CHANGE LOCATION" : "SET LOCATION"}
-                </TacticalButton>
-                {location.location ? (
-                  <TacticalButton tone="ghost" onClick={() => actions.clearLocation()}>
-                    CLEAR
-                  </TacticalButton>
-                ) : null}
-              </div>
-            </div>
-          </TacticalPanel>
-
-          <TacticalPanel title="Mission Filters" eyebrow="Lobby Read Model">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
-                Mode
-                <select
-                  className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
-                  value={lobby.filters.mode}
-                  onChange={(event) => void lobby.actions.setFilters({ mode: event.target.value as typeof lobby.filters.mode })}
-                >
-                  <option value="all">All Modes</option>
-                  <option value="free">Free Mode</option>
-                  <option value="precision">Precision Mode</option>
-                </select>
-              </label>
-              <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
-                Status
-                <select
-                  className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
-                  value={lobby.filters.status}
-                  onChange={(event) => void lobby.actions.setFilters({ status: event.target.value as typeof lobby.filters.status })}
-                >
-                  <option value="lobby">Recruiting</option>
-                  <option value="prestart">Prestart</option>
-                  <option value="running">Running</option>
-                  <option value="settled">Settled</option>
-                </select>
-              </label>
-              <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
-                Distance
-                <select
-                  className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
-                  value={lobby.filters.distance}
-                  onChange={(event) => void lobby.actions.setFilters({ distance: event.target.value as typeof lobby.filters.distance })}
-                >
-                  <option value="all">All Distances</option>
-                  <option value="same_system">Same System</option>
-                  <option value="same_constellation">Same Constellation</option>
-                  <option value="within_2">Within 2 Jumps</option>
-                </select>
-              </label>
-            </div>
-          </TacticalPanel>
-
-          <TacticalPanel title="Active Matches" eyebrow="Discovery">
-            <div className="space-y-3">
-              {lobby.loadingMatches ? (
-                <p className="border border-eve-red/25 bg-[#080808] px-3 py-3 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
-                  Loading lobby read model...
-                </p>
               ) : null}
-
-              {!lobby.loadingMatches && lobby.matches.length === 0 ? (
-                <p className="border border-eve-red/25 bg-[#080808] px-3 py-3 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
-                  No matches available for the current filters.
-                </p>
-              ) : null}
-
-              {lobby.matches.map((match) => {
-                const selected = lobby.selectedMatchId === match.id;
-                const joinCta = helpers.getJoinCta(match);
-
-                return (
-                  <MatchCard
-                    key={match.id}
-                    match={match}
-                    selected={selected}
-                    onSelect={() => void lobby.actions.openMatch(match.id)}
-                    joinCta={joinCta}
-                  />
-                );
-              })}
             </div>
-          </TacticalPanel>
-        </div>
+          </div>
+        </TacticalPanel>
 
-        <div className="space-y-4">
-          <TacticalPanel title="Match Detail" eyebrow="Preview">
-            {!selectedMatch ? (
-              <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/70">Select a match on the left to inspect its detail.</p>
-            ) : (
-              <div className="space-y-4">
-                <MatchDetailSummary detail={selectedMatch} />
-                {(() => {
-                  const joinCta = helpers.getJoinCta(selectedMatch.match);
+        <TacticalPanel title="Mission Filters" eyebrow="Lobby Read Model">
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+              Mode
+              <select
+                className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
+                value={lobby.filters.mode}
+                onChange={(event) => void lobby.actions.setFilters({ mode: event.target.value as typeof lobby.filters.mode })}
+              >
+                <option value="all">All Modes</option>
+                <option value="free">Free Mode</option>
+                <option value="precision">Precision Mode</option>
+              </select>
+            </label>
+            <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+              Status
+              <select
+                className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
+                value={lobby.filters.status}
+                onChange={(event) => void lobby.actions.setFilters({ status: event.target.value as typeof lobby.filters.status })}
+              >
+                <option value="lobby">Recruiting</option>
+                <option value="prestart">Prestart</option>
+                <option value="running">Running</option>
+                <option value="settled">Settled</option>
+              </select>
+            </label>
+            <label className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
+              Distance
+              <select
+                className="mt-2 w-full border border-eve-red/25 bg-[#080808] px-3 py-2 text-xs text-eve-offwhite outline-none"
+                value={lobby.filters.distance}
+                onChange={(event) => void lobby.actions.setFilters({ distance: event.target.value as typeof lobby.filters.distance })}
+              >
+                <option value="all">All Distances</option>
+                <option value="same_system">Same System</option>
+                <option value="same_constellation">Same Constellation</option>
+                <option value="within_2">Within 2 Jumps</option>
+              </select>
+            </label>
+          </div>
+        </TacticalPanel>
 
-                  return (
-                    <div className="space-y-3 border border-eve-red/15 bg-[#080808]/80 px-4 py-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Join Access</p>
-                      <div className="flex flex-wrap gap-2">
-                        <JoinMatchAction joinCta={joinCta} />
-                        <Link href="/planning" className={actionLinkClass("ghost")}>
-                          Open Team Registry
-                        </Link>
-                      </div>
-                      {joinCta.blocker ? (
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
-                          Hover the disabled join button to inspect the blocker.
-                        </p>
-                      ) : (
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-eve-offwhite/65">
-                          Squad verified. Continue into Team Lobby to finish lock and payment.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
+        <TacticalPanel title="Active Matches" eyebrow="Discovery">
+          <div className="space-y-3">
+            {lobby.loadingMatches ? (
+              <p className="border border-eve-red/25 bg-[#080808] px-3 py-3 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
+                Loading lobby read model...
+              </p>
+            ) : null}
 
-                {selectedMatch.match.mode === "precision" ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Target Nodes</p>
-                    {selectedMatch.match.targetNodes.length === 0 ? (
-                      <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">No frozen target-node snapshot is available yet.</p>
-                    ) : null}
-                    {selectedMatch.match.targetNodes.map((node) => (
-                      <div key={node.objectId} className="border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-xs uppercase tracking-[0.16em]">
-                        <div className="flex items-center justify-between gap-3">
-                          <span>{node.name}</span>
-                          <span className={urgencyTone(node.urgency)}>{node.urgency}</span>
-                        </div>
-                        <p className="mt-2 text-eve-offwhite/65">Fuel Fill: {Math.round(node.fillRatio * 100)}%</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-eve-red/90">Free Mode Recommendations</p>
-                      {location.location ? (
-                        <TacticalButton
-                          tone="ghost"
-                          onClick={() => void lobby.actions.loadRecommendations(selectedMatch.match.id)}
-                          disabled={lobby.loadingRecommendationsFor === selectedMatch.match.id}
-                        >
-                          {lobby.loadingRecommendationsFor === selectedMatch.match.id ? "LOADING" : "REFRESH"}
-                        </TacticalButton>
-                      ) : null}
-                    </div>
+            {!lobby.loadingMatches && lobby.matches.length === 0 ? (
+              <p className="border border-eve-red/25 bg-[#080808] px-3 py-3 text-xs uppercase tracking-[0.18em] text-eve-offwhite/75">
+                No matches available for the current filters.
+              </p>
+            ) : null}
 
-                    {!location.location ? (
-                      <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">Set your current location to unlock node recommendations.</p>
-                    ) : null}
+            {lobby.matches.map((match) => {
+              const selected = lobby.selectedMatchId === match.id;
+              const joinCta = helpers.getJoinCta(match);
 
-                    {location.location && lobby.recommendations.length === 0 ? (
-                      <p className="text-xs uppercase tracking-[0.18em] text-eve-offwhite/60">No recommendations are available for the current context.</p>
-                    ) : null}
-
-                    {lobby.recommendations.map((recommendation) => (
-                      <div key={recommendation.node.id} className="border border-eve-red/20 bg-[#080808]/80 px-3 py-3 text-xs uppercase tracking-[0.16em]">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-black text-eve-offwhite">{recommendation.node.name}</span>
-                          <span className={urgencyTone(recommendation.node.urgency)}>{recommendation.node.urgency}</span>
-                        </div>
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          <MatchMetric
-                            label="Route"
-                            value={recommendation.distanceHops === 0 ? "ON SITE" : `${recommendation.distanceHops} JUMPS`}
-                          />
-                          <MatchMetric label="Score" value={recommendation.score.toFixed(2)} tone="text-eve-yellow" />
-                        </div>
-                        <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-eve-offwhite/52">{recommendation.reason}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </TacticalPanel>
-        </div>
+              return (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  selected={selected}
+                  onSelect={() => void actions.openMatchDetail(match.id)}
+                  joinCta={joinCta}
+                />
+              );
+            })}
+          </div>
+        </TacticalPanel>
       </section>
 
       {ui.pickerOpen ? (
@@ -702,6 +759,20 @@ export function LobbyDiscoveryScreen() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {ui.detailOpen ? (
+        <MatchDetailModal
+          detail={selectedMatch}
+          isLoading={lobby.loadingDetail}
+          error={lobby.error}
+          joinCta={selectedMatch ? helpers.getJoinCta(selectedMatch.match) : null}
+          recommendations={lobby.recommendations}
+          loadingRecommendationsFor={lobby.loadingRecommendationsFor}
+          hasLocation={Boolean(location.location)}
+          onClose={actions.closeMatchDetail}
+          onRefreshRecommendations={(matchId) => void lobby.actions.loadRecommendations(matchId)}
+        />
       ) : null}
     </FuelMissionShell>
   );

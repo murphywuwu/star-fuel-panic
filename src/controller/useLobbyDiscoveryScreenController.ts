@@ -76,6 +76,7 @@ export function useLobbyDiscoveryScreenController() {
 
   const [createMatchOpen, setCreateMatchOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [expandedRegionId, setExpandedRegionId] = useState<number | null>(null);
   const [expandedConstellationId, setExpandedConstellationId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,6 +108,27 @@ export function useLobbyDiscoveryScreenController() {
 
     void teamDossier.actions.load(auth.state.walletAddress);
   }, [auth.state.isConnected, auth.state.walletAddress, teamDossier.actions]);
+
+  useEffect(() => {
+    if (!detailOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDetailOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [detailOpen]);
+
+  useEffect(() => {
+    if (detailOpen && !lobby.selectedMatchId) {
+      setDetailOpen(false);
+    }
+  }, [detailOpen, lobby.selectedMatchId]);
 
   useEffect(() => {
     if (!pickerOpen) {
@@ -187,6 +209,11 @@ export function useLobbyDiscoveryScreenController() {
     await lobby.actions.openMatch(matchId);
   };
 
+  const openMatchDetail = async (matchId: string) => {
+    setDetailOpen(true);
+    await lobby.actions.openMatch(matchId);
+  };
+
   return {
     location,
     lobby,
@@ -194,6 +221,7 @@ export function useLobbyDiscoveryScreenController() {
     ui: {
       createMatchOpen,
       pickerOpen,
+      detailOpen,
       expandedRegionId,
       expandedConstellationId,
       searchQuery,
@@ -205,6 +233,8 @@ export function useLobbyDiscoveryScreenController() {
       closeCreateMatch: () => setCreateMatchOpen(false),
       openPicker: () => setPickerOpen(true),
       closePicker: () => setPickerOpen(false),
+      openMatchDetail,
+      closeMatchDetail: () => setDetailOpen(false),
       clearLocation: () => location.clearLocation(),
       handleSystemSelect,
       handleSearchChange,

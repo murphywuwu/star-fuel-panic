@@ -144,8 +144,9 @@ async function buildNodes(options: { forceRefresh?: boolean } = {}) {
   // Write to local store
   writePersistedNetworkNodes(indexedNodes);
 
-  // Write to Supabase (for production persistence)
-  if (isSupabaseRuntimeStoreAvailable() && indexedNodes.length > 0) {
+  // Keep passive discovery/detail reads side-effect free.
+  // Supabase projection writes are reserved for explicit refresh/worker sync paths.
+  if (options.forceRefresh && isSupabaseRuntimeStoreAvailable() && indexedNodes.length > 0) {
     writeNetworkNodesToSupabase(indexedNodes).catch((error) => {
       console.error("[nodeRuntime] Failed to write to Supabase:", error);
     });

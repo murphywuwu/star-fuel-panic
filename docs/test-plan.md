@@ -6,7 +6,7 @@
 - Related PRD: `docs/PRD.md` v2.7.0
 - Related SPEC: `docs/SPEC.md` v6.5
 - Related TODO: `docs/TODO.md` v2.7.0
-- Version: v1.11
+- Version: v1.12
 - Status: In Progress
 - Owner (Testing Agent): Codex
 - Last Updated: 2026-04-01
@@ -51,6 +51,8 @@
   - F-019 `T-1901`: match-specific Team Lobby inherits match `teamSize`, enforces fixed role-slot total, and charges `entryFee × teamSize`
   - F-019 `T-1902`: `/planning?matchId=` routes into Team Lobby and surfaces fixed roster + team entry fee
   - F-019 `T-1903`: fixed team-size pricing model passes targeted runtime/API/build/layer verification
+  - F-023 `T-2300`: `/lobby` match detail opens in a modal instead of a fixed right sidebar
+  - F-023 `T-2301`: lobby detail modal change passes build and architecture guardrails
   - F-022 `T-2200`: `POST /api/matches` no longer performs full backend hydrate before persisting a new draft
   - F-022 `T-2201`: create-draft route regression covers the Vercel timeout path and verifies no `GET /rest/v1/matches?select=*` prefetch
   - F-008 `T-0800`: `fuelConfigRuntime` loads `FuelConfig.fuel_efficiency` and keeps stale fallback on failure
@@ -119,6 +121,7 @@
 | TC-0708-TOOL | 4.x / 6.1 | QA / Tooling | T-0708 | P1 |
 | TC-1900-MATCH-TEAMSIZE | 4.1 / 4.3 | 2.4, 3.1, 7.1 | T-1900 / T-1901 | P0 |
 | TC-1902-TEAMLOBBY-ROUTE | 4.3 | 3.3, Architecture 4.1, 7.3 | T-1902 | P0 |
+| TC-2300-LOBBY-MODAL | 4.3 | 3.2, Architecture 4.4 | T-2300 / T-2301 | P1 |
 | TC-2200-CREATE-TIMEOUT | 4.1 | 4.2, 5.5, 6.1 | T-2200 / T-2201 | P0 |
 
 ## 4. Test Strategy
@@ -1009,6 +1012,11 @@ Detected during this pass:
   - 根因：planning team registry 只有 create/join 两个动作，没有独立申请事实层，也没有对应 API/UI 控制
   - 当前结论：独立战队需要独立的 `planning_team_applications` 事实层，并在 `/planning` 首屏直接提供 captain approval / member leave / captain disband
   - 当前状态：runtime、backend mirror、API、UI 和定向回归均已完成
+- `T-2300 / T-2301` 已完成
+  - 症状：`/lobby` 选中比赛后详情固定显示在右侧边栏，占用主视图区
+  - 根因：Lobby screen 采用双栏布局，把 `selectedMatchDetail` 常驻渲染在右侧 `Match Detail` panel
+  - 当前结论：保留现有 `selectedMatchDetail` 读模型和 join CTA 逻辑，只把展示形态切换为 modal，更符合当前交互目标
+  - 当前状态：`useLobbyDiscoveryScreenController` 已新增 detail modal 开关与 `Escape` 关闭；`LobbyDiscoveryScreen` 已切为单列列表 + 详情弹窗；`pnpm build` 与 `node ./scripts/check-layer-imports.mjs` 通过，未额外新增自动化 UI 测试
 - `T-2200 / T-2201` 已完成
   - 症状：线上 `POST /api/matches` 在 Vercel 返回 `FUNCTION_INVOCATION_TIMEOUT`
   - 根因：创建草稿前会无条件执行一次全量 backend hydrate，额外扫 `matches / teams / team_members / match_targets / settlements`；随后 draft 持久化又继续串行请求后端
