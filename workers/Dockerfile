@@ -16,4 +16,5 @@ COPY . .
 
 ENV WORKER_ENTRY=workers/runtimeSupervisor.ts
 
-CMD ["sh", "-lc", "node --experimental-strip-types \"$WORKER_ENTRY\""]
+# Use tsx to support TypeScript path aliases
+CMD ["npx", "tsx", "workers/runtimeSupervisor.ts"]

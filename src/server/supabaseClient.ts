@@ -3,6 +3,9 @@
  * Uses REST API directly for compatibility with both Next.js API routes and standalone workers.
  */
 
+// Timeout for Supabase requests (5 seconds) - prevents hanging on connection issues
+const SUPABASE_REQUEST_TIMEOUT_MS = 5000;
+
 type SupabaseConfig = {
   baseUrl: string;
   serviceRoleKey: string;
@@ -96,7 +99,8 @@ export async function supabaseSelect<T>(
       "Content-Type": "application/json",
       Prefer: options.single ? "return=representation,count=exact" : "return=representation"
     },
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -150,7 +154,8 @@ export async function supabaseInsert<T>(
       Prefer: prefer
     },
     body: JSON.stringify(rows),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -201,7 +206,8 @@ export async function supabaseUpsert<T>(
       Prefer: prefer
     },
     body: JSON.stringify(rows),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -246,7 +252,8 @@ export async function supabaseUpdate<T>(
       Prefer: prefer
     },
     body: JSON.stringify(data),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -284,7 +291,8 @@ export async function supabaseDelete(
       "Content-Type": "application/json",
       Prefer: "return=minimal"
     },
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -310,7 +318,8 @@ export async function supabaseRpc<T>(
       "Content-Type": "application/json"
     },
     body: JSON.stringify(params),
-    cache: "no-store"
+    cache: "no-store",
+    signal: AbortSignal.timeout(SUPABASE_REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {

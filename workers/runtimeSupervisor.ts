@@ -13,10 +13,12 @@ const restartDelayMs = Number(process.env.RUNTIME_SUPERVISOR_RESTART_DELAY_MS ??
 
 function spawnWorker(file: string): ChildProcess {
   const workerPath = path.join(process.cwd(), "workers", file);
-  const child = spawn(process.execPath, ["--experimental-strip-types", workerPath], {
+  // Use tsx to support TypeScript path aliases (@/server, @/types, etc.)
+  const child = spawn("npx", ["tsx", workerPath], {
     cwd: process.cwd(),
     env: process.env,
-    stdio: "inherit"
+    stdio: "inherit",
+    shell: true
   });
 
   child.on("exit", (code, signal) => {
